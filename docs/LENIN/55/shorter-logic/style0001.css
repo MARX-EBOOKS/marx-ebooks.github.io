@@ -3,7 +3,7 @@
   display: block;
   font-size: 1.41667em;
   font-weight: bold;
-  line-height: 1.2;
+line-height:1.5em;
   text-align: center;
   text-indent: 0;
   margin: 0.5em auto 2.5em;
@@ -13,9 +13,10 @@
   display: block;
   font-size: 1.41667em;
   font-weight: bold;
-  line-height: 1.2;
+  line-height: 1.5em;
   text-align: center;
   margin: 1.5em 0 0.8em;
+
 }
 .bodycontent-text {
   display: block;
@@ -23,6 +24,7 @@
   text-indent: 2em;
   padding: 0;
   margin: 0 0;
+  line-height: 1.5em;
 }
 .bodycontent-text_center {
   display: block;
@@ -30,34 +32,40 @@
   font-weight: bold;
   text-align: center;
   margin: 1em 0;
+  line-height: 1.5em;
 }
 .bodycontent-text_right {
   display: block;
   font-size: 1em;
   text-align: right;
   margin: 1em 0;
+  line-height: 1.5em;
 }
 .bodycontent-text_yinwen {
   display: block;
   font-size: 1em;
   text-indent: 2em;
   margin: 1em 0;
+  line-height: 1.5em;
 }
 .bodycontent-text-bold {
   display: block;
   margin: 1em 0;
+  line-height: 1.5em;
 }
 .bodycontent-third-title {
   display: block;
   font-size: 1.125em;
   font-weight: bold;
   margin: 1em 0 0.7em;
+  line-height: 1.5em;
 }
 .bodycontent-third-title1 {
   display: block;
   font-size: 1.125em;
   font-weight: bold;
   margin: 1em 0;
+  line-height: 1.5em;
 }
 .h {
   display: block;
@@ -101,7 +109,7 @@
   font-size: 2em;
   font-weight: bold;
   letter-spacing: 1em;
-  line-height: 1.2;
+  line-height: 1.5em;
   margin-bottom: 1em;
   text-align: center;
   border-bottom: #000 dotted 1.5px;

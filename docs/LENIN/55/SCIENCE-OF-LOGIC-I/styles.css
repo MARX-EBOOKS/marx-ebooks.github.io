@@ -5,15 +5,19 @@ body {
     padding: 1em;
     font-size: 1em;
 color:#1F2937;
-background-color: #FAFAF8;}
+background-color: #FAFAF8;
+line-height:1.5em;
+}
 
 p.quote,div.quote,span.quote {
     font-size: 0.75em;
     margin: 1.5em 1px 1.5em 1px;
+line-height:1.45em;
 }
 table.quote  {
     font-size: 0.75em;
     margin: 1.5em auto 1.5em auto;
+line-height:1.45em;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -21,6 +25,7 @@ h1, h2, h3, h4, h5, h6 {
     margin-bottom: 0.5em;
     font-weight: bold;
     text-align:center;
+line-height:1.5em;
 }
 
 
@@ -28,6 +33,7 @@ p.date,div.date {
     font-size: 0.75em;
     margin: 1.5em auto 1.5em auto;
     text-align:center;
+line-height:1.45em;
 }
 span.cq,div.cq {
 text-align:center;

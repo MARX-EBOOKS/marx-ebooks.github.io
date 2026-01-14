@@ -16,7 +16,7 @@
 /* General								*/
 /* =====================================*/
 
-body {background-color: #FAFAF8; color:#1F2937;; margin-right:5px; margin-left:5px;  -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;}
+body {background-color: #FAFAF8; color:#1F2937;; margin-right:5px; margin-left:5px;  -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;line-height:1.5em;}
 a:link {color: #000099; background: transparent }
 a:visited {color: #883399; background: transparent }
 a.mecw {color: #aaaaaa; background: transparent; text-decoration: none }
@@ -70,6 +70,7 @@ H1 {
  font-size: xx-large; 
  font-family: "Hoefler Text", "Century Schoolbook", "Georgia", serif;
  text-align: center; 
+margin:2.5em
  }
  
  H1.big {
@@ -79,7 +80,7 @@ H1 {
  font-size: 28pt; 
  font-family: "Hoefler Text", "Century Schoolbook", "Georgia", serif;
  text-align: center; 
-
+margin:5em
  }
 
 /* Authors' name */
@@ -91,7 +92,7 @@ H2 {
  line-height: 150%;
  font-family: "Helvetica", "Arial", sans-serif;
  text-align: center; 
-
+margin:2.5em
  }
 
 /* Chapter Title */
@@ -103,7 +104,7 @@ H3 {
  font-family : "Century Schoolbook", "Hoefler Text", "Georgia", serif;
  line-height: 150%;
  font-size: 22pt; 
-
+margin:2.5em
  }
  
 /* Section Title */
@@ -115,7 +116,7 @@ H4 {
  font-family : "Arial", sans-serif;
  font-size: 14pt;  
  line-height: 150%;
-
+margin:2em
  }
  
 /* Sub Section 2 */
@@ -127,7 +128,7 @@ H5 {
  font-family : "Arial", sans-serif;
  font-size: 12pt;  
  line-height: 175%;
-
+margin:2em
  }
  
 /* Sub Section 3 */
@@ -139,7 +140,7 @@ H6 {
  font-family : "Arial", sans-serif;
  font-size: 12pt;  
  line-height: 175%;
-
+margin:2em
  }
 
  /* Sub Section 4 */
@@ -151,7 +152,7 @@ H7 {
  font-family : "Arial", sans-serif;
  font-size: 12pt;  
  line-height: 175%;
-
+margin:2em
  }
 
  

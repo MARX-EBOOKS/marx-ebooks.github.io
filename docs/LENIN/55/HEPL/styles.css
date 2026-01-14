@@ -1,7 +1,6 @@
 
 body {
     font-family:"Baskerville Old Face",Garamond,"Times New Roman",serif;
-    line-height: 1.2;
     margin: 0;
     padding: 1em;
     font-size: 1em;
@@ -9,7 +8,9 @@ body {
     text-align: justify;
     text-justify: inter-word;
 color:#1F2937;
-background-color: #FAFAF8;}
+background-color: #FAFAF8;
+line-height:1.5em;
+}
 
 .mbppagebreak {
     display: block;
@@ -23,22 +24,25 @@ font-style: italic;
 font-family:Garamond;
 }
 h1, h2 {
+    margin-top:2em;
+    margin-bottom: 0em;
+    font-weight: bold;
+    text-align:center;
+line-height:1.5em;
+}
+h3, h4 {
     margin-top: 1.5em;
     margin-bottom: 0.5em;
     font-weight: bold;
     text-align:center;
-}
-h3, h4 {
-    margin-top: 1em;
-    margin-bottom: 0.5em;
-    font-weight: bold;
-    text-align:center;
+line-height:1.5em;
 }
 h5 {
     margin-top: 0.5em;
-    margin-bottom: 0em;
+    margin-bottom: 0.5em;
     font-weight: bold;
     font-size: 1em;
+line-height:1.5em;
 }
 h6 {
     margin-top: 0.5em;
@@ -46,6 +50,7 @@ h6 {
     font-weight: bold;
     text-align:center;
     font-size: 1em;
+line-height:1.5em;
 }
 img {
     max-width: 100%;

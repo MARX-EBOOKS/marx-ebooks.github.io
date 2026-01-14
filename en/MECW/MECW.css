@@ -1,0 +1,49 @@
+/* This defines styles and classes used in the book */
+body {background-color: #FAFAF8; color:#1F2937; margin-right:5px; margin-left:5px;  -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;line-height:1.5em;}
+code { font-family: monospace; }
+h1,h2 {text-align:center;margin:1.5em;line-height:150%;}
+h3,h4,h5,h6 {text-align:center;margin:1em;line-height:150%;}
+table {margin:1.5em;max-width:100vw;!important}
+a {color: #2563EB;text-decoration: underline;}/*#1A0DAB;*/
+a:visited {color: #4B6CB7;}
+a:hover, a:focus {color: #1E40AF;}/*#2563EB;#6B7280*/
+h1.title { }
+h2.author {font-size:0.8em;}
+h3.date {font-size:0.8em;}
+nav#toc ol,
+nav#landmarks ol { padding: 0; margin-left: 1em; }
+nav#toc ol li,
+nav#landmarks ol li { list-style-type: none; margin: 0; padding: 0; }
+a.footnote-ref { vertical-align: super; }
+em, em em em, em em em em em { font-style: italic;}
+em em, em em em em { font-style: normal; }
+code{ white-space: pre-wrap; }
+span.smallcaps{ font-variant: small-caps; }
+span.underline{ text-decoration: underline; }
+q { quotes: "“" "”" "‘" "’"; }
+div.column{ display: inline-block; vertical-align: top; width: 50%; }
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+blockquote {margin-right:5px; margin-left:5px; margin-top:2em; margin-bottom:2em; font-size:0.8em;line-height:1.5em;}
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #121212;
+    color: #e0e0e0;
+  }
+a {
+  color: #79c0ff;  
+  text-decoration: underline;
+}
+
+a:visited {
+  color:  #0969da;
+}
+
+a:hover, a:focus {
+  color: #a3d4ff;
+  text-decoration: underline;
+}
+
+a:active {
+  color:  #ff6b6b; 
+}
+}
