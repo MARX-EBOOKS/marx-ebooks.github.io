@@ -11,7 +11,7 @@ color:#1F2937;
 background-color: #FAFAF8;
 line-height:200%;
 }
-p,div {text-indent:1em;margin:1em 10px 1em 10px;line-height:200%;}
+p,div {text-indent:1em;margin:1em 0.5% 1em 0.5%;line-height:200%;}
 .mbppagebreak {
     display: block;
     margin-bottom: 0;

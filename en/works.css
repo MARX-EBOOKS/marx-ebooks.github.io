@@ -16,7 +16,7 @@
 /* General								*/
 /* =====================================*/
 
-body {background-color: #FAFAF8; color:#1F2937;font-family:"Times New Roman","Baskerville Old Face"，Arial,Helvetica,serif; margin-right:10px; margin-left:10px;  -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;line-height:200%;font-size:1.25em;}
+body {background-color: #FAFAF8; color:#1F2937;font-family:"Times New Roman","Baskerville Old Face"，Arial,Helvetica,serif; margin-right:0.5%; margin-left:0.5%;  -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;line-height:200%;font-size:1.25em;}
 a:link {color: #000099; background: transparent }
 a:visited {color: #883399; background: transparent }
 a.mecw {color: #aaaaaa; background: transparent; text-decoration: none }
