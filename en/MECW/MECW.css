@@ -1,8 +1,8 @@
 /* This defines styles and classes used in the book */
-body {background-color: #FAFAF8; color:#1F2937; margin-right:5px; margin-left:5px;  -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;line-height:1.5em;}
+body {background-color: #FAFAF8; color:#1F2937; margin-right:10px; margin-left:10px;  -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;line-height:200%;font-family:"Times New Roman","Baskerville Old Face",Arial,Helvetica,serif;font-size:1.25em;}
 code { font-family: monospace; }
-h1,h2 {text-align:center;margin:1.5em;line-height:150%;}
-h3,h4,h5,h6 {text-align:center;margin:1em;line-height:150%;}
+h1,h2 {text-align:center;margin:1.5em;line-height:200%;}
+h3,h4,h5,h6 {text-align:center;margin:1em;line-height:200%;}
 table {margin:1.5em;max-width:100vw;!important}
 a {color: #2563EB;text-decoration: underline;}/*#1A0DAB;*/
 a:visited {color: #4B6CB7;}
@@ -16,14 +16,15 @@ nav#toc ol li,
 nav#landmarks ol li { list-style-type: none; margin: 0; padding: 0; }
 a.footnote-ref { vertical-align: super; }
 em, em em em, em em em em em { font-style: italic;}
-em em, em em em em { font-style: normal; }
+em em, em em em em { font-style: normal;}
 code{ white-space: pre-wrap; }
 span.smallcaps{ font-variant: small-caps; }
 span.underline{ text-decoration: underline; }
+p,div {text-indent:1em;margin:1em 10px 1em 10px;line-height:200%;}
 q { quotes: "“" "”" "‘" "’"; }
 div.column{ display: inline-block; vertical-align: top; width: 50%; }
 div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
-blockquote {margin-right:5px; margin-left:5px; margin-top:2em; margin-bottom:2em; font-size:0.8em;line-height:1.5em;}
+blockquote {margin-right:10px; margin-left:10px; margin-top:1em; margin-bottom:1em; font-size:0.75em;line-height:150%;}
 @media (prefers-color-scheme: dark) {
   body {
     background-color: #121212;
