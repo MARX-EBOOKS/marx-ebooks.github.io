@@ -8,7 +8,10 @@ p,div {text-indent:1em;margin:1em 0.5% 1em 0.5%;line-height:200%;}
 a {color: #2563EB;text-decoration: underline;}/*#1A0DAB;*/
 a:visited {color: #4B6CB7;}
 a:hover, a:focus {color: #1E40AF;}/*#2563EB;#6B7280*/
-
+.table-wrapper {
+  overflow-x: auto;
+  max-width: 100%;
+}
 @media (prefers-color-scheme: dark) {
   body {
     background-color: #1e1e1e;

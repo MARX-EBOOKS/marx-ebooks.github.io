@@ -1,93 +1,100 @@
-(function () {
-  'use strict';
+const ALLOWED_PATHS = [
+  /\/LENIN\/.+/,      
+  /\/MEW-ZH\/.+/,     
+  /\/MEW\/.+/,        
+  /\/MEA\/.+/,        
+  /\/VIL\/.+/
+];
 
- 
-  const CONFIG = {
-    enableTableScroll: true,
-    enableProgress: true,
-    saveInterval: 1000,
-    storagePrefix: 'reader-progress:',
-    restoreOffset: 0
-  };
+function isPathAllowed() {
+  const path = window.location.pathname;
+  return ALLOWED_PATHS.some(function(regex) {
+    return regex.test(path);
+  });
+}
 
-   
-  function getPageKey() {
-    return (
-      location.pathname +
-      location.search +
-      location.hash.replace(/#.*/, '')
-    );
+function shouldRestore() {
+  const params = new URLSearchParams(window.location.search);
+  return params.has('rd');
+}
+
+window.addEventListener('load', function() {
+  if (!isPathAllowed()) return;
+  if (!shouldRestore()) return;
+  
+  const key = 'scroll_' + window.location.pathname;
+  const saved = localStorage.getItem(key);
+  if (saved) {
+    window.scrollTo(0, parseInt(saved));
   }
+});
 
-  function storageKey() {
-    return CONFIG.storagePrefix + getPageKey();
-  }
+window.addEventListener('scroll', function() {
+  if (!isPathAllowed()) return;
+  if (!shouldRestore()) return;
+  
+  const key = 'scroll_' + window.location.pathname;
+  localStorage.setItem(key, window.scrollY);
+});
 
-  function restoreProgress() {
-    if (!CONFIG.enableProgress) return;
-
-    const saved = localStorage.getItem(storageKey());
-    if (!saved) return;
-
-    const y = parseInt(saved, 10);
-    if (isNaN(y)) return;
-
-    requestAnimationFrame(() => {
-      window.scrollTo(0, Math.max(0, y - CONFIG.restoreOffset));
+function addParamToLinks() {
+  const params = new URLSearchParams(window.location.search);
+  
+  if (params.has('rd')) {
+    document.querySelectorAll('a').forEach(function(link) {
+      const href = link.getAttribute('href');
+      
+      if (link.dataset.paramAdded) return;
+      
+      if (href && !href.startsWith('http') && !href.startsWith('javascript:') && !href.startsWith('mailto:')) {
+        const hashIndex = href.indexOf('#');
+        let path = hashIndex > -1 ? href.substring(0, hashIndex) : href;
+        let hash = hashIndex > -1 ? href.substring(hashIndex) : '';
+        
+        if (path && !path.includes('?')) {
+          link.href = path + '?rd' + hash;
+          link.dataset.paramAdded = 'true';
+        }
+      }
     });
   }
-
-  function bindProgressSaver() {
-    if (!CONFIG.enableProgress) return;
-
-    let timer = null;
-    window.addEventListener(
-      'scroll',
-      function () {
-        if (timer) return;
-        timer = setTimeout(() => {
-          localStorage.setItem(storageKey(), window.scrollY);
-          timer = null;
-        }, CONFIG.saveInterval);
-      },
-      { passive: true }
-    );
-  }
-
-  function makeTablesScrollable() {
-  document.querySelectorAll('table').forEach(function (table) {
-    if (table.parentNode.classList.contains('table-scroll')) return;
-
-    var wrapper = document.createElement('div');
-    wrapper.className = 'table-scroll';
-    wrapper.style.overflowX = 'auto';
-    wrapper.style.maxWidth = '100%';
-    wrapper.style.webkitOverflowScrolling = 'touch';
-    table.parentNode.insertBefore(wrapper, table);
-    wrapper.appendChild(table);
-  });
 }
-function makeImgScrollable() {
-  document.querySelectorAll('img').forEach(function (img) {
-    if (!img.parentNode) return;
-    if (img.parentNode.classList?.contains('img-scroll')) return;
-    var d = document.createElement('div');
-    d.className = 'img-scroll';
-    d.style.overflowX = 'auto';
-    d.style.webkitOverflowScrolling = 'touch';
-    d.style.maxWidth = '100%';
-    img.parentNode.insertBefore(d, img);
-    d.appendChild(img);
-  });
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', addParamToLinks);
+} else {
+  addParamToLinks();
 }
-  function init() {
-    restoreProgress();
-    bindProgressSaver();
-    makeTablesScrollable();
+
+window.addEventListener('load', function() {
+  document.querySelectorAll('table').forEach(function(table) {
+    if (table.offsetWidth > table.parentElement.offsetWidth) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'table-wrapper';
+      table.parentNode.insertBefore(wrapper, table);
+      wrapper.appendChild(table);
+    }
+  });
+  
+  document.querySelectorAll('img').forEach(function(img) {
+    if (img.style.maxWidth) return;
+    
+    if (img.complete) {
+      checkImageWidth(img);
+    } else {
+      img.addEventListener('load', function() {
+        checkImageWidth(img);
+      });
+    }
+  });
+});
+
+function checkImageWidth(img) {
+  const containerWidth = img.parentElement.offsetWidth;
+  const imageWidth = img.naturalWidth || img.width;
+  
+  if (imageWidth > containerWidth) {
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
   }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-})();
+}

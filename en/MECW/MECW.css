@@ -26,6 +26,10 @@ div.column{ display: inline-block; vertical-align: top; width: 50%; }
 div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
 blockquote {margin-right:0.5%; margin-left:0.5%; margin-top:1em; margin-bottom:1em; font-size:0.75em;line-height:150%;}
 .volc {width:85%;text-align:justify;margin:1em auto;text-indent:0;}
+.table-wrapper {
+  overflow-x: auto;
+  max-width: 100%;
+}
 @media (prefers-color-scheme: dark) {
   body {
     background-color: #121212;
