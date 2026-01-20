@@ -1,11 +1,5 @@
 // 配置:需要记录位置的页面路径正则表达式
-const ALLOWED_PATHS = [
-  /\/LENIN\/.+/,      
-  /\/MEW-ZH\/.+/,     
-  /\/MEW\/.+/,        
-  /\/MEA\/.+/,        
-  /\/VIL\/.+/
-];
+const ALLOWED_PATHS = [/^.+$/];
 
 function isPathAllowed() {
   const path = window.location.pathname;
