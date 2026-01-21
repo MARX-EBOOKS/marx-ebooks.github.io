@@ -1,4 +1,4 @@
-BODY {color:#000;background:#FFFFFF;-webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;margin-left:10%;margin-right:10%;font-family:Arial,Helvetica,sans-serif,"Times New Roman";background-color: #FAFAF8;line-height:200%;font-size:1.25em;}
+BODY {color:#000;background:#FFFFFF;-webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;margin-left:10%;margin-right:10%;font-family:Arial,Helvetica,sans-serif,"Times New Roman";background-color:#EEF0F5;line-height:200%;font-size:1.25em;}
 TD P {margin-left:1%;margin-right:1%}
 .wde {margin-left:0;margin-right:0}
 TABLE{margin-left:0;margin-right:0}
@@ -21,7 +21,7 @@ SMALL HR {text-align:LEFT}
   body {
     background-color: #121212;
     color: #e0e0e0;
-  background-color: #FAFAF8;}
+  background-color:#EEF0F5;}
 a {
   color: #79c0ff;  
   text-decoration: underline;

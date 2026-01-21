@@ -1,16 +1,17 @@
 body {
     font-family:"Times New Roman","Baskerville Old Face",Arial,Helvetica,serif;
-    margin: 0;
+    margin-right: 5%;
+    margin-left: 5%;
     padding: 1em;
     font-size: 1em;
 -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;
     text-align: justify;
     text-justify: inter-word;
-color:#1F2937;
-background-color: #FAFAF8;
+color:#2D3A53;
+background-color:#EEF0F5;
 line-height:1.5em;
 }
-p {text-indent:1em;margin:1em 0.5% 1em 0.5%;line-height:200%;}
+p {text-indent:1em;margin:1em 0;line-height:200%;}
 .mbppagebreak {
     display: block;
     margin-bottom: 0;

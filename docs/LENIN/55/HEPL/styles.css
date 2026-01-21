@@ -7,8 +7,8 @@ body {
 -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;
     text-align: justify;
     text-justify: inter-word;
-color:#1F2937;
-background-color: #FAFAF8;
+color:#2D3A53;
+background-color:#EEF0F5;
 line-height:200%;
 }
 p,div {text-indent:1em;margin:1em 0.5% 1em 0.5%;line-height:200%;}

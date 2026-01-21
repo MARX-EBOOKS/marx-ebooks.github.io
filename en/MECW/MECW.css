@@ -1,5 +1,5 @@
 /* This defines styles and classes used in the book */
-body {background-color: #FAFAF8; color:#1F2937; margin-right:0.5%; margin-left:0.5%;  -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;line-height:200%;font-family:"Times New Roman","Baskerville Old Face",Arial,Helvetica,serif;font-size:1.25em;}
+body {color:#2D3A53;background-color:#EEF0F5; margin-right:5%; margin-left:5%;  -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;line-height:200%;font-family:"Times New Roman","Baskerville Old Face",Arial,Helvetica,serif;font-size:1.25em;}
 code { font-family: monospace; }
 h1,h2 {text-align:center;margin:1.5em;line-height:200%;}
 h3,h4,h5,h6 {text-align:center;margin:1em;line-height:200%;}
@@ -16,15 +16,15 @@ nav#toc ol li,
 nav#landmarks ol li { list-style-type: none; margin: 0; padding: 0; }
 a.footnote-ref { vertical-align: super; }
 em, em em em, em em em em em { font-style: italic;}
-em em, em em em em { font-style: normal;}
+i i,i i i i,em em, em em em em { font-style: normal;}
 code{ white-space: pre-wrap; }
 span.smallcaps{ font-variant: small-caps; }
 span.underline{ text-decoration: underline; }
-p,div {text-indent:1em;margin:1em 0.5% 1em 0.5%;line-height:200%;}
+p {text-indent:1em;margin:1em 0;line-height:200%;}
 q { quotes: "“" "”" "‘" "’"; }
 div.column{ display: inline-block; vertical-align: top; width: 50%; }
 div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
-blockquote {margin-right:0.5%; margin-left:0.5%; margin-top:1em; margin-bottom:1em; font-size:0.75em;line-height:150%;}
+blockquote,.Publication,.Collection {margin-right:0; margin-left:0; margin-top:1em; margin-bottom:1em; font-size:0.75em;line-height:150%;}
 .volc {width:85%;text-align:justify;margin:1em auto;text-indent:0;}
 .table-wrapper {
   overflow-x: auto;

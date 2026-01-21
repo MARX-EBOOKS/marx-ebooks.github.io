@@ -6,7 +6,7 @@ table {margin: 1.5em;max-width:100vw;}
 table.quote  {font-size: 0.75em; margin: 1.5em;}
 h1,h2 {font-family: "黑体"; text-align:center;margin:1.5em;line-height:200%;}
 h3,h4,h5,h6 {font-family: "黑体"; text-align:center;margin:1em;line-height:200%;}
-body {max-width: 100%;font-family: "华文中宋","黑体";color:#1F2937;background-color: #FAFAF8;line-height:200%;font-size:1.25em;text-align:justify;}/*#F9FAFB;#F7F7F5;#000000;*/
+body {max-width: 100%;font-family: "华文中宋","黑体";color:#2D3A53;background-color:#EEF0F5;line-height:200%;font-size:1.25em;text-align:justify;}/*#F9FAFB;#F7F7F5;#000000;*/
 p {margin: 0 1px 0 1px;line-height:200%;}
 p.quote,div.quote,span.quote {
     font-size: 0.75em;
