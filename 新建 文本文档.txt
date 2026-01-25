@@ -1,0 +1,76 @@
+// 配置:需要记录位置的页面路径正则表达式
+const ALLOWED_PATHS = [
+  /\/article\/.+/,     // 示例: /article/xxx
+  /\/post\/.+/,        // 示例: /post/xxx
+  /\/blog\/.+/         // 示例: /blog/xxx
+];
+
+// 检查当前路径是否允许记录位置
+function isPathAllowed() {
+  const path = window.location.pathname;
+  return ALLOWED_PATHS.some(function(regex) {
+    return regex.test(path);
+  });
+}
+
+// 检查是否从主页打开(通过URL参数判断)
+function isFromHomepage() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('from') === 'home';
+}
+
+// 如果当前页面有from=home参数,给所有站内链接也加上
+function propagateFromParam() {
+  if (!isFromHomepage()) return;
+  
+  document.querySelectorAll('a').forEach(function(link) {
+    try {
+      const url = new URL(link.href, window.location.origin);
+      // 只处理站内链接
+      if (url.origin === window.location.origin) {
+        url.searchParams.set('from', 'home');
+        link.href = url.toString();
+      }
+    } catch(e) {
+      // 忽略无效链接
+    }
+  });
+}
+
+// 1. 记录和恢复阅读位置
+window.addEventListener('load', function() {
+  if (!isPathAllowed()) return;
+  
+  // 如果是从主页直接打开的,不恢复位置
+  if (isFromHomepage()) return;
+  
+  const key = 'scroll_' + window.location.pathname;
+  const saved = localStorage.getItem(key);
+  if (saved) {
+    window.scrollTo(0, parseInt(saved));
+  }
+});
+
+window.addEventListener('scroll', function() {
+  if (!isPathAllowed()) return;
+  
+  const key = 'scroll_' + window.location.pathname;
+  localStorage.setItem(key, window.scrollY);
+});
+
+// 传递from参数到页面内所有链接
+window.addEventListener('DOMContentLoaded', function() {
+  propagateFromParam();
+});
+
+// 2. 给超宽表格加滚动条
+window.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('table').forEach(function(table) {
+    if (table.offsetWidth > table.parentElement.offsetWidth) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'table-wrapper';
+      table.parentNode.insertBefore(wrapper, table);
+      wrapper.appendChild(table);
+    }
+  });
+});
