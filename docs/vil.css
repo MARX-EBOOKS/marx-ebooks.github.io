@@ -29,8 +29,11 @@ a:hover, a:focus {color:#1E40AF;}/*#2563EB;#6B7280*/
 @media (prefers-color-scheme: dark) {
   body {
     background-color: #121212;
-    color: #e0e0e0;
-  background-color: #FAFAF8;}
+color:rgba(224,224,224,0.75);
+}
+h1,h2,h3,h4,h5,h6,b {
+ color:  #F0F0F0;
+}
 a {
   color: #79c0ff;  
   text-decoration: underline;

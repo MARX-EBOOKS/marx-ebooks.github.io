@@ -47,7 +47,7 @@ a:hover, a:focus {color:#1E40AF;}/*#2563EB;#6B7280*/
 @media (prefers-color-scheme: dark) {
   body {
     background-color: #1e1e1e;
-    color: #e0e0e0;
+color:rgba(224,224,224,0.75);
 }
 a {
   color: #64ABD5;
