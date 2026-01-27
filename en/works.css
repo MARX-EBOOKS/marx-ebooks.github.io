@@ -678,10 +678,10 @@ td.sdata {
  }
  
 @media (prefers-color-scheme: dark) {
-  body {
-    background-color: #121212;
-    color: #e0e0e0;
-  }
+    body {
+    background-color: #1e1e1e;
+color:rgba(224,224,224,0.75);
+}
 a {
   color: #79c0ff;  
   text-decoration: underline;
