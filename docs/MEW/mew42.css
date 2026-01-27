@@ -1,5 +1,5 @@
 .seitenzahlen {font-size:0.6em;}
-.zitat {font-size:0.75em;margin:1.5em;}
+.zitat {font-size:0.75em;margin:1.5em 0;}
 h1,h2,h3,h4,h5,h6 {text-align:center;margin:1em;}
 table {margin:1.5em;max-width:100vw;!important}
 BODY {-webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;font-family:Arial,Helvetica,sans-serif,"Times New Roman";color:#2D3A53;background-color:#EEF0F5;line-height:1.5em;}
