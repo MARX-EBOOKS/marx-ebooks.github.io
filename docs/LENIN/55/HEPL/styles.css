@@ -93,7 +93,7 @@ a {
 }
 
 a:visited {
-  color:  #8597AE
+  color:  #8597AE;
 }
 
 a:hover, a:focus {
@@ -112,7 +112,7 @@ a b,b a {
   text-decoration: underline;
 }
 a:visited  b,b a:visited{
-  color:  #8597AE
+  color:  #8597AE;
 }
 
 a:hover b, a:focus b ,b a:focus, b a:hover{

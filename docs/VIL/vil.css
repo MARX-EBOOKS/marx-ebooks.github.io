@@ -1,4 +1,4 @@
-BODY {color:#2D3A53;background-color:#EEF0F5;-webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;margin-left:10%;margin-right:10%;font-family:Arial,Helvetica,sans-serif,"Times New Roman";line-height:200%;font-size:1.25em;}
+BODY {color:#2D3A53;background-color:#EEF0F5;-webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;margin-left:5%;margin-right:5%;font-family:Arial,Helvetica,sans-serif,"Times New Roman";line-height:200%;font-size:1.25em;}
 TD P {margin-left:1%;margin-right:1%}
 .wde {margin-left:0;margin-right:0}
 TABLE{margin-left:0;margin-right:0}
@@ -28,19 +28,16 @@ a:hover, a:focus {color:#1E40AF;}/*#2563EB;#6B7280*/
 }
 @media (prefers-color-scheme: dark) {
   body {
-    background-color: #121212;
+    background-color: #1e1e1e;
 color:rgba(224,224,224,0.75);
 }
-h1,h2,h3,h4,h5,h6,b {
- color:  #F0F0F0;
-}
 a {
-  color: #79c0ff;  
+  color: #64ABD5;
   text-decoration: underline;
 }
 
 a:visited {
-  color:  #0969da;
+  color:  #8597AE;
 }
 
 a:hover, a:focus {
@@ -51,4 +48,23 @@ a:hover, a:focus {
 a:active {
   color:  #ff6b6b; 
 }
+h1,h2,h3,h4,h5,h6,b {
+ color:  #F0F0F0;
+}
+a b,b a {
+ color:   #64ABD5;
+  text-decoration: underline;
+}
+a:visited  b,b a:visited{
+  color:  #8597AE;
+}
+
+a:hover b, a:focus b ,b a:focus, b a:hover{
+  color: #a3d4ff;
+}
+
+a:active b,b a:active {
+  color:  #ff6b6b; 
+}
+
 }

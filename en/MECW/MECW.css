@@ -11,37 +11,39 @@ h1.title { }
 h2.author {font-size:0.8em;}
 h3.date {font-size:0.8em;}
 nav#toc ol,
-nav#landmarks ol { padding: 0; margin-left: 1em; }
+nav#landmarks ol {padding: 0; margin-left: 1em;overflow: hidden;}
 nav#toc ol li,
-nav#landmarks ol li { list-style-type: none; margin: 0; padding: 0; }
+nav#landmarks ol li { list-style-type: none; margin: 0; padding: 0;overflow-wrap: break-word;}
 a.footnote-ref { vertical-align: super; }
 em, em em em, em em em em em { font-style: italic;}
 i i,i i i i,em em, em em em em { font-style: normal;}
 code{ white-space: pre-wrap; }
 span.smallcaps{ font-variant: small-caps; }
 span.underline{ text-decoration: underline; }
-p {text-indent:1em;margin:1em 0;line-height:200%;}
+p {text-indent:1em;margin:0 0;line-height:200%;}
 q { quotes: "“" "”" "‘" "’"; }
 div.column{ display: inline-block; vertical-align: top; width: 50%; }
 div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
-blockquote,.Publication,.Collection {margin-right:0; margin-left:0; margin-top:1em; margin-bottom:1em; font-size:0.75em;line-height:150%;}
+blockquote,.Publication,.Collection,.mw-references-wrap {margin-right:0; margin-left:0; margin-top:0.5em; margin-bottom:0.5em; font-size:0.75em;line-height:150%;}
 .volc {width:85%;text-align:justify;margin:1em auto;text-indent:0;}
 .table-wrapper {
   overflow-x: auto;
   max-width: 100%;
 }
+.mw-references-wrap {border-top: 1px solid; margin-top:2em;}
+hr.clearhr {margin-bottom:2em; }
 @media (prefers-color-scheme: dark) {
     body {
     background-color: #1e1e1e;
 color:rgba(224,224,224,0.75);
 }
 a {
-  color: #79c0ff;  
+  color: #64ABD5;
   text-decoration: underline;
 }
 
 a:visited {
-  color:  #0969da;
+  color:  #8597AE;
 }
 
 a:hover, a:focus {
@@ -52,4 +54,23 @@ a:hover, a:focus {
 a:active {
   color:  #ff6b6b; 
 }
+h1,h2,h3,h4,h5,h6,b {
+ color:  #F0F0F0;
+}
+a b,b a {
+ color:   #64ABD5;
+  text-decoration: underline;
+}
+a:visited  b,b a:visited{
+  color:  #8597AE;
+}
+
+a:hover b, a:focus b ,b a:focus, b a:hover{
+  color: #a3d4ff;
+}
+
+a:active b,b a:active {
+  color:  #ff6b6b; 
+}
+
 }
