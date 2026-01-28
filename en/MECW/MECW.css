@@ -34,8 +34,8 @@ blockquote,.Publication,.Collection,.mw-references-wrap {margin-right:0; margin-
 hr.clearhr {margin-bottom:2em; }
 @media (prefers-color-scheme: dark) {
     body {
-    background-color: #1e1e1e;
-color:rgba(224,224,224,0.75);
+    background-color: #020206;
+color:#ABABAB;
 }
 a {
   color: #64ABD5;
