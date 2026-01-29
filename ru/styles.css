@@ -1,5 +1,5 @@
 .style1 {color: #FF0000;font-family: "黑体";}
-.style2 {font-size: 1.25em}
+.style2 {font-weight:bold;font-size: 1.25em;}
 .style3 {font-size: 0.75em;text-align:center;}
 .quote {font-size: 0.75em;margin: 1.5em 1px 1.5em 1px;}
 .date {font-size: 0.75em;text-align:center;}
@@ -9,5 +9,5 @@ h1,h2 {font-family: "黑体"; text-align:center;}
 h3,h4,h5,h6 {font-family: "黑体"; text-align:center;}
 body {max-width: 100%;font-family: "华文中宋","黑体";}
 span.cq,div.cq {text-align:center;display: block;}
-div[align="right"] table {margin: 1.5em 0 1.5em auto;}
+div[align="right"] table,div.quote[align="right"] {margin: 1.5em 0 1.5em auto;}
 span[align="center"] {display: block;}
