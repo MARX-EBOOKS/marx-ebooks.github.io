@@ -28,7 +28,7 @@ a:hover, a:focus {color:#1E40AF;}/*#2563EB;#6B7280*/
 }
 @media (prefers-color-scheme: dark) {
   body {
-    background-color: #020206;
+background-color: #020206;
 color:#ABABAB;
 }
 a {
