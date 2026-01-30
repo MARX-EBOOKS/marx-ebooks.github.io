@@ -11,6 +11,7 @@ HR {text-align:center}
 SMALL HR {text-align:LEFT;}
 ASIDE HR {width:15%;margin-left:0;}
 BLOCKQUOTE {font-size:0.75em;margin:1em,0;line-height:150%;}
+blockquote p {line-height:150%;}
 .HEADER {font-size:80%;text-align:center;text-decoration: underline;margin-bottom:0.5em;}
 .HEADER-1 {font-size:80%;text-align:center;margin-bottom:0.5em;}
 .rzr {letter-spacing:0.2em}
@@ -28,7 +29,7 @@ a:hover, a:focus {color:#1E40AF;}/*#2563EB;#6B7280*/
 }
 @media (prefers-color-scheme: dark) {
   body {
-background-color: #020206;
+    background-color: #020206;
 color:#ABABAB;
 }
 a {

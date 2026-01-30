@@ -5,6 +5,7 @@
 .TOC {width: 85%;text-align:justify;margin:1em auto;}
 table.TOC {width: 75%;text-align:justify;margin:auto;}
 .quote,blockquote,.footnote {font-size: 0.75em;margin: 1.5em 0;line-height:150%;}
+blockquote p {line-height:150%;}
 .footnote {margin-top:2em;}
 table {margin: 1.5em;max-width:120vw !important;}
 table.quote,table.footnote,blockquote table  {font-size: 0.75em; margin: 1.5em;}
