@@ -1,5 +1,5 @@
 .seitenzahlen {font-size:0.6em;}
-.zitat,blockquote {font-size:0.75em;margin:1em 0;line-height:150%;}
+.zitat,blockquote {font-size:0.75em;margin:1em 0;line-height:150%;text-indent:1em;}
 blockquote p {line-height:150%;}
 h1,h2 {text-align:center;margin:1.5em;line-height:200%;}
 h3,h4,h5,h6 {text-align:center;margin:1em;line-height:200%;}
