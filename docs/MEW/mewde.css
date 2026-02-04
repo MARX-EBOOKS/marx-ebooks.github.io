@@ -14,6 +14,10 @@ a:hover, a:focus {color: #1E40AF;}/*#2563EB;#6B7280#080B10;*/
   overflow-x: auto;
   max-width: 100%;
 }
+.ctr,.lft,.rgt {text-indent:1em;}
+.ctr {text-align:center;}
+.lft {text-align:left;}
+.rgt {text-align:right;}
 @media (prefers-color-scheme: dark) {
   body {
 background-color: #020206;
@@ -54,6 +58,5 @@ a:hover b, a:focus b ,b a:focus, b a:hover{
 a:active b,b a:active {
   color:  #ff6b6b; 
 }
-
 }
 
