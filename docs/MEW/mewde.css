@@ -14,7 +14,7 @@ a:hover, a:focus {color: #1E40AF;}/*#2563EB;#6B7280#080B10;*/
   overflow-x: auto;
   max-width: 100%;
 }
-.ctr,.lft,.rgt {text-indent:1em;}
+.ctr,.lft,.rgt {text-indent:0;}
 .ctr {text-align:center;}
 .lft {text-align:left;}
 .rgt {text-align:right;}
