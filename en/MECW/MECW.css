@@ -3,6 +3,7 @@ body {color:#2D3A53;background-color:#EEF0F5; margin-right:5%; margin-left:5%;  
 code { font-family: monospace; }
 h1,h2 {text-align:center;margin:1.5em;line-height:200%;hyphens: auto;}
 h3,h4,h5,h6 {text-align:center;margin:1em;line-height:200%;hyphens: auto;}
+h1.firstHeading {margin-top:0.5em;margin-bottom:0;line-height:160%;}
 table {margin:1.5em;max-width:100vw;!important}
 a {color: #2563EB;text-decoration: underline;}/*#1A0DAB;*/
 a:visited {color: #4B6CB7;}
