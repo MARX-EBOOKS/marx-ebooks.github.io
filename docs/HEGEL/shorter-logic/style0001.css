@@ -1,3 +1,4 @@
+
 .bodycontent-first-title {
   background: #f9f9f9;
   display: block;
@@ -24,7 +25,7 @@ line-height:1.5em;
   text-indent: 2em;
   padding: 0;
   margin: 0 0;
-  line-height: 1.5em;
+  line-height: 2em;
 }
 .bodycontent-text_center {
   display: block;
@@ -143,7 +144,10 @@ line-height:1.5em;
 }
 body {
 color:#2D3A53;
-background-color:#EEF0F5;}
+background-color:#EEF0F5;
+font-size:1.25em;
+margin:0 5%;
+}
 a {color:#2563EB;text-decoration: underline;}/*#1A0DAB;*/
 a:visited {color:#4B6CB7}
 a:hover, a:focus {color:#1E40AF;}/*#2563EB;#6B7280*/
