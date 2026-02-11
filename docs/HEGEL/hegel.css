@@ -22,7 +22,7 @@ em,i {
 font-style: italic;
 font-family:"Times New Roman",Garamond;
 }
-.TOC,.volc {width: 85%;text-align:justify;margin:2em auto;text-indent:0;}
+.TOC,.volc {text-align:justify;margin:2em auto;text-indent:0;}
 h1 {
     margin-top:0;
     margin-bottom: 2.5em;
