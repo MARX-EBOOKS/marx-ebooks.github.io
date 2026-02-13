@@ -28,7 +28,7 @@ div.column{ display: inline-block; vertical-align: top; width: 50%; }
 div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
 blockquote,.Publication,.Collection,.mw-references-wrap {margin-right:0; margin-left:0; margin-top:0.5em; margin-bottom:0.5em; font-size:0.75em;line-height:150%;}
 blockquote p {line-height:150%;}
-.volc {width:85%;text-align:justify;margin:1em auto;text-indent:0;}
+.volc {text-align:justify;margin:1em auto;text-indent:0;}
 .table-wrapper {
   overflow-x: auto;
   max-width: 100%;
