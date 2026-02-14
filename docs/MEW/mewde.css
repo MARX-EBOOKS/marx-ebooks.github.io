@@ -5,7 +5,8 @@ h1,h2 {text-align:center;margin:1.5em;line-height:200%;}
 h3,h4,h5,h6 {text-align:center;margin:1em;line-height:200%;}
 table {margin:1.5em;max-width:120vw !important;}
 BODY {margin-right:4%; margin-left:4%;max-width:100%; -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;font-family:"Times New Roman","Baskerville Old Face",Arial,Helvetica,serif;color:#2D3A53;background-color:#EEF0F5;line-height:200%;font-size:1.25em;}
-.volc {max-width:100%;text-align:justify;margin:1em auto;text-indent:0;}
+.TOC {max-width:95%;text-align:justify;margin:1em auto;text-indent:0;}
+.volc {max-width:85%;text-align:justify;margin:1em auto;text-indent:0;}
 p {text-indent:1em;margin: 0 0;line-height:200%;}
 a {color: #2563EB;text-decoration: underline;}/*#1A0DAB;#1e1e1e;*/
 a:visited {color: #4B6CB7;}
