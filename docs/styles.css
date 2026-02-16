@@ -1,33 +1,32 @@
+body {margin-right:5%; margin-left:5%;max-width: 100%;font-family: "华文中宋","黑体";color:#2D3A53;background-color:#EEF0F5;line-height:200%;font-size:1.25em;text-align:justify;}
+p,p.date-l  {margin: 0;line-height:200%;}
+h1 {font-family: "黑体"; text-align:center;margin-top:0.5em;margin-bottom:1em;line-height:200%;}
+h2 {font-family: "黑体"; text-align:center;margin:1.5em;line-height:200%;}
+h3,h4,h5,h6 {font-family: "黑体"; text-align:center;margin:1em;line-height:200%;}
+table {margin: 1.5em;max-width:120vw !important;}
+hr {margin: 1em auto;text-align:center;}
+.quote,blockquote,.footnote,.src,.add {font-size: 0.75em;line-height:150%;}
+blockquote p {line-height:150%;}
+.quote,blockquote,.footnote {margin: 1.5em 0;}
+.footnote,.sign {margin-top:2em;}
+table.quote,table.footnote,blockquote table,.add td,.src td {font-size: 0.75em;margin: 1.5em auto;line-height:150%;}
 .style2 {font-weight:bold;font-size: 1.25em;}
 .date,.style3 {font-size: 0.75em;text-align:center;margin-top:0;margin-bottom:2em;}
 .TCC {width: 20%;font-size: 0.75em;text-align:justify;margin:1em auto;}
 .TOC {width: 85%;text-align:justify;margin:2em auto;}
 table.TOC {width: 75%;text-align:justify;margin:auto;}
-.quote,blockquote,.footnote,.src,.add {font-size: 0.75em;margin: 1.5em 0;line-height:150%;}
-blockquote p {line-height:150%;}
-.footnote {margin-top:2em;}
-table {margin: 1.5em;max-width:120vw !important;}
-table.quote,table.footnote,blockquote table {font-size: 0.75em; margin: 1.5em;}
-h1 {font-family: "黑体"; text-align:center;margin-top:0.5em;margin-bottom:1em;line-height:200%;}
-h2 {font-family: "黑体"; text-align:center;margin:1.5em;line-height:200%;}
-h3,h4,h5,h6 {font-family: "黑体"; text-align:center;margin:1em;line-height:200%;}
-body {margin-right:5%; margin-left:5%;max-width: 100%;font-family: "华文中宋","黑体";color:#2D3A53;background-color:#EEF0F5;line-height:200%;font-size:1.25em;text-align:justify;}
-p,p.date-l  {margin: 0;line-height:200%;}
-.ct {margin-right: auto;margin:left:auto;}
+.ct {margin:1.5em auto;}
 p.ct,div.ct,p.cq,div.cq,span.ct,span.cq {text-align:center;}
 .rt {margin-right:0;margin-left:auto;}
 p.rt,div.rt,.sign {text-align:right;}
 span.cq,span.rt,span.ct {display: block;}
-.rt table,div[align="right"] table,div.quote[align="right"] {display:table;margin:1.5em 0 1.5em auto;max-width:60%;}
-table.src.rt table.add.rt,table.quote.rt {border-collapse: collapse; border: none; margin:1.5em 0 1.5em auto;max-width:60%;}
-table.src.rt td,table.add.rt td,.rt table td,div[align="right"] table.quote td {text-align:left;padding: 0;}
+.rt table,table.rt,table.sign,div[align="right"] table {border-collapse: collapse; border: none; margin:1.5em 0 1.5em auto;font-size:1em;line-height:200%;}
+div.quote[align="right"] {line-height:150%;}
+.rt td,.sign td,div[align="right"] table.quote td {text-align:left;padding: 0;}
 a {color:#2563EB;text-decoration: underline;}
 a:visited {color:#4B6CB7}
 a:hover, a:focus {color:#1E40AF;}
-.table-wrapper {
-  overflow-x: auto;
-  max-width: 100%;
-}
+.table-wrapper {overflow-x: auto;max-width: 100%;}
 @media (prefers-color-scheme: dark) {
 body {
 background-color: #020206;
