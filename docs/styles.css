@@ -5,7 +5,7 @@ h2 {font-family: "黑体"; text-align:center;margin:1.5em;line-height:200%;}
 h3,h4,h5,h6 {font-family: "黑体"; text-align:center;margin:1em;line-height:200%;}
 table {margin: 1.5em;max-width:120vw !important;}
 hr {margin: 1em auto;text-align:center;}
-.quote,blockquote,.footnote,.src,.add {font-size: 0.75em;line-height:150%;}
+.quote,.footnote,blockquote,.src,.add {font-size: 0.75em;margin: 1.5em 0;line-height:150%;}
 blockquote p {line-height:150%;}
 .quote,blockquote,.footnote {margin: 1.5em 0;}
 .footnote,.sign {margin-top:2em;}
@@ -20,8 +20,10 @@ p.ct,div.ct,p.cq,div.cq,span.ct,span.cq {text-align:center;}
 .rt {margin-right:0;margin-left:auto;}
 p.rt,div.rt,.sign {text-align:right;}
 span.cq,span.rt,span.ct {display: block;}
-.rt table,table.rt,table.sign,div[align="right"] table {border-collapse: collapse; border: none; margin:1.5em 0 1.5em auto;font-size:1em;line-height:200%;}
+.rt table,table.rt,table.sign,div[align="right"] table,table.tnb {border-collapse: collapse; border: none;}
+.rt table,table.rt,table.sign,div[align="right"] table {margin:1.5em 0 1.5em auto;font-size:1em;line-height:200%;}
 div.quote[align="right"] {line-height:150%;}
+.tnb td {padding: 0;}
 .rt td,.sign td,div[align="right"] table.quote td {text-align:left;padding: 0;}
 a {color:#2563EB;text-decoration: underline;}
 a:visited {color:#4B6CB7}
