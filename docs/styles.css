@@ -21,7 +21,7 @@ p.ct,div.ct,p.cq,div.cq,span.ct,span.cq {text-align:center;}
 p.rt,div.rt,.sign,p.add {text-align:right;}
 span.cq,span.rt,span.ct {display: block;}
 .rt table,table.rt,table.sign,div[align="right"] table {border-collapse: collapse; border: none; margin:1.5em 0 1.5em auto;font-size:1em;line-height:200%;}
-.src,p.add  {max-width:60%;margin:1.5em 0 1.5em auto;}
+.src,.add  {max-width:60%;margin:1.5em 0 1.5em auto;}
 div.quote[align="right"] {line-height:150%;}
 .rt td,.sign td {text-align:left;padding: 0;}
 a {color:#2563EB;text-decoration: underline;}
