@@ -88,6 +88,12 @@ hr {
 aside {
 margin-top:2em;
 }
+.h6u 
+{
+text-align:center;
+margin-top:1em;
+margin-bottom:1em;
+}
 .fn {
 font-size:0.75em;
 line-height:1.5em;
