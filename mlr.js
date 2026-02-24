@@ -1,12 +1,17 @@
 // 配置:需要记录位置的页面路径正则表达式
 const ALLOWED_PATHS = [
-  /\/docs\/.+/,     
   /\/LENIN\/.+/,      
-  /\/MEW-ZH\/.+/,     
+  /\/MEW-ZH\/.+/,   
+   /\/MEA\/.+/,        
   /\/MEW\/.+/,        
-  /\/MEA\/.+/,        
+  /\/MEW-ZENO\/.+/,     
+  /\/HEGEL\/.+/,     
   /\/VIL\/.+/,
-  /\/en\/.+/
+  /\/VIL-UAIO\/.+/,
+  /\/VIL-FB2\/.+/,
+  /\/MECW\/.+/,
+  /\/archieve\/.+/,
+  /\/history\/.+/
 ];
 
 function isPathAllowed() {

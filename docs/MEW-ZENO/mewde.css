@@ -11,10 +11,12 @@ p {text-indent:1em;margin: 0 0;line-height:200%;}
 a {color: #2563EB;text-decoration: underline;}/*#1A0DAB;#1e1e1e;*/
 a:visited {color: #4B6CB7;}
 a:hover, a:focus {color: #1E40AF;}/*#2563EB;#6B7280#080B10;*/
-.fn {
+pre {max-width:100%;overflow-x: auto;white-space: pre;-webkit-overflow-scrolling:touch;}        
+.fn,.ind4 {
 font-size:0.75em;
 line-height:1.5em;
 }
+aside.fn {margin:2em 0;}
 .fn td {
   vertical-align: top;
 }
