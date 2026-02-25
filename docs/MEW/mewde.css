@@ -3,16 +3,18 @@ BODY {margin-right:4%; margin-left:4%;max-width:100%; -webkit-hyphens: auto;-moz
 .zitat,blockquote {font-size:0.75em;margin:1em 0;line-height:150%;text-indent:1em;}
 .fn {font-size:0.75em;line-height:1.5em;}
 .fn table,blockquote table {font-size: 0.75em;margin:1em auto;line-height: 150%;}
-.fn td a {vertical-align: super;}
-aside.fn {margin:2em 0;padding-top: 1em;}
+div.fnt {margin:1em 0;font-size:1.25rem;}
+aside.fn {margin:2em 0;}
+.fni {text-indent:0;}
 blockquote p,.fn p,blockquote .poem {line-height:150%;margin:0 auto;}
 h1,h2 {text-align:center;margin:1.5em;line-height:200%;}
 h3,h4,h5,h6 {text-align:center;margin:1em;line-height:200%;}
+h5,h6 {font-size:1em;}
 table {margin:1.5em;max-width:120vw !important;}
 .TOC {max-width:95%;text-align:justify;margin:1em auto;text-indent:0;}
 body.TOC p {text-indent: 0;}
-.volc {max-width:85%;text-align:justify;margin:1em auto;text-indent:0;}
 p {text-indent:1em;margin: 0 0;line-height:200%;}
+.volc,.TCC {max-width:85%;text-align:justify;margin:1em auto;text-indent:0;}
 a,a:focus-visible {color: #2563EB;text-decoration: none;}/*#1A0DAB;#1e1e1e;*/
 a:visited {color: #4B6CB7;}
 a:active {color: #1E40AF;text-decoration: underline;}/*#2563EB;#6B7280#080B10;*/

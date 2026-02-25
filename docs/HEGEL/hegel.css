@@ -71,12 +71,6 @@ hr {
     margin: 1em auto 1em auto;
     text-align:center;
 }
-.cover-image {{
-            max-width: 100%;
-            height: auto;
-            margin: 20px 0;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        }}
 .pa {
     display: block;
     margin-left: 1em;
@@ -98,9 +92,8 @@ margin-bottom:1em;
 font-size:0.75em;
 line-height:1.5em;
 }
-.fn td {
-  vertical-align: top;
-}
+.fn .fnt {font-size:1.25rem;margin:1em 0;}
+.fni {text-indent:0;}
 a,a:focus-visible {color:#2563EB;text-decoration: none;}/*#1A0DAB;*/
 a:visited {color:#4B6CB7}
 a:active {color: #1E40AF;text-decoration: underline;}/*#2563EB;#6B7280*/
