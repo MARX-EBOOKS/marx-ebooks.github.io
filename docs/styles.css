@@ -24,9 +24,9 @@ span.cq,span.rt,span.ct {display: block;}
 .src,.add  {max-width:60%;margin:1.5em 0 1.5em auto;}
 div.quote[align="right"] {line-height:150%;}
 .rt td,.sign td {text-align:left;padding: 0;}
-a {color:#2563EB;text-decoration: underline;}
+a,a:focus-visible {color:#2563EB;text-decoration:none;}
 a:visited {color:#4B6CB7}
-a:hover, a:focus {color:#1E40AF;}
+a:active {color: #1E40AF;text-decoration: underline;}
 .table-wrapper {overflow-x: auto;max-width: 100%;display: block;}
 @media (prefers-color-scheme: dark) {
 body {
@@ -35,20 +35,16 @@ color:#ABABAB;
 }
 a {
   color: #64ABD5;
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 a:visited {
   color:  #8597AE;
 }
 
-a:hover, a:focus {
+a:active  {
   color: #a3d4ff;
   text-decoration: underline;
-}
-
-a:active {
-  color:  #ff6b6b; 
 }
 h1,h2,h3,h4,h5,h6,b {
 font-weight:bold;

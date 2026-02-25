@@ -5,9 +5,9 @@ h1,h2 {text-align:center;margin:1.5em;line-height:200%;hyphens: auto;}
 h3,h4,h5,h6 {text-align:center;margin:1em;line-height:200%;hyphens: auto;}
 h1.firstHeading {margin-top:0.5em;margin-bottom:0;line-height:160%;}
 table {margin:1.5em;max-width:100vw !important;}
-a {color: #2563EB;text-decoration: underline;}/*#1A0DAB;*/
+a,a:focus-visible {color: #2563EB;text-decoration: none;}/*#1A0DAB;*/
 a:visited {color: #4B6CB7;}
-a:hover, a:focus {color: #1E40AF;}/*#2563EB;#6B7280*/
+a:active {color: #1E40AF;text-decoration: underline;}/*#2563EB;#6B7280*/
 li {hyphens: auto;}
 h1.title { }
 h2.author {font-size:0.8em;}
@@ -34,7 +34,7 @@ pre {max-width: 100%;overflow-x: auto;white-space: pre;}
   overflow-x: auto;
   max-width: 100%;
 }
-.mw-references-wrap {border-top: 1px solid; margin-top:2em;}
+.mw-references-wrap {border-top: 1px solid; margin-top:1em;padding-top:1em;}
 hr.clearhr {margin-bottom:2em; }
 @media (prefers-color-scheme: dark) {
     body {
@@ -43,20 +43,16 @@ color:#ABABAB;
 }
 a {
   color: #64ABD5;
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 a:visited {
   color:  #8597AE;
 }
 
-a:hover, a:focus {
+a:active  {
   color: #a3d4ff;
   text-decoration: underline;
-}
-
-a:active {
-  color:  #ff6b6b; 
 }
 h1,h2,h3,h4,h5,h6,b {
  color:  #F0F0F0;

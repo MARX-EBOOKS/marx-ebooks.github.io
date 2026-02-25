@@ -21,9 +21,9 @@ blockquote p {line-height:150%;}
 .bor {border-width:1; border-style:solid}
 .bordn {border-width:1; border-style:solid; border-top-style:none}
 .borup {border-width:1; border-style:solid; border-bottom-style:none}
-a {color:#2563EB;text-decoration: underline;}/*#1A0DAB;*/
+a,a:focus-visible {color:#2563EB;text-decoration: none;}/*#1A0DAB;*/
 a:visited {color:#4B6CB7}
-a:hover, a:focus {color:#1E40AF;}/*#2563EB;#6B7280*/
+a:active {color: #1E40AF;text-decoration: underline;}/*#2563EB;#6B7280*/
 .table-wrapper {
   overflow-x: auto;
   max-width: 100%;
@@ -73,20 +73,16 @@ color:#ABABAB;
 }
 a {
   color: #64ABD5;
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 a:visited {
   color:  #8597AE;
 }
 
-a:hover, a:focus {
+a:active  {
   color: #a3d4ff;
   text-decoration: underline;
-}
-
-a:active {
-  color:  #ff6b6b; 
 }
 h1,h2,h3,h4,h5,h6,b {
  color:  #F0F0F0;

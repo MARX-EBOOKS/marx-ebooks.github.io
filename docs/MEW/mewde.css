@@ -1,21 +1,26 @@
+BODY {margin-right:4%; margin-left:4%;max-width:100%; -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;font-family:"Times New Roman","Baskerville Old Face",Arial,Helvetica,serif;color:#2D3A53;background-color:#EEF0F5;line-height:200%;font-size:1.25em;}
 .seitenzahlen {font-size:0.6em;}
 .zitat,blockquote {font-size:0.75em;margin:1em 0;line-height:150%;text-indent:1em;}
-blockquote p {line-height:150%;}
+.fn {font-size:0.75em;line-height:1.5em;}
+.fn table,blockquote table {font-size: 0.75em;margin:1em auto;line-height: 150%;}
+.fn td a {vertical-align: super;}
+aside.fn {margin:2em 0;padding-top: 1em;}
+blockquote p,.fn p,blockquote .poem {line-height:150%;margin:0 auto;}
 h1,h2 {text-align:center;margin:1.5em;line-height:200%;}
 h3,h4,h5,h6 {text-align:center;margin:1em;line-height:200%;}
 table {margin:1.5em;max-width:120vw !important;}
-BODY {margin-right:4%; margin-left:4%;max-width:100%; -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;font-family:"Times New Roman","Baskerville Old Face",Arial,Helvetica,serif;color:#2D3A53;background-color:#EEF0F5;line-height:200%;font-size:1.25em;}
 .TOC {max-width:95%;text-align:justify;margin:1em auto;text-indent:0;}
+body.TOC p {text-indent: 0;}
 .volc {max-width:85%;text-align:justify;margin:1em auto;text-indent:0;}
 p {text-indent:1em;margin: 0 0;line-height:200%;}
-a {color: #2563EB;text-decoration: underline;}/*#1A0DAB;#1e1e1e;*/
+a,a:focus-visible {color: #2563EB;text-decoration: none;}/*#1A0DAB;#1e1e1e;*/
 a:visited {color: #4B6CB7;}
-a:hover, a:focus {color: #1E40AF;}/*#2563EB;#6B7280#080B10;*/
+a:active {color: #1E40AF;text-decoration: underline;}/*#2563EB;#6B7280#080B10;*/
 .table-wrapper {
   overflow-x: auto;
   max-width: 100%;
 }
-.poem {margin:1em auto 1em auto;max-width:50%;}
+.poem {margin:1em auto;max-width:50%;}
 .ctr,.lft,.rgt,.poem {text-indent:0;}
 .ctr {text-align:center;}
 .lft {text-align:left;}
@@ -27,20 +32,16 @@ color:#ABABAB;
 }
 a {
   color: #64ABD5;
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 a:visited {
   color:  #8597AE;
 }
 
-a:hover, a:focus {
+a:active  {
   color: #a3d4ff;
   text-decoration: underline;
-}
-
-a:active {
-  color:  #ff6b6b; 
 }
 h1,h2,h3,h4,h5,h6,b {
  color:  #F0F0F0;
