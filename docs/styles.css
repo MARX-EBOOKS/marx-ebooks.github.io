@@ -10,7 +10,7 @@ blockquote p {line-height:150%;}
 .quote,blockquote,.footnote {margin: 1.5em 0;}
 .footnote,.sign {margin-top:2em;}
 table.quote,table.footnote,blockquote table,.add td,.src td {font-size: 0.75em;margin: 1.5em auto;line-height:150%;}
-.style2 {font-weight:bold;font-size: 1.25em;}
+.style2 {font-weight:bold;font-size: 1.25rem;}
 .date,.style3 {font-size: 0.75em;text-align:center;margin-top:0;margin-bottom:2em;}
 .TCC {width: 20%;font-size: 0.75em;text-align:justify;margin:1em auto;}
 .TOC {width: 85%;text-align:justify;margin:2em auto;}
@@ -24,9 +24,9 @@ span.cq,span.rt,span.ct {display: block;}
 .src,.add  {max-width:60%;margin:1.5em 0 1.5em auto;}
 div.quote[align="right"] {line-height:150%;}
 .rt td,.sign td {text-align:left;padding: 0;}
-a,a:focus-visible {color:#2563EB;text-decoration:none;}
+a,a:focus-visible {color:#2563EB;text-decoration: none;}
 a:visited {color:#4B6CB7}
-a:active {color: #1E40AF;text-decoration: underline;}
+a:active {color:#1E40AF;text-decoration: underline;}
 .table-wrapper {overflow-x: auto;max-width: 100%;display: block;}
 @media (prefers-color-scheme: dark) {
 body {
