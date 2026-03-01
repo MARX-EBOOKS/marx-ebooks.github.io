@@ -13,7 +13,7 @@ h1.title { }
 h2.author {font-size:0.8em;}
 h3.date {font-size:0.8em;}
 nav#toc ol,
-nav#landmarks ol {padding: 0; margin-left: 1em;overflow: hidden;}
+nav#landmarks ol {padding: 0; margin-left: 0;overflow: hidden;}
 nav#toc ol li,
 nav#landmarks ol li { list-style-type: none; margin: 0; padding: 0;overflow-wrap: break-word;}
 a.footnote-ref { vertical-align: super; }
