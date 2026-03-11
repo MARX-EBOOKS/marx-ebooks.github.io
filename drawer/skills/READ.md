@@ -6,7 +6,7 @@ Before reading — distil 1–3 core propositions from the user's question and m
   You may also summarise your goal from earlier readings of other texts.
 
 While reading (after read_file_html returns) —
-- Use HTML tags as semantic guides: <blockquote> = quoted block, <sup>/<a href="#..."> = footnote, <table> = data table.
+- Use HTML tags as semantic guides: <blockquote>...</blockquote> = quoted block, <sup>/<a href="#...">...</a></sup> = footnote, <table>...</table> = data table.
 - Scan paragraph by paragraph and ask only: does this paragraph contain a sentence that directly serves the above propositions?
     Yes → call add_quote immediately (preserve the source language; do not translate).
     No  → skip; do not summarise the paragraph or expand on irrelevant content.
