@@ -3,7 +3,7 @@ Translate the HTML document below from {source_lang} into {target_lang}. Strictl
 
 **Tag handling**
 - Preserve all HTML tags and attributes; do not add or remove any tags; do not alter class, id, href, src, or other attribute values.
-- Content inside <head>, <script>, and <style> must not be translated; leave it exactly as-is.
+- Content inside <head>...</head>, <script>...</script>, and <style>...</style> must not be translated; leave it exactly as-is.
 - Among attributes, translate only the values of alt, title, and placeholder; leave all other attribute values untouched.
 
 **Text translation**
