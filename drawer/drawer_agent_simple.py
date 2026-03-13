@@ -12,12 +12,7 @@ from typing import Optional
 import httpx
 from bs4 import BeautifulSoup
 from agent_config import Config
-"""
-确保httpx、bs4均已安装
-命令示例
-pip install bs4
-pip install httpx
-"""
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ChatClient — independent LLM wrapper
 # ══════════════════════════════════════════════════════════════════════════════
@@ -158,32 +153,61 @@ class SearchTools:
 
     # ── public ─────────────────────────────────────────────────────────────
     def grep_files(
-        self, keyword: str = "", subdir: str = "",
+        self, keyword: str = "",
+        subdir: list[str] | str = None,
         max_hits: int = None, is_regex: bool = False,
-        CONTEXT_CHARS: int = 100, full_text: bool = False,
+        context_chars: int = 100, full_text: bool = False,
+        exclude: list[str] | str = None,
     ) -> str:
         if max_hits is None:
             max_hits = self._cfg.MAX_HITS
-        ok, err = self._check_lang(keyword, subdir)
-        if not ok:
-            return err
-        if CONTEXT_CHARS > 250:
-            return "上下文字符数长于 250，请缩小范围，或直接用 full_text=True 阅读某个文件。"
-        file_iter, single_file, err_str = self._resolve_iter(subdir)
-        if err_str:
-            return err_str
-        # full_text with no keyword → return whole file body
+
+        # 标准化 subdir → list
+        if not subdir:
+            subdirs = [""]
+        elif isinstance(subdir, str):
+            subdirs = [s.strip() for s in subdir.split(",") if s.strip()] or [""]
+        else:
+            subdirs = [s.strip() for s in subdir] or [""]
+
+        # 标准化 exclude → pattern 列表
+        if not exclude:
+            excl_terms = []
+        elif isinstance(exclude, str):
+            excl_terms = [e.strip() for e in exclude.split(",") if e.strip()]
+        else:
+            excl_terms = [e.strip() for e in exclude if e.strip()]
+        excl_patterns = [re.compile(re.escape(e), re.IGNORECASE) for e in excl_terms]
+
+        # 语言检查
+        for sd in subdirs:
+            ok, err = self._check_lang(keyword, sd)
+            if not ok:
+                return err
+
+        # ── full_text 无关键词：直接返回指定单文件的 HTML body ──────────
         if full_text and not keyword:
+            sd = subdirs[0]
+            file_iter, single_file, err_str = self._resolve_iter(sd)
+            if err_str:
+                return err_str
+            if not single_file:
+                return "full_text=True 且无关键词时，subdir 须指定单个 html 文件路径。"
             for html_file in file_iter:
                 try:
                     soup = BeautifulSoup(
                         html_file.read_text(encoding="utf-8-sig", errors="ignore"),
                         "html.parser",
                     )
-                    return f"[阅读后请将此处文本压缩至{self._cfg.MAX_TOOL_RESULT_CHARS}字符以下，阅读时如发现关键语句务必及时调用add_quote记录！]"+"\n"+str(soup.body)+"\n"+f"[阅读后请将此处文本压缩至{self._cfg.MAX_TOOL_RESULT_CHARS}字符以下，如有关键语句务必调用add_quote记录！]" if soup.body else str(soup)
+                    limit  = self._cfg.MAX_TOOL_RESULT_CHARS
+                    notice = (f"[阅读时如发现关键语句务必调用 add_quote 记录！]")
+                    body   = str(soup.body) if soup.body else str(soup)
+                    return f"{notice}\n{body}\n{notice}"
                 except Exception as exc:
                     return f"读取失败：{exc}"
             return "文件不存在。"
+
+        # ── 编译关键词 pattern ────────────────────────────────────────────
         try:
             pattern = re.compile(
                 keyword if is_regex else re.escape(keyword), re.IGNORECASE
@@ -191,52 +215,83 @@ class SearchTools:
         except re.error as exc:
             return (f"正则语法错误：{exc}\n"
                     "常用：(?:A|B)（或）、(?=.*A)(?=.*B)（同段同时含）")
-        effective_max = float("inf") if (subdir and not single_file) else max_hits
-        hits, collected = [], 0
-        for html_file in file_iter:
-            if collected >= effective_max:
-                break
-            try:
-                raw  = html_file.read_text(encoding="utf-8-sig", errors="ignore")
-                soup = BeautifulSoup(raw, "html.parser")               
-                    # full_text=True with keyword: return tagged body of matching files
-                text = soup.get_text(separator="\n")
-                if full_text and pattern.search(text):
-                    full_text=False
-                    collected+=1
-                    continue
-            except Exception:
-                continue
-            for m in pattern.finditer(text):
+
+        # ── 多路径收集 ────────────────────────────────────────────────────
+        seen: set[str] = set()
+        hits: list[str] = []
+
+        for sd in subdirs:
+            file_iter, single_file, err_str = self._resolve_iter(sd)
+            if err_str:
+                return err_str
+            effective_max = float("inf") if (sd and not single_file) else max_hits
+
+            for html_file in file_iter:
                 if len(hits) >= effective_max:
                     break
-                start   = max(0, m.start() - CONTEXT_CHARS // 2)
-                end     = min(len(text), m.end() + CONTEXT_CHARS // 2)
-                snippet = text[start:end].strip()
-                title   = self._extract_title(html_file)
-                rel     = str(html_file.relative_to(self._root))
-                hits.append(
-                    f"[文件：{rel}" + (f" | 标题：{title}" if title else "") + "]\n"
-                    + snippet
-                )
-                collected += 1
+                rel = str(html_file.relative_to(self._root))
+                if rel in seen:
+                    continue
+                seen.add(rel)
+
+                try:
+                    soup = BeautifulSoup(
+                        html_file.read_text(encoding="utf-8-sig", errors="ignore"),
+                        "html.parser",
+                    )
+                    text = soup.get_text(separator="\n")
+                except Exception:
+                    continue
+
+                if not pattern.search(text):
+                    continue
+
+                title = self._extract_title(html_file)
+                header = (f"[文件：{rel}"
+                          + (f" | 标题：{title}" if title else "") + "]")
+
+                # full_text + keyword：返回整个文件的 tagged body
+
+
+
+                # 普通模式：按匹配位置返回上下文片段
+                for m in pattern.finditer(text):
+                    if len(hits) >= effective_max:
+                        break
+                    start   = max(0, m.start() - context_chars // 2)
+                    end     = min(len(text), m.end() + context_chars // 2)
+                    snippet = text[start:end].strip()
+                    if excl_patterns and any(p.search(snippet) for p in excl_patterns) or any(p.search(title) for p in excl_patterns):
+                        continue
+                    hits.append(f"{header}\n{snippet}")
+
         if not hits:
-            scope = f"「{subdir}」内" if subdir else "全库"
-            return f"{scope}未找到包含「{keyword}」的内容。"
+            scope    = "、".join(s for s in subdirs if s) or "全库"
+            excl_note = f"（排除：{'、'.join(excl_terms)}）" if excl_terms else ""
+            loc      = f"「{scope}」内" if any(subdirs) else "全库"
+            return f"{loc}未找到包含「{keyword}」的内容{excl_note}。"
+        if full_text:
+            return "检索关键词时请注意将full_text设为False！\n---\n".join(hits)
         return "\n---\n".join(hits)
 
     def book_index(self, subdir: str) -> str:
         if subdir in self._cfg.SPECIAL_DIRS:
             attr, fname = self._cfg.SPECIAL_DIRS[subdir]
             return (self._cfg.prefix_for(attr)
-                    + f"[DIRECTORY: {subdir}]\n[Discard after locating target files, keep only needed paths in your reply.]\n"
-                    + self._cfg.dir_text(fname)+"\n[Discard after locating target files, keep only needed paths in your reply.]")
+                    + f"[DIRECTORY: {subdir}]\n"
+                    + self._cfg.dir_text(fname)+"\n")
         norm = subdir.replace("\\", "/").strip("/")
         if (norm.startswith("en/MECW/")
                 and not norm.endswith(".html")
                 and norm != "en/MECW"):
             return ("DIRECTORY ERROR: No sub-folders in en/MECW/. "
                     "Open en/MECW/MECWxx-index.html directly.")
+        if (norm.startswith("ru/VIL-UAIO/")
+                and not norm.endswith(".html")
+                and norm != "ru/VIL-UAIO/" and norm != "ru/VIL-UAIO"):
+            return ("DIRECTORY ERROR: This tool is invaild in current directory, use grep_files instead!")
+        if not norm.endswith("index.html") and norm.endswith(".html"):
+            return ("DIRECTORY ERROR: This tool is invaild for current file, use grep_files instead!")
         html_file = self._find_index(norm)
         if html_file is None:
             return f"No index page found in {subdir}."
@@ -251,8 +306,8 @@ class SearchTools:
                 if a.get_text(strip=True)
                 and not a["href"].startswith(("http://", "https://", "mailto:"))
             ]
-            return (f"[Contents: {subdir}  Total: {len(lines)}]\n"+"[Discard after locating target files, keep only needed paths in your reply.]\n"
-                    + "\n".join(lines)+"\n[Discard after locating target files, keep only needed paths in your reply.]") if lines else soup.get_text(separator="\n")[:3000]+"\n[Discard after locating target files, keep only needed paths in your reply.]"
+            return (f"[Contents: {subdir}  Total: {len(lines)}]\n"
+                    + "\n".join(lines)) if lines else soup.get_text(separator="\n")[:3000]
         except Exception as exc:
             return f"读取失败：{exc}"
 
@@ -372,32 +427,28 @@ class ToolHandler:
                                 "For Marx/Engels prefer German then English/French; for Lenin prefer "
                                 "Russian then German/English/French. Chinese is forbidden unless the "
                                 "user permits it.\n"
+                                "Also accepts a full sentence as the keyword to get its exact context.\n"
                                 "For multiple terms always construct a valid regex and set is_regex=True.\n"
                                 "Regex: (?:A|B)=A or B; (?=.*A)(?=.*B)=both in paragraph; "
                                 "A.{0,50}B=within 50 chars."
                             ),
                             "default": "",
                         },
-                        "subdir": {
-                            "type": "string",
-                            "description": (
-                                "Search scope (relative to the library root): "
-                                "a subdirectory path, a single HTML file, "
-                                "or leave empty for a full-library search."
-                            ),
-                            "default": "",
-                        },
+                        "subdir":{"type": "string","description": (
+                                "Subdirectory, file path, or comma-separated list of paths (volumes) to search. "
+                               "Leave empty to search the full library. "
+                         "Example: 'docs/MEW-ZENO/' or 'ru/VIL-UAIO/,ru/VIL-FB2/' or 'docs/HEGEL/5/' or 'en/MECW/MECW35-xxx.html'."),"default": ""},
                         "max_hits": {
                             "type": "integer",
-                            "description": "Maximum number of snippets to return.",
-                            "default": 8,
+                            "description": f"Maximum number of snippets to return. Default: {Config.MAX_HITS}.",
+                            "default":Config.MAX_HITS,
                         },
                         "is_regex": {
                             "type": "boolean",
                             "description": "Enable regex mode.",
                             "default": False,
                         },
-                        "CONTEXT_CHARS": {
+                        "context_chars": {
                             "type": "integer",
                             "description": (
                                 "Context characters around each match. "
@@ -413,6 +464,12 @@ class ToolHandler:
                             ),
                             "default": False,
                         },
+                        "exclude": { "type": "string", "description": (
+                            "Comma-separated exclusion terms. "
+                            "Any result snippet containing one of these terms is dropped. "
+                           "Useful to suppress footnotes, indexes, or editorial matter. "
+                            "Example: 'Fußnote,Anmerkung' or 'footnote,index'."
+                              ),"default": "",},
                     },
                     "required": ["keyword"],
                 },
@@ -504,14 +561,13 @@ class Agent:
         self._interrupt = chat_client._interrupt
 
     def run(self, user_input: str, history: list,
-            show_tools: bool, show_think: bool, deep_read: bool) -> AgentResult:
+            show_tools: bool, show_think: bool) -> AgentResult:
         # ── build system prompt ────────────────────────────────────────────
-        system = self._cfg.system_prompt_simp.replace("{LIBRARY_MAP}", self._cfg.library_map)
+        system = self._cfg.system_prompt_simp
         if not history:
             system += ("\n## 重要著作速查\n"
                        + self._cfg.important_works_me + "\n"
                        + self._cfg.important_works_vl)
-        pre_query_history = list(history)
         messages = [
             {"role": "system", "content": system},
             *history,
@@ -523,7 +579,7 @@ class Agent:
                 msg = self._client.chat(messages, self._tools.TOOLS, think=show_think)
             except KeyboardInterrupt:
                 self._interrupt.clear()
-                result = self._wait_for_followup(messages, pre_query_history)
+                result = self._wait_for_followup(messages)
                 if result is not None:
                     return result
                 continue
@@ -563,7 +619,7 @@ class Agent:
                 })
             if interrupted:
                 self._interrupt.clear() 
-                result = self._wait_for_followup(messages, pre_query_history)
+                result = self._wait_for_followup(messages)
                 if result is not None:
                     return result
                 continue
@@ -576,7 +632,6 @@ class Agent:
             print(context_note)
         print(
             "  选项：\n"
-            "    <问题>  精简上下文单次作答（不使用工具）\n"
             "    c       继续/重新发送当前请求\n"
             "    回车    输入补充问题后继续\n"
             "    p       保留记录返回主菜单\n"
@@ -588,8 +643,7 @@ class Agent:
         except (EOFError, KeyboardInterrupt):
             return "p"
 
-    def _wait_for_followup(self, messages: list,
-                           pre_query_history: list) -> Optional[AgentResult]:
+    def _wait_for_followup(self, messages: list) -> Optional[AgentResult]:
         while True:
             reply       = self._pause_menu("[已中断]")
             new_history = [m for m in messages if m.get("role") != "system"]
@@ -639,18 +693,13 @@ class Agent:
                 continue
 
 
-            # 其他输入 → 精简上下文单次作答
-            #self._single_trimmed_request(messages, reply)
 
     # ── tool result cap ─────────────────────────────────────────────────────
 
     def _cap_tool_result(self, text: str) -> str:
         limit = self._cfg.MAX_TOOL_RESULT_CHARS
-        if len(text) > limit:
-            return (text
-                    + f"\n[Search result too long, already exceed {limit} chars, "
-                    "please sort out the results needed for answering user's question! "
-                    "And also using add_quote to record if you find key contexts!]")
+        #if len(text) > limit:
+        #    return text
         return text
 
     # ── context management ──────────────────────────────────────────────────
@@ -661,7 +710,7 @@ class Agent:
 
     def _trim_messages(self, messages: list, char_limit: int) -> list:
         """Return system + as many recent non-system messages as fit in char_limit.
-        Orphaned tool_calls / tool results (whose pair was trimmed away) are collapsed to '未匹配'."""
+        Orphaned tool_calls / tool results (whose pair was trimmed away) are collapsed to '未匹配'.备用"""
         system     = [m for m in messages if m.get("role") == "system"]
         non_system = [m for m in messages if m.get("role") != "system"]
         kept, chars = [], 0
@@ -696,7 +745,7 @@ class Agent:
         return system + kept
 
     def _single_trimmed_request(self, messages: list, question: str):
-        """Send one tool-free question with a half-size trimmed context."""
+        """Send one tool-free question with a half-size trimmed context.备用"""
         trimmed = self._trim_messages(messages, self._cfg.MAX_CONTEXT_CHARS // 2)
         trimmed.append({"role": "user", "content": question})
         print(f"  [精简上下文：{self._total_chars(trimmed)} 字符，无工具，发送中…]")
@@ -860,6 +909,7 @@ class AppController:
         self.history = result.history
         if result.signal == AgentSignal.PAUSE:
             print("[已暂停，待重新发送指令]\n")
+            print("\n" + "─"*55 + "\n")
             return                          # 返回主菜单，history 已恢复
         # ANSWER
         if result.answer:

@@ -1,3 +1,5 @@
+Do not use book\_index to read any index since you will only get numbers in vain due to the link texts are only some page numbers. Use grep\_files to search these volumes' folder as whole and find relevant files instead.
+
 1/ 1893-1894
 
 2/ 1895-1897
@@ -56,7 +58,7 @@
 
 29/ ФИЛОСОФСКИЕ ТЕТРАДИ
 
-30/ Июль 1916 - февраль 1917	
+30/ Июль 1916 - февраль 1917
 
 31/ Март - апрель 1917
 
@@ -66,7 +68,7 @@
 
 34/ Июль - октябрь 1917
 
-35/ Октябрь 1917~ март 1918
+35/ Октябрь 1917\~ март 1918
 
 36/ Март - июль 1918
 

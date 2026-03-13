@@ -12,7 +12,9 @@ class Config:
     MODELS            = ["glm-4.7-flash","glm-4-flash","glm-5","deepseek-reasoner","deepseek-v3.2","qwen3.5-plus","qwen3-max","kimi-k2.5","minimax-m2.5","kimi-k2-thinking","gpt-5.4"] #可自行编辑，根据api支持的模型名称填写
     MODEL=MODELS[1] #最终选择的模型，根据以上数组的编号选择对应模型
     MAX_TOKENS       = 127000 #最大token
-    TEMPERATURE      = 0.2 #控制模型输出随机性，越低随机性越低
+    COMPRESS_HISTORY = True #是否压缩对话历史
+    COMPRESS_THRESHOLD =0.8 #对话历史压缩阈值
+    TEMPERATURE      = 0.4 #控制模型输出随机性
     TOP_P            = 0.9 #控制模型关联token输出
     MAX_RETRIES      = 2 #模型请求连接失败时重试数
     RETRY_WAIT       = 300 #请求失败时等待时间
@@ -21,7 +23,7 @@ class Config:
     # ── Search ─────────────────────────────────────────────────────────────
     MAX_HITS              = 20 #最大匹配数
     TRANS_CHUNK_CHARS     = 6000 #翻译分段大小
-    MAX_TOOL_RESULT_CHARS = 200 #各工具结果最大字符数
+    MAX_TOOL_RESULT_CHARS = 1000 #各工具结果最大字符数
     MAX_CONTEXT_CHARS     = 500000 
     # ── Paths ──────────────────────────────────────────────────────────────
     HTML_FOLDER         =".." #文件目录，自行配置，此处为仓库主目录（即agent的上一级文件夹）

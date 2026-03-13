@@ -12,12 +12,7 @@ from typing import Optional
 import httpx
 from bs4 import BeautifulSoup
 from agent_config import Config
-"""
-确保httpx、bs4均已安装
-命令示例
-pip install bs4
-pip install httpx
-"""
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ChatClient — independent LLM wrapper (httpx)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -27,6 +22,8 @@ class ChatClient:
         self._interrupt = interrupt_flag
         self._sem       = threading.Semaphore(cfg.MAX_CONCURRENT)
         self._timeout   = cfg.TIMEOUT
+        self.prompt_usage=0
+        self._usage_lock = threading.Lock()
         self._headers   = {
             "Content-Type":  "application/json",
             "Authorization": f"Bearer {cfg.API_KEY}",
@@ -55,6 +52,8 @@ class ChatClient:
             print(f"Token 使用：输入={usage['prompt_tokens']}，"
                   f"输出={usage['completion_tokens']}，"
                   f"总计={usage['total_tokens']}")
+            with self._usage_lock:
+                self.prompt_usage=usage['prompt_tokens']
         msg     = data["choices"][0]["message"]
         thinking = msg.get("reasoning_content", "").strip()
         if not thinking and msg.get("content"):
@@ -152,38 +151,81 @@ class SearchTools:
         self._root = Path(cfg.HTML_FOLDER)
 
     def grep_files(
-        self, keyword: str, subdir: str = "",
+        self, keyword: str,
+        subdir: str | list[str] = "",
         max_hits: int = None, is_regex: bool = False,
-        count_only: bool = False, page: int = 0, page_size: int = 600,
-        CONTEXT_CHARS_COARSE: int = 100,
+        count_only: bool = False, page: int = 0, page_size: int = 100,
+        context_chars_coarse: int = 150,
+        exclude: str | list[str] = "",
     ) -> str:
         if max_hits is None:
             max_hits = self._cfg.MAX_HITS
-        ok, err = self._check_lang(keyword, subdir)
-        if not ok:
-            return err
-        if CONTEXT_CHARS_COARSE > 250:
+        if context_chars_coarse > 250:
             return "上下文字符数长于 250，请缩小范围。"
-        file_iter, single_file, err_str = self._resolve_iter(subdir)
-        if err_str:
-            return err_str
+
+        # 标准化 subdir → list
+        if isinstance(subdir, str):
+            subdirs = [s.strip() for s in subdir.split(",") if s.strip()] or [""]
+        else:
+            subdirs = [s.strip() for s in subdir] or [""]
+
+        # 标准化 exclude → pattern 列表
+        if isinstance(exclude, str):
+            excl_terms = [e.strip() for e in exclude.split(",") if e.strip()]
+        else:
+            excl_terms = [e.strip() for e in exclude if e.strip()]
+        excl_patterns = [re.compile(re.escape(e), re.IGNORECASE) for e in excl_terms]
+
+        # 语言检查（每个子目录）
+        for sd in subdirs:
+            ok, err = self._check_lang(keyword, sd)
+            if not ok:
+                return err
+
+        # 编译关键词
         try:
             pattern = re.compile(
                 keyword if is_regex else re.escape(keyword), re.IGNORECASE
             )
         except re.error as exc:
             return (f"正则语法错误：{exc}\n"
-                    "常用：(?:A|B)（或）、(?=.*A)(?=.*B)（同段同时含）")
-        effective_max = float("inf") if (subdir and not single_file) else max_hits
-        all_hits = self._collect(file_iter, pattern, effective_max,
-                                 count_only, CONTEXT_CHARS_COARSE)
-        total = len(all_hits)
-        scope = f"（范围：{subdir}）" if subdir else ""
+                    "常用：(A|B)（或）、(?=.*A)(?=.*B)（同段同时含）")
+
+        # 多路径收集，按文件路径去重
+        seen: set[str] = set()
+        all_hits: list = []
+        for sd in subdirs:
+            file_iter, single_file, err_str = self._resolve_iter(sd)
+            if err_str:
+                return err_str
+            effective_max = float("inf") if (sd and not single_file) else max_hits
+            for hit in self._collect(file_iter, pattern, effective_max,
+                                     count_only, context_chars_coarse):
+                if hit[0] not in seen:
+                    seen.add(hit[0])
+                    all_hits.append(hit)
+
+        # 排除词过滤
+        if excl_patterns:
+            all_hits = [
+                h for h in all_hits
+                if not any(
+                    p.search(h[0] or "") or p.search(h[1] or "") or p.search(h[2] or "")
+                    for p in excl_patterns
+                )
+            ]
+
+        scope_parts = [sd for sd in subdirs if sd]
+        scope       = f"（范围：{'、'.join(scope_parts)}）" if scope_parts else ""
+        excl_note   = f"（排除：{'、'.join(excl_terms)}）" if excl_terms else ""
+        total       = len(all_hits)
+
         if total == 0:
-            return f"{'「'+subdir+'」内' if subdir else '全库'}未找到「{keyword}」。"
+            loc = '「' + '、'.join(scope_parts) + '」内' if scope_parts else '全库'
+            return f"{loc}未找到「{keyword}」{excl_note}，请更换目录或关键词！"
         if count_only:
             lines = [
-                f"命中 {total} 个文件{scope}，关键词「{keyword}」",
+                f"命中 {total} 个文件{scope}{excl_note}，关键词「{keyword}」",
                 f"（按页取结果：page_size={page_size}，共 {-(-total//page_size)} 页）",
                 "",
             ]
@@ -193,7 +235,7 @@ class SearchTools:
         total_pages = -(-total // page_size)
         page        = max(0, min(page, total_pages - 1))
         sliced      = all_hits[page*page_size:(page+1)*page_size]
-        header      = (f"共 {total} 处命中{scope}，"
+        header      = (f"共 {total} 处命中{scope}{excl_note}，"
                        f"第 {page+1}/{total_pages} 页，每页 {page_size} 条\n")
         parts = [
             f"[文件：{r}" + (f" | 标题：{t}" if t else "") + "]\n" + s
@@ -205,14 +247,20 @@ class SearchTools:
         if subdir in self._cfg.SPECIAL_DIRS:
             attr, fname = self._cfg.SPECIAL_DIRS[subdir]
             return (self._cfg.prefix_for(attr)
-                    + f"[DIRECTORY: {subdir}]\n[Discard after locating target files, keep only needed paths in your reply.]\n]"
-                    + self._cfg.dir_text(fname)+"\n[Discard after locating target files, keep only needed paths in your reply.]")
+                    + f"[DIRECTORY: {subdir}]\n"
+                    + self._cfg.dir_text(fname)+"\n")
         norm = subdir.replace("\\", "/").strip("/")
         if (norm.startswith("en/MECW/")
                 and not norm.endswith(".html")
                 and norm != "en/MECW"):
             return ("DIRECTORY ERROR: No sub-folders in en/MECW/. "
                     "Open en/MECW/MECWxx-index.html directly.")
+        if (norm.startswith("ru/VIL-UAIO/")
+                and not norm.endswith(".html")
+                and norm != "ru/VIL-UAIO/" and norm != "ru/VIL-UAIO"):
+            return ("DIRECTORY ERROR: This tool is invaild in current directory, use grep_files instead!")
+        if not norm.endswith("index.html") and norm.endswith(".html"):
+            return ("DIRECTORY ERROR: This tool is invaild for current file, use grep_files instead!")
         html_file = self._find_index(norm)
         if html_file is None:
             return f"No index page found in {subdir}."
@@ -227,8 +275,7 @@ class SearchTools:
                 if a.get_text(strip=True)
                 and not a["href"].startswith(("http://", "https://", "mailto:"))
             ]
-            return (f"[Contents: {subdir}  Total: {len(lines)}]"+"\n[Discard after locating target files, keep only needed paths in your reply.]\n"
-                    + "\n".join(lines)+"\n[Discard after locating target files, keep only needed paths in your reply.]") if lines else soup.get_text(separator="\n")[:3000]+"\n[Discard after locating target files, keep only needed paths in your reply.]"
+            return (f"[Contents: {subdir}  Total: {len(lines)}]"+ "\n".join(lines)) if lines else soup.get_text(separator="\n")[:3000]
         except Exception as exc:
             return f"读取失败：{exc}"
 
@@ -350,9 +397,10 @@ class ReadingTools:
     def __init__(self, cfg: Config):
         self._root = Path(cfg.HTML_FOLDER)
         self.MAX_TOOL_RESULT_CHARS=cfg.MAX_TOOL_RESULT_CHARS
+        self.COMPRESS_HISTORY=cfg.COMPRESS_HISTORY
 
     def read_file_html(self, rel_path: str,
-                       max_chars: int = 30000, offset: int = 0) -> str:
+                       max_chars: int = 5000, offset: int = 0) -> str:
         p = self._resolve(rel_path)
         if p is None:
             return f"文件不存在：{rel_path}"
@@ -372,9 +420,13 @@ class ReadingTools:
         title     = SearchTools._extract_title(p)
         header    = (f"[文件：{rel_path}" + (f" | 标题：{title}" if title else "") + "]\n"
                      f"[字符 {offset}~{offset+len(chunk)} / 共 {total}")
+        reminder_head="，阅读时如发现关键语句务必及时调用add_quote记录，"+f"阅读后可将此处文本压缩至{self.MAX_TOOL_RESULT_CHARS}字符以下" if self.COMPRESS_HISTORY else ""
+        reminder_back=f"[阅读后可将此处文本压缩至{self.MAX_TOOL_RESULT_CHARS}字符以下，如有关键语句务必调用add_quote记录]" if self.COMPRESS_HISTORY else ""
         if remaining > 0:
-            header += f"，剩余 {remaining} 字符，读后续部分请将offset设为{offset+max_chars}"+" 阅读时如发现关键语句务必及时调用add_quote记录，"+f"阅读后请将此处文本压缩至{self.MAX_TOOL_RESULT_CHARS}字符以下"
-        return header + "]\n" + chunk+"\n"+f"[阅读后请将此处文本压缩至{self.MAX_TOOL_RESULT_CHARS}字符以下，如有关键语句务必调用add_quote记录]"
+            header += f"，剩余 {remaining} 字符，读后续部分请将offset设为{offset+max_chars}"+reminder_head
+        elif remaining==0:
+            header += f"，本文件已读完，"+"阅读时如发现关键语句务必及时调用add_quote记录，"+f"阅读后可将此处文本压缩至{self.MAX_TOOL_RESULT_CHARS}字符以下"
+        return header + "]\n" + chunk+"\n"+reminder_back
 
     def read_file_links(self, rel_path: str, anchors_only: bool = False) -> str:
         p = self._resolve(rel_path)
@@ -487,21 +539,13 @@ class TranslationTools:
 # ToolHandler — TOOLS schema, dispatch table, session quotes
 # ══════════════════════════════════════════════════════════════════════════════
 class ToolHandler:
-    TOOLS = [
+    _BASE_TOOLS= [
         {
             "type": "function",
             "function": {
                 "name": "grep_files",
                 "description": (
-                    "Broad keyword search across the whole library or a subdirectory. "
-                    "Returns the first matching context snippet from each hit file.\n"
-                    "【Two-step workflow to prevent oversized results】\n"
-                    "1. Call with count_only=true → get hit count + file list.\n"
-                    "2a. Hits ≤ page_size → call normally (count_only=false).\n"
-                    "2b. Hits > page_size → page through (page=0,1,…) or pick key files "
-                    "    and read them with read_file_html.\n"
-                    "When subdir points to a directory the full directory is scanned "
-                    "(max_hits cap is ignored)."
+                    "Broad keyword search across the whole library or a subdirectory or within a file."
                 ),
                 "parameters": {
                     "type": "object",
@@ -509,21 +553,35 @@ class ToolHandler:
                         "keyword": {
                             "type": "string",
                             "description": (
-                                "Search keyword; language must match the files in subdir. "
-                                "German/English/Russian for those corpora; Chinese is forbidden "
-                                "unless the user explicitly permits it.\n"
-                                "For multiple terms use a regex and set is_regex=true.\n"
-                                "Regex: (?:A|B)=A or B; (?=.*A)(?=.*B)=both in paragraph; "
-                                "A.{0,50}B=within 50 chars."
+                                "Search keyword; language must match the files in subdir.\n"
+                                "Also accepts a full sentence as the keyword to get its exact context.\n"
+                                "No Chinese unless the user explicitly permits, especailly when searching non-Chinese contents!\n"
+                                "Also can and must set as a regex pattern for patching multiple terms while set is_regex=True.\n"
+                                "Regex pattern reference: (A|B)=A or B; (?=.*A)(?=.*B)=both in paragraph; A.{0,50}B=within 50 chars."
                             ),
                         },
-                        "subdir":               {"type": "string",  "default": ""},
-                        "max_hits":             {"type": "integer", "default": 20},
-                        "is_regex":             {"type": "boolean", "default": False},
-                        "count_only":           {"type": "boolean", "default": False},
-                        "page":                 {"type": "integer", "default": 0},
-                        "page_size":            {"type": "integer", "default": 600},
-                        "CONTEXT_CHARS_COARSE": {"type": "integer", "default": 150},
+                        "subdir":{"type": "string","description": (
+                                "Subdirectory, file path, or comma-separated list of paths (volumes) to search. "
+                               "Leave empty to search the full library. "
+                         "Example: 'docs/MEW-ZENO' or 'docs/MEW,docs/MEW-ZENO' or 'en/MECW/MECW35-xxx.html'."),"default": ""},
+                        "max_hits":{"type": "integer","description": (
+                            f"Hit cap for full-library searches (default {Config.MAX_HITS}); "
+                            "ignored when subdir points to a directory."
+                        ), "default": Config.MAX_HITS},
+                        "is_regex":{"type": "boolean", "description": "Enable regex mode to use keyword as a regex pattern. Default is false.","default": False},
+                        "count_only":{"type": "boolean","description": "When true, returns the total hit count and a list of file paths without context snippets for gauging result size.", "default": False},
+                        "page":{"type": "integer","description": "Page number (0-based) when paging through results together with page_size.","default": 0},
+                        "page_size":{"type": "integer", "description": "Number of hits per page (default 100).", "default": 100},
+                        "context_chars_coarse": {"type": "integer","description": (
+                            "Number of context characters returned around each keyword match. "
+                            "Adjust based on file language and need. Do not exceed 250. Default is 150."
+                        ), "default": 150},
+                        "exclude": { "type": "string", "description": (
+                            "Comma-separated exclusion terms or phrases. "
+                            "Any result snippet containing one of these terms or phrases is dropped. "
+                           "Useful to suppress endnotes, indexes, or editorial matter. "
+                            "Example: 'Указатель литературных работ,Указатель имен,Примечания' or 'Указатель,Примечания'."
+                              ),"default": "",},
                     },
                     "required": ["keyword"],
                 },
@@ -555,9 +613,7 @@ class ToolHandler:
             "function": {
                 "name": "read_file_html",
                 "description": (
-                "Reads the tagged body of an HTML file for close reading and excerpting.\n"
-                "Semantic tags preserved: blockquote = quotation, table = table, "
-                "sup = footnote reference, li = list item, h1–h6 = heading levels.\n"
+                "Reads the tagged body of an HTML file for close reading and excerpting while preserving these tags: blockquote, table, sup = footnote reference, li = list item, h1–h6 = heading levels.\n"
                 "Noise tags stripped: script, style, nav, header, footer.\n"
                 "Once you have located a file, prefer this tool over further grep searches for details.\n"
                 "Use the offset parameter to read long files in chunks."
@@ -566,7 +622,7 @@ class ToolHandler:
                     "type": "object",
                     "properties": {
                         "rel_path":  {"type": "string","description":"Relative file path (as returned by grep_files or book_index)."},
-                        "max_chars": {"type": "integer","description":"Maximum characters to read per chunk. Default is 30 000. Increase for denser files, decrease to read by shorter context.", "default": 30000},
+                        "max_chars": {"type": "integer","description":"Maximum characters to read per chunk. Default is 5 000. Should be increased for denser files, decreased to read by shorter context.", "default": 5000},
                         "offset":    {"type": "integer","description": "Starting character position. Use 0 for the first chunk. To read the next page, set offset = previous_offset + max_chars. Increment repeatedly to page through the entire file.","default": 0},
                     },
                     "required": ["rel_path"],
@@ -651,12 +707,17 @@ class ToolHandler:
                     "required": ["content", "source_lang"],
                 },
             },
-        },
+        }
     ]
 
     def __init__(self, search: SearchTools, reading: ReadingTools,
                  translation: TranslationTools):
         self.session_quotes: list[dict] = []
+        self._messages: list = []
+        self.COMPRESS_HISTORY=Config.COMPRESS_HISTORY
+        self.MAX_TOOL_RESULT_CHARS=Config.MAX_TOOL_RESULT_CHARS
+        self.TOOLS = list(self._BASE_TOOLS)
+        self.COMPRESSIBLE_TOOLS = {"grep_files", "book_index", "read_file_html", "read_file_links","translate_file","translate_snippet"}
         self._dispatch = {
             "grep_files":        search.grep_files,
             "book_index":        search.book_index,
@@ -673,12 +734,104 @@ class ToolHandler:
 
     def clear_quotes(self):
         self.session_quotes.clear()
-
+    def add_compress_history(self):
+        if self.COMPRESS_HISTORY:
+            self.TOOLS.append({
+    "type": "function",
+    "function": {
+        "name": "manage_history",
+        "description": (
+    "Compress or discard tool results to save context space if you no longer need them."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "tool_call_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of tool_call_ids whose results should be compressed.",
+                },
+                "action": {
+                    "type": "string",
+                    "enum": ["discard", "summarize","discard_last_assistant"],
+                    "description": (
+                        "discard: replace result with '[discarded]'. "
+                        "summarize: compress result to key points only."
+                        "discard_last_assistant: discard your last assistant message after extracting all needed information."
+                    ),
+                },
+            },
+            "required": ["tool_call_ids", "action"],
+        },
+       },
+     })
+            self._dispatch["manage_history"]=self.manage_history
     def _add_quote(self, text: str, source: str, note: str = "") -> str:
         self.session_quotes.append({"text": text, "source": source, "note": note})
         idx     = len(self.session_quotes)
         preview = text[:120] + ("…" if len(text) > 120 else "")
         return f"[摘录 #{idx} 已记录]\n来源：{source}\n内容：{preview}"
+    def build_compress_notice(self, total: int) -> str:
+        """构建压缩指令消息内容，列出所有可压缩记录的摘要。"""
+        id_to_tool: dict[str, str] = {}
+        for m in self._messages:
+            if m.get("role") == "assistant":
+                for tc in m.get("tool_calls", []):
+                    id_to_tool[tc["id"]] = tc["function"]["name"]
+ 
+        compressible = []
+        for m in self._messages:
+            tid = m.get("tool_call_id")
+            if (m.get("role") == "tool"
+                    and tid
+                    and id_to_tool.get(tid) in self.COMPRESSIBLE_TOOLS):
+                preview = str(m.get("content", ""))[:5000].replace("\n", " ")
+                compressible.append(
+                    f"  - id={tid} tool={id_to_tool[tid]} | {preview}"
+                )
+ 
+        notice = (
+            f"[SYSTEM NOTICE] Context is now {total} tokens, approaching the limit.\n"
+            "Compressible tool results:\n"
+            + ("\n".join(compressible) if compressible else "  (none)")
+            + "\n\nPlease call manage_history to discard or summarize irrelevant results, "
+            "then continue your task. Keep answering in user's original language."
+        )
+        return notice
+ 
+    def _manage_history(self, tool_call_ids: list, action: str) -> str:
+        if action == "discard_last_assistant":
+            for m in reversed(self._messages):
+                if (m.get("role") == "assistant"
+                and m.get("content")
+                and not m.get("tool_calls")
+                and m["content"] != "[discarded]"):
+                    m["content"] = "[discarded]"
+                    return "[Last assistant output discarded.]"
+            return "[No assistant output found.]"
+        id_to_tool: dict[str, str] = {}
+        for m in self._messages:
+            if m.get("role") == "assistant":
+                for tc in m.get("tool_calls", []):
+                    id_to_tool[tc["id"]] = tc["function"]["name"]
+ 
+        affected = 0
+        skipped  = 0
+        for m in self._messages:
+            if m.get("role") == "tool" and m.get("tool_call_id") in tool_call_ids:
+                tool_name = id_to_tool.get(m["tool_call_id"], "")
+                if tool_name not in self.COMPRESSIBLE_TOOLS:
+                    skipped += 1
+                    continue
+                if action == "discard":
+                    m["content"] = "[discarded]"
+                elif action == "summarize":
+                    m["content"] = m["content"][:self.MAX_TOOL_RESULT_CHARS] + "…[summarized]"
+                affected += 1
+ 
+        return (f"[{action}: {affected} result(s) compressed"
+                + (f", {skipped} skipped (not compressible)" if skipped else "")
+                + "]")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Agent — agentic loop
@@ -690,6 +843,11 @@ class Agent:
         self._client = chat_client
         self._tools  = tool_handler
         self._interrupt = chat_client._interrupt  # 获取 interrupt 引用
+        self._compressing = False
+        self.user_compressing = False
+        self.prompt_usage=0
+
+    # ========== 以下是新增的方法 ==========
 
     def run(self, user_input: str, history: list,
             show_tools: bool, show_think: bool, deep_read: bool) -> AgentResult:
@@ -700,32 +858,34 @@ class Agent:
             system += ("\n## 重要著作速查\n"
                        + self._cfg.important_works_me + "\n"
                        + self._cfg.important_works_vl)
-        pre_query_history = list(history)
         messages = [
             {"role": "system", "content": system},
             *history,
             {"role": "user",   "content": user_input},
         ]
         while True:
-
             try:
+                messages=self._auto_compress_if_needed(messages)
                 msg = self._client.chat(messages, self._tools.TOOLS, think=show_think)
             except KeyboardInterrupt:
                 self._interrupt.clear()  # 清除标志，避免重复触发
-                result = self._wait_for_followup(messages, pre_query_history)
+                result = self._wait_for_followup(messages)
                 if result is not None:
                     return result
                 continue
             self._print_thinking(msg, show_think)
             messages.append({k: v for k, v in msg.items() if k != "_thinking"})
             if not msg.get("tool_calls"):
-                answer      = msg.get("content", "").strip()
-                new_history = [m for m in messages if m.get("role") != "system"]
+                answer= msg.get("content", "").strip()
+                new_history= [m for m in messages if m.get("role") != "system"]
                 return AgentResult(AgentSignal.ANSWER, answer=answer, history=new_history)
             interrupted = False
             for tc in msg["tool_calls"]:
                 fn_name = tc["function"]["name"]
                 fn_args = json.loads(tc["function"]["arguments"])
+                if fn_name == "manage_history":
+                    self._compressing = False
+                    messages=self._tools._messages
                 if show_tools:
                     print(f"\n[工具] {fn_name}({fn_args})")
                 try:
@@ -749,14 +909,27 @@ class Agent:
                     "role": "tool", "tool_call_id": tc["id"],
                     "content": result_str,
                 })
+                self.prompt_usage=self._client.prompt_usage
             if interrupted:
                 self._interrupt.clear() 
-                result = self._wait_for_followup(messages, pre_query_history)
+                result = self._wait_for_followup(messages)
                 if result is not None:
                     return result
                 continue
-
-
+    def _auto_compress_if_needed(self, messages: list) -> list:
+        if self._compressing:
+            return messages
+        total     = self.prompt_usage
+        threshold = self._cfg.MAX_TOKENS * self._cfg.COMPRESS_THRESHOLD
+        if total <= threshold and not self.user_compressing:
+            return messages
+        self._tools._messages=messages
+        print(f"[上下文过长：{total} tokens，注入压缩指令…]")
+        self._compressing = True
+        return [{
+    "role": "user",
+    "content": self._tools.build_compress_notice(total),
+}]
 
     @staticmethod
     def _pause_menu(context_note: str = "") -> str:
@@ -764,7 +937,7 @@ class Agent:
             print(context_note)
         print(
             "  选项：\n"
-            "    <问题>  精简上下文单次作答（不使用工具）\n"
+            "    z       压缩历史记录\n"
             "    c       继续/重新发送当前请求\n"
             "    回车    输入补充问题后继续\n"
             "    p       保留记录返回主菜单\n"
@@ -775,25 +948,15 @@ class Agent:
             return input("  > ").strip()
         except (EOFError, KeyboardInterrupt):
             return "p"
-    def _single_trimmed_request(self, messages: list, question: str):
-        """Send one tool-free question with a half-size trimmed context."""
-        trimmed = self._trim_messages(messages, self._cfg.MAX_CONTEXT_CHARS // 2)
-        trimmed.append({"role": "user", "content": question})
-        print(f"  [精简上下文：{self._total_chars(trimmed)} 字符，无工具，发送中…]")
-        try:
-            single = self._client.chat(trimmed, tools=None, think=False)
-            print(f"\n{single.get('content', '').strip()}\n")
-        except Exception as exc:
-            print(f"  [单次请求失败：{exc}]")
-
-    def _wait_for_followup(self, messages: list,
-                           pre_query_history: list) -> Optional[AgentResult]:
+    def _wait_for_followup(self, messages: list) -> Optional[AgentResult]:
         while True:
             reply = self._pause_menu("[已中断]")
             new_history = [m for m in messages if m.get("role") != "system"]
             if reply.lower() == "c":
                 return None
-
+            if reply.lower()=="z":
+                self.user_compressing = True
+                return None
             if reply.lower() == "p":
                 self._interrupt.clear()
                 return AgentResult(AgentSignal.PAUSE, history=new_history)
@@ -844,12 +1007,21 @@ class Agent:
                     + f"\n[Search result too long, already exceed {limit} chars, "
                     "please sort out the results needed for answering user's question! And also using add_quote to record if you find key contexts!]")
         return text
-
     @staticmethod
     def _total_chars(messages: list) -> int:
         return sum(len(str(m.get("content", ""))) for m in messages)
-
+    def _single_trimmed_request(self, messages: list, question: str):
+        """备用"""
+        trimmed = self._trim_messages(messages, self._cfg.MAX_CONTEXT_CHARS // 2)
+        trimmed.append({"role": "user", "content": question})
+        print(f"  [精简上下文：{self._total_chars(trimmed)} 字符，无工具，发送中…]")
+        try:
+            single = self._client.chat(trimmed, tools=None, think=False)
+            print(f"\n{single.get('content', '').strip()}\n")
+        except Exception as exc:
+            print(f"  [单次请求失败：{exc}]")
     def _trim_messages(self, messages: list, char_limit: int) -> list:
+        """备用"""
         system     = [m for m in messages if m.get("role") == "system"]
         non_system = [m for m in messages if m.get("role") != "system"]
         kept, chars = [], 0
@@ -1008,6 +1180,7 @@ class AppController:
         self.history = result.history
         if result.signal == AgentSignal.PAUSE:
             print("[已暂停，待重新发送指令]\n")
+            print("\n" + "─"*55 + "\n")
             return                          # 返回主菜单，history 已恢复
         # ANSWER
         if result.answer:
@@ -1031,11 +1204,13 @@ class AppController:
             self._tool_handler.clear_quotes()
             self.history = []
             print("[原记录已清空，新对话开始]\n")
+            print("\n" + "─"*55 + "\n")
 
     def _cmd_new(self):
         self._tool_handler.clear_quotes()
         self.history = []
         print("[原记录已清空，新对话开始]\n")
+        print("\n" + "─"*55 + "\n")
 
     def _cmd_undo(self):
         last_user = next(
