@@ -40,10 +40,10 @@ class ChatClient:
             "stream":             False,
             "repetition_penalty": 1.0,
             "presence_penalty":   1.5,
-            "extra_body": {"TOP_K": 20, "enable_thinking": think},
         }
         if tools:
             payload["tools"] = tools
+        payload[self._cfg.MODEL_THINK_TYPE] = self._cfg.MODEL_THINK_CFG[self._cfg.MODEL_THINK_TYPE]
         resp = self._request_with_retry(payload)
         resp.raise_for_status()
         data  = resp.json()
@@ -53,18 +53,26 @@ class ChatClient:
                   f"输出={usage['completion_tokens']}，"
                   f"总计={usage['total_tokens']}")
             with self._usage_lock:
-                self.prompt_usage=usage['prompt_tokens']
-        msg     = data["choices"][0]["message"]
-        thinking = msg.get("reasoning_content", "").strip()
-        if not thinking and msg.get("content"):
-            m = re.search(r"<think>(.*?)</think>", msg["content"], re.DOTALL)
+                self.prompt_usage = usage['prompt_tokens']
+        msg      = data["choices"][0]["message"]
+        thinking = (msg.get("reasoning_content") or "").strip()
+        content  = msg.get("content") or ""
+        if not thinking and content:
+            m = re.search(r"<think>(.*?)</think>", content, re.DOTALL)
             if m:
                 thinking = m.group(1).strip()
-                msg["content"] = re.sub(
-                    r"<think>.*?</think>\s*", "", msg["content"], flags=re.DOTALL
+                cleaned  = re.sub(
+                    r"<think>.*?</think>\s*", "", content, flags=re.DOTALL
                 ).strip()
+                # tool_calls 存在时 content 清空也没关系；无 tool_calls 时正常替换
+                msg["content"] = cleaned
+
+        if msg.get("content") is None:
+            msg["content"] = ""
+
         if thinking:
             msg["_thinking"] = thinking
+        msg["content"] = (msg.get("content") or "").strip()
         return msg
 
     def _request_with_retry(self, payload: dict):
@@ -156,12 +164,14 @@ class SearchTools:
         max_hits: int = None, is_regex: bool = False,
         count_only: bool = False, page: int = 0, page_size: int = 100,
         context_chars_coarse: int = 150,
-        exclude: str | list[str] = "",
+        exclude: str | list[str] = "",read_context=False
     ) -> str:
         if max_hits is None:
             max_hits = self._cfg.MAX_HITS
-        if context_chars_coarse > 250:
-            return "上下文字符数长于 250，请缩小范围。"
+        if not read_context and context_chars_coarse > 250:
+            context_chars_coarse=250
+        elif read_context and context_chars_coarse >1000:
+            context_chars_coarse=1000
 
         # 标准化 subdir → list
         if isinstance(subdir, str):
@@ -223,6 +233,8 @@ class SearchTools:
         if total == 0:
             loc = '「' + '、'.join(scope_parts) + '」内' if scope_parts else '全库'
             return f"{loc}未找到「{keyword}」{excl_note}，请更换目录或关键词！"
+        if total>1 and read_context and context_chars_coarse > 250:
+            return "有多处匹配，请调整keyword以锁定上下文！"
         if count_only:
             lines = [
                 f"命中 {total} 个文件{scope}{excl_note}，关键词「{keyword}」",
@@ -256,8 +268,7 @@ class SearchTools:
             return ("DIRECTORY ERROR: No sub-folders in en/MECW/. "
                     "Open en/MECW/MECWxx-index.html directly.")
         if (norm.startswith("ru/VIL-UAIO/")
-                and not norm.endswith(".html")
-                and norm != "ru/VIL-UAIO/" and norm != "ru/VIL-UAIO"):
+                and (not norm.endswith(".html") or norm.endswith("index.html"))) and norm != "ru/VIL-UAIO/" and norm != "ru/VIL-UAIO":
             return ("DIRECTORY ERROR: This tool is invaild in current directory, use grep_files instead!")
         if not norm.endswith("index.html") and norm.endswith(".html"):
             return ("DIRECTORY ERROR: This tool is invaild for current file, use grep_files instead!")
@@ -574,7 +585,8 @@ class ToolHandler:
                         "page_size":{"type": "integer", "description": "Number of hits per page (default 100).", "default": 100},
                         "context_chars_coarse": {"type": "integer","description": (
                             "Number of context characters returned around each keyword match. "
-                            "Adjust based on file language and need. Do not exceed 250. Default is 150."
+                            "Set to 500–2000 for close reading of a specific passage in a known file while setting read_context=true and keyword to be a concrete context instead of calling read_file_html. Do not exceed 2000."
+                            "Adjust based on file language and need. Default is 150."
                         ), "default": 150},
                         "exclude": { "type": "string", "description": (
                             "Comma-separated exclusion terms or phrases. "
@@ -582,6 +594,9 @@ class ToolHandler:
                            "Useful to suppress endnotes, indexes, or editorial matter. "
                             "Example: 'Указатель литературных работ,Указатель имен,Примечания' or 'Указатель,Примечания'."
                               ),"default": "",},
+                        "read_context": { "type": "boolean", "description": (
+                            "Set this True when you are acquiring context by concrete sentences. Default is False."
+                              ),"default":False,},
                     },
                     "required": ["keyword"],
                 },
@@ -730,8 +745,22 @@ class ToolHandler:
 
     def call(self, fn_name: str, fn_args: dict) -> str:
         fn = self._dispatch.get(fn_name)
-        return str(fn(**fn_args)) if fn else f"未知工具：{fn_name}"
-
+        if not fn:
+            return f"未知工具：{fn_name}"
+        # 从 TOOLS schema 获取合法参数名，过滤掉模型乱写的参数
+        valid = {
+            t["function"]["name"]: set(
+                t["function"]["parameters"]["properties"].keys()
+            )
+            for t in self.TOOLS
+            if t.get("type") == "function"
+        }.get(fn_name)
+        if valid:
+            bad = {k for k in fn_args if k not in valid}
+            if bad:
+                print(f"  [忽略未知参数 {fn_name}: {bad}]")
+                fn_args = {k: v for k, v in fn_args.items() if k in valid}
+        return str(fn(**fn_args))
     def clear_quotes(self):
         self.session_quotes.clear()
     def add_compress_history(self):
@@ -795,7 +824,7 @@ class ToolHandler:
             "Compressible tool results:\n"
             + ("\n".join(compressible) if compressible else "  (none)")
             + "\n\nPlease call manage_history to discard or summarize irrelevant results, "
-            "then continue your task. Keep answering in user's original language."
+            "then continue your task. Keep answering user's original questions in user's original language."
         )
         return notice
  
@@ -867,6 +896,10 @@ class Agent:
             try:
                 messages=self._auto_compress_if_needed(messages)
                 msg = self._client.chat(messages, self._tools.TOOLS, think=show_think)
+                if not msg.get("tool_calls") and msg.get("_thinking"):
+                    parsed = self._extract_tool_calls_from_thinking(msg["_thinking"])
+                    if parsed:
+                        msg["tool_calls"] = parsed
             except KeyboardInterrupt:
                 self._interrupt.clear()  # 清除标志，避免重复触发
                 result = self._wait_for_followup(messages)
@@ -876,7 +909,7 @@ class Agent:
             self._print_thinking(msg, show_think)
             messages.append({k: v for k, v in msg.items() if k != "_thinking"})
             if not msg.get("tool_calls"):
-                answer= msg.get("content", "").strip()
+                answer=(msg.get("content") or "").strip()
                 new_history= [m for m in messages if m.get("role") != "system"]
                 return AgentResult(AgentSignal.ANSWER, answer=answer, history=new_history)
             interrupted = False
@@ -920,7 +953,7 @@ class Agent:
         if self._compressing:
             return messages
         total     = self.prompt_usage
-        threshold = self._cfg.MAX_TOKENS * self._cfg.COMPRESS_THRESHOLD
+        threshold = self._cfg.COMPRESS_THRESHOLD
         if total <= threshold and not self.user_compressing:
             return messages
         self._tools._messages=messages
@@ -1002,11 +1035,49 @@ class Agent:
 
     def _cap_tool_result(self, text: str) -> str:
         limit =self._cfg.MAX_TOOL_RESULT_CHARS
-        if len(text) > limit:
+        if len(text) > limit and self._cfg.COMPRESS_HISTORY:
             return (text
                     + f"\n[Search result too long, already exceed {limit} chars, "
                     "please sort out the results needed for answering user's question! And also using add_quote to record if you find key contexts!]")
         return text
+    def _extract_tool_calls_from_thinking(self,thinking: str) -> list:
+        import uuid
+        # 从 TOOLS schema 建立合法参数名索引
+        valid_params = {
+            t["function"]["name"]: set(
+                t["function"]["parameters"]["properties"].keys()
+            )
+            for t in self._tools.TOOLS
+            if t.get("type") == "function"
+        }
+        results = []
+        for block in re.finditer(r"<tool_call>(.*?)</tool_call>", thinking, re.DOTALL):
+            block_text = block.group(1).strip()
+            fn_match = re.search(r"<function=(\w+)>", block_text)
+            if not fn_match:
+                continue
+            fn_name = fn_match.group(1)
+            if fn_name not in valid_params:
+                continue
+            allowed = valid_params[fn_name]
+            params = {}
+            for p in re.finditer(
+                r"<parameter=(\w+)>\s*(.*?)\s*</parameter>", block_text, re.DOTALL
+            ):
+                k, v = p.group(1), p.group(2).strip()
+                if k in allowed:
+                    params[k] = v
+                else:
+                    print(f"  [thinking 工具调用：忽略未知参数 {fn_name}.{k}]")
+            results.append({
+                "id":       f"thinking_{uuid.uuid4().hex[:8]}",
+                "type":     "function",
+                "function": {
+                    "name":      fn_name,
+                    "arguments": json.dumps(params, ensure_ascii=False),
+                },
+            })
+        return results
     @staticmethod
     def _total_chars(messages: list) -> int:
         return sum(len(str(m.get("content", ""))) for m in messages)
@@ -1056,7 +1127,7 @@ def save_history(history: list, quotes: list,
     lines = []
     for m in history:
         role    = m.get("role")
-        content = m.get("content", "").strip()
+        content = (m.get("content") or "").strip()
         if role == "user" and content:
             lines.append(f"## 问\n{content}\n")
         elif role == "assistant":

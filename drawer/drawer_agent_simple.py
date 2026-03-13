@@ -42,10 +42,10 @@ class ChatClient:
             "stream":             False,
             "repetition_penalty": 1.0,
             "presence_penalty":   1.5,
-            "extra_body": {"TOP_K": 20, "enable_thinking": think},
         }
         if tools:
             payload["tools"] = tools
+        payload[self._cfg.MODEL_THINK_TYPE] = self._cfg.MODEL_THINK_CFG[self._cfg.MODEL_THINK_TYPE]
         resp = self._request_with_retry(payload)
         resp.raise_for_status()
         data  = resp.json()
@@ -54,17 +54,27 @@ class ChatClient:
             print(f"Token 使用：输入={usage['prompt_tokens']}，"
                   f"输出={usage['completion_tokens']}，"
                   f"总计={usage['total_tokens']}")
-        msg     = data["choices"][0]["message"]
-        thinking = msg.get("reasoning_content", "").strip()
-        if not thinking and msg.get("content"):
-            m = re.search(r"<think>(.*?)</think>", msg["content"], re.DOTALL)
+            with self._usage_lock:
+                self.prompt_usage = usage['prompt_tokens']
+        msg      = data["choices"][0]["message"]
+        thinking = (msg.get("reasoning_content") or "").strip()
+        content  = msg.get("content") or ""
+        if not thinking and content:
+            m = re.search(r"<think>(.*?)</think>", content, re.DOTALL)
             if m:
                 thinking = m.group(1).strip()
-                msg["content"] = re.sub(
-                    r"<think>.*?</think>\s*", "", msg["content"], flags=re.DOTALL
+                cleaned  = re.sub(
+                    r"<think>.*?</think>\s*", "", content, flags=re.DOTALL
                 ).strip()
+                # tool_calls 存在时 content 清空也没关系；无 tool_calls 时正常替换
+                msg["content"] = cleaned
+
+        if msg.get("content") is None:
+            msg["content"] = ""
+
         if thinking:
             msg["_thinking"] = thinking
+        msg["content"] = (msg.get("content") or "").strip()
         return msg
 
     # ── internals ─────────────────────────────────────────────────────────
@@ -538,7 +548,22 @@ class ToolHandler:
 
     def call(self, fn_name: str, fn_args: dict) -> str:
         fn = self._dispatch.get(fn_name)
-        return str(fn(**fn_args)) if fn else f"未知工具：{fn_name}"
+        if not fn:
+            return f"未知工具：{fn_name}"
+        # 从 TOOLS schema 获取合法参数名，过滤掉模型乱写的参数
+        valid = {
+            t["function"]["name"]: set(
+                t["function"]["parameters"]["properties"].keys()
+            )
+            for t in self.TOOLS
+            if t.get("type") == "function"
+        }.get(fn_name)
+        if valid:
+            bad = {k for k in fn_args if k not in valid}
+            if bad:
+                print(f"  [忽略未知参数 {fn_name}: {bad}]")
+                fn_args = {k: v for k, v in fn_args.items() if k in valid}
+        return str(fn(**fn_args))
 
     def clear_quotes(self):
         self.session_quotes.clear()
