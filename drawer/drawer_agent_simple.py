@@ -12,6 +12,7 @@ from typing import Optional
 import httpx
 from bs4 import BeautifulSoup
 from agent_config import Config
+import argparse
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ChatClient — independent LLM wrapper
@@ -30,6 +31,7 @@ class ChatClient:
             "Content-Type":  "application/json",
             "Authorization": f"Bearer {cfg.API_KEY}",
         }
+        self.prompt_usage=0
 
     def chat(self, messages: list, tools: Optional[list] = None,
              think: bool = True) -> dict:
@@ -297,9 +299,8 @@ class SearchTools:
             return ("DIRECTORY ERROR: No sub-folders in en/MECW/. "
                     "Open en/MECW/MECWxx-index.html directly.")
         if (norm.startswith("ru/VIL-UAIO/")
-                and not norm.endswith(".html")
-                and norm != "ru/VIL-UAIO/" and norm != "ru/VIL-UAIO"):
-            return ("DIRECTORY ERROR: This tool is invaild in current directory, use grep_files instead!")
+                and (not norm.endswith(".html") or norm.endswith("index.html"))) and norm != "ru/VIL-UAIO/" and norm != "ru/VIL-UAIO":
+            return ("DIRECTORY ERROR: This tool is invaild in current directory, use grep_files to read this volume's content instead!")
         if not norm.endswith("index.html") and norm.endswith(".html"):
             return ("DIRECTORY ERROR: This tool is invaild for current file, use grep_files instead!")
         html_file = self._find_index(norm)
@@ -642,6 +643,12 @@ class Agent:
                     "role": "tool", "tool_call_id": tc["id"],
                     "content": result_str,
                 })
+                if self._client.prompt_usage>=self._cfg.COMPRESS_THRESHOLD*0.8:
+                    print(f"[模型调用已接近上限，输入token{self.ChatClient.prompt_usage}大于最大上下文允许的输入的80%：{self._cfg.COMPRESS_THRESHOLD*0.8}]")
+                    messages.append({
+                            "role": "user",
+                            "content": "模型输入已达到上限，停止工具调用，立刻根据工具调用结果（构思如何）生成答案！Input has overszied! Stop using tools and begin to figure out and write the answer fastly and  immediately according to your tool usage!",
+                        })
             if interrupted:
                 self._interrupt.clear() 
                 result = self._wait_for_followup(messages)
@@ -995,11 +1002,44 @@ class AppController:
         print("  t 工具显示  d 思考模式  n 新对话  s 保存 + 新对话  e 撤销  q 退出")
         print("  Ctrl+C 中止当前查询（再按一次强制退出）\n")
 
+def _parse_args(cfg: Config) -> Config:
+    parser = argparse.ArgumentParser(description="文献查询系统")
+    parser.add_argument("--model",                 type=str,   help="模型名称")
+    parser.add_argument("--api-url",               type=str,   help="API 地址")
+    parser.add_argument("--api-key",               type=str,   help="API 密钥")
+    parser.add_argument("--max-context-token",            type=int,   help="模型最大上下文窗口 token 数")
+    parser.add_argument("--max-tokens",            type=int,   help="最大输出 token 数")
+    parser.add_argument("--max-hits",              type=int,   help="搜索最大命中数")
+    parser.add_argument("--temperature",           type=float, help="温度，控制模型输出随机性")
+    parser.add_argument("--top-p",                 type=float, help="top-p，控制模型关联token输出")
+    parser.add_argument("--max-tool-result-chars", type=int,   help="工具结果最大字符数")
+    parser.add_argument("--html-folder",           type=str,   help="文献库根目录")
+    parser.add_argument("--output",                type=str,   help="历史保存目录")
+    parser.add_argument("--tools",     action="store_true",    help="启动时开启工具显示")
+    parser.add_argument("--think",     action="store_true",    help="启动时开启思考模式")
+    parser.add_argument("--think-type",     type=str,    help="模型思考模式加载参数")
+    args = parser.parse_args()
+
+    if args.model:                   cfg.MODEL                 = args.model
+    if args.api_url:                 cfg.API_URL               = args.api_url
+    if args.api_key:                 cfg.API_KEY               = args.api_key
+    if args.max_tokens:              cfg.MAX_TOKENS            = args.max_tokens
+    if args.max_context_token:              cfg.MODEL_MAX_CONTEXT_TOKEN          = args.max_context_token
+    if args.max_hits:                cfg.MAX_HITS              = args.max_hits
+    if args.temperature is not None: cfg.TEMPERATURE           = args.temperature
+    if args.top_p       is not None: cfg.TOP_P                 = args.top_p
+    if args.max_tool_result_chars:   cfg.MAX_TOOL_RESULT_CHARS = args.max_tool_result_chars
+    if args.html_folder:             cfg.HTML_FOLDER           = args.html_folder
+    if args.output:                  cfg.HISTORY_OUTPUT_PATH   = args.output
+    if args.tools:                   cfg.DISPLAY_TOOLS         = True
+    if args.think:                   cfg.ENABLE_THINKING       = True
+    if args.think_type:               cfg.MODEL_THINK_TYPE      =args.think_type
+    return cfg
 # ══════════════════════════════════════════════════════════════════════════════
-# main — wires dependencies, hands off to AppController
+# main
 # ══════════════════════════════════════════════════════════════════════════════
 def main():
-    cfg          = Config()
+    cfg          = _parse_args(Config())
     interrupt    = threading.Event()
     chat_client  = ChatClient(cfg, interrupt)
     search       = SearchTools(cfg)

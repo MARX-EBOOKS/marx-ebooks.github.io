@@ -12,6 +12,8 @@ from typing import Optional
 import httpx
 from bs4 import BeautifulSoup
 from agent_config import Config
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import argparse
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ChatClient — independent LLM wrapper (httpx)
@@ -269,7 +271,7 @@ class SearchTools:
                     "Open en/MECW/MECWxx-index.html directly.")
         if (norm.startswith("ru/VIL-UAIO/")
                 and (not norm.endswith(".html") or norm.endswith("index.html"))) and norm != "ru/VIL-UAIO/" and norm != "ru/VIL-UAIO":
-            return ("DIRECTORY ERROR: This tool is invaild in current directory, use grep_files instead!")
+            return ("DIRECTORY ERROR: This tool is invaild in current directory, use grep_files or read_file_html to read this volume's content instead!")
         if not norm.endswith("index.html") and norm.endswith(".html"):
             return ("DIRECTORY ERROR: This tool is invaild for current file, use grep_files instead!")
         html_file = self._find_index(norm)
@@ -913,35 +915,51 @@ class Agent:
                 new_history= [m for m in messages if m.get("role") != "system"]
                 return AgentResult(AgentSignal.ANSWER, answer=answer, history=new_history)
             interrupted = False
-            for tc in msg["tool_calls"]:
-                fn_name = tc["function"]["name"]
-                fn_args = json.loads(tc["function"]["arguments"])
-                if fn_name == "manage_history":
-                    self._compressing = False
-                    messages=self._tools._messages
-                if show_tools:
-                    print(f"\n[工具] {fn_name}({fn_args})")
-                try:
-                    result_str = self._tools.call(fn_name, fn_args)
-                except KeyboardInterrupt:
-                    self._interrupt.clear()  # 清除标志
-                    idx = msg["tool_calls"].index(tc)
-                    for rtc in msg["tool_calls"][idx:]:
+            # 并发执行所有 tool_calls
+            futures = {}
+            with ThreadPoolExecutor(max_workers=self._cfg.MAX_CONCURRENT) as executor:
+                for tc in msg["tool_calls"]:
+                    fn_name = tc["function"]["name"]
+                    fn_args = json.loads(tc["function"]["arguments"])
+                    if show_tools:
+                        print(f"\n[工具] {fn_name}({fn_args})")
+                    if fn_name == "manage_history":
+                        self._compressing = False
+                        self._tools._messages = messages
+                        result_str = self._tools.call(fn_name, fn_args)
+                        messages = self._tools._messages
+                        if show_tools:
+                            print(f"  [结果] {result_str[:300]}")
                         messages.append({
-                            "role": "tool", "tool_call_id": rtc["id"],
-                            "content": "[STOPPED ABRUPTLY]",
+                            "role": "tool", "tool_call_id": tc["id"],
+                            "content": result_str,
                         })
-                    interrupted = True
-                    break
-                if fn_name not in [r"translate_file",r"translate_snippet"]:
-                    result_str = self._cap_tool_result(result_str)
-                if show_tools:
-                    print(f"  [结果] {result_str[:300]}"
-                          f"{'…' if len(result_str) > 300 else ''}")
-                messages.append({
-                    "role": "tool", "tool_call_id": tc["id"],
-                    "content": result_str,
-                })
+                        continue
+                    futures[executor.submit(self._tools.call, fn_name, fn_args)] = tc
+
+                for future in as_completed(futures):
+                    tc = futures[future]
+                    try:
+                        result_str = future.result()
+                    except KeyboardInterrupt:
+                        self._interrupt.clear()
+                        for remaining_tc in futures.values():
+                            messages.append({
+                                "role": "tool", "tool_call_id": remaining_tc["id"],
+                                "content": "[STOPPED ABRUPTLY]",
+                            })
+                        interrupted = True
+                        break
+                    fn_name = tc["function"]["name"]
+                    if fn_name not in {"translate_file", "translate_snippet"}:
+                        result_str = self._cap_tool_result(result_str)
+                    if show_tools:
+                        print(f"  [结果] {result_str[:300]}"
+                              f"{'…' if len(result_str) > 300 else ''}")
+                    messages.append({
+                        "role": "tool", "tool_call_id": tc["id"],
+                        "content": result_str,
+                    })
                 self.prompt_usage=self._client.prompt_usage
             if interrupted:
                 self._interrupt.clear() 
@@ -956,14 +974,33 @@ class Agent:
         threshold = self._cfg.COMPRESS_THRESHOLD
         if total <= threshold and not self.user_compressing:
             return messages
+        largest_i, largest_len = None, 0
+        for i, m in enumerate(messages):
+            if m.get("role") == "tool":
+                l = len(str(m.get("content", "")))
+                if l > largest_len:
+                    largest_i, largest_len = i, l
+        # 单条异常大（超过阈值一半）且总量没超太多，直接丢掉这一条
+        if (largest_i is not None
+                and largest_len > threshold // 2
+                and not self.user_compressing):
+            self._tools._messages = messages
+            result = self._tools._manage_history([], "discard_largest")
+            print(f"[单条异常大结果：{result}]")
+            return self._tools._messages
         self._tools._messages=messages
         print(f"[上下文过长：{total} tokens，注入压缩指令…]")
         self._compressing = True
-        return [{
-    "role": "user",
-    "content": self._tools.build_compress_notice(total),
-}]
-
+        self.user_compressing = False
+        # 找最后一条用户消息
+        last_user = next(
+            (m for m in reversed(messages) if m.get("role") == "user"),
+            None,
+        )
+        compress_msg = {"role": "user", "content": self._tools.build_compress_notice(total)}
+        if last_user:
+            compress_msg["content"] += f"\n\n[用户原始问题，请在压缩完成后继续回答：{last_user['content']}]"
+        return [compress_msg]
     @staticmethod
     def _pause_menu(context_note: str = "") -> str:
         if context_note:
@@ -1311,11 +1348,47 @@ class AppController:
         print("  t 工具显示  d 思考模式  r 深度阅读  n 新对话  s 保存 + 新对话  e 撤销  q 退出")
         print("  Ctrl+C 中止当前查询（再按一次强制退出）\n")
 
+def _parse_args(cfg: Config) -> Config:
+    parser = argparse.ArgumentParser(description="文献查询系统")
+    parser.add_argument("--model",                 type=str,   help="模型名称")
+    parser.add_argument("--api-url",               type=str,   help="API 地址")
+    parser.add_argument("--api-key",               type=str,   help="API 密钥")
+    parser.add_argument("--max-context-token",            type=int,   help="模型最大上下文窗口 token 数")
+    parser.add_argument("--max-tokens",            type=int,   help="最大输出 token 数")
+    parser.add_argument("--max-hits",              type=int,   help="搜索最大命中数")
+    parser.add_argument("--temperature",           type=float, help="温度，控制模型输出随机性")
+    parser.add_argument("--top-p",                 type=float, help="top-p，控制模型关联token输出")
+    parser.add_argument("--max-tool-result-chars", type=int,   help="工具结果最大字符数")
+    parser.add_argument("--html-folder",           type=str,   help="文献库根目录")
+    parser.add_argument("--output",                type=str,   help="历史保存目录")
+    
+    parser.add_argument("--tools",     action="store_true",    help="启动时开启工具显示")
+    parser.add_argument("--think",     action="store_true",    help="启动时开启思考模式")
+    parser.add_argument("--think-type",     type=str,    help="模型思考模式加载参数")
+    parser.add_argument("--deep-read", action="store_true",    help="启动时开启深度阅读")
+    args = parser.parse_args()
+
+    if args.model:                   cfg.MODEL                 = args.model
+    if args.api_url:                 cfg.API_URL               = args.api_url
+    if args.api_key:                 cfg.API_KEY               = args.api_key
+    if args.max_context_token:              cfg.MODEL_MAX_CONTEXT_TOKEN          = args.max_context_token
+    if args.max_tokens:              cfg.MAX_TOKENS            = args.max_tokens
+    if args.max_hits:                cfg.MAX_HITS              = args.max_hits
+    if args.temperature is not None: cfg.TEMPERATURE           = args.temperature
+    if args.top_p       is not None: cfg.TOP_P                 = args.top_p
+    if args.max_tool_result_chars:   cfg.MAX_TOOL_RESULT_CHARS = args.max_tool_result_chars
+    if args.html_folder:             cfg.HTML_FOLDER           = args.html_folder
+    if args.output:                  cfg.HISTORY_OUTPUT_PATH   = args.output
+    if args.tools:                   cfg.DISPLAY_TOOLS         = True
+    if args.think:                   cfg.ENABLE_THINKING       = True
+    if args.think_type:               cfg.MODEL_THINK_TYPE      =args.think_type
+    if args.deep_read:               cfg.DEEP_READ             = True
+    return cfg
 # ══════════════════════════════════════════════════════════════════════════════
 # main
 # ══════════════════════════════════════════════════════════════════════════════
 def main():
-    cfg          = Config()
+    cfg          = _parse_args(Config())
     interrupt    = threading.Event()
     chat_client  = ChatClient(cfg, interrupt)
     search       = SearchTools(cfg)
