@@ -24,6 +24,7 @@ class ChatClient:
         self._interrupt = interrupt_flag
         self._sem       = threading.Semaphore(cfg.MAX_CONCURRENT)
         self._timeout   = cfg.TIMEOUT
+        self._cancel    =threading.Event()
         self.prompt_usage=0
         self._usage_lock = threading.Lock()
         self._headers   = {
@@ -31,24 +32,30 @@ class ChatClient:
             "Authorization": f"Bearer {cfg.API_KEY}",
         }
 
-    def chat(self, messages: list, tools: Optional[list] = None,
-             think: bool = True) -> dict:
+    def _build_payload(self, messages: list,
+                       tools: Optional[list] = None,
+                       think: bool = True) -> dict:
         payload = {
-            "model":              self._cfg.MODEL,
-            "messages":           messages,
-            "temperature":        self._cfg.TEMPERATURE,
-            "top_p":              self._cfg.TOP_P,
-            "max_tokens":         self._cfg.MAX_TOKENS,
-            "stream":             False,
+            "model":       self._cfg.MODEL,
+            "messages":    messages,
+            "temperature": self._cfg.TEMPERATURE,
+            "top_p":       self._cfg.TOP_P,
+            "max_tokens":  self._cfg.MAX_TOKENS,
+            "stream":      False,
             "repetition_penalty": 1.0,
             "presence_penalty":   1.5,
         }
         if tools:
             payload["tools"] = tools
-        payload[self._cfg.MODEL_THINK_TYPE] = self._cfg.MODEL_THINK_CFG[self._cfg.MODEL_THINK_TYPE]
-        resp = self._request_with_retry(payload)
-        resp.raise_for_status()
-        data  = resp.json()
+        think_val = self._cfg.get_think_payload(think)
+        if think_val is not None:
+            payload[self._cfg.MODEL_THINK_TYPE] = think_val
+            if self._cfg.MODEL_THINK_TYPE=="enable_thinking":
+                payload["top_k"]=20
+        return payload
+
+    # ── 响应解析 ─────────────────────────────────────────────────────────
+    def _parse_response(self, data: dict) -> dict:
         usage = data.get("usage")
         if usage:
             print(f"Token 使用：输入={usage['prompt_tokens']}，"
@@ -56,26 +63,184 @@ class ChatClient:
                   f"总计={usage['total_tokens']}")
             with self._usage_lock:
                 self.prompt_usage = usage['prompt_tokens']
+
         msg      = data["choices"][0]["message"]
         thinking = (msg.get("reasoning_content") or "").strip()
         content  = msg.get("content") or ""
+
         if not thinking and content:
             m = re.search(r"<think>(.*?)</think>", content, re.DOTALL)
             if m:
                 thinking = m.group(1).strip()
-                cleaned  = re.sub(
+                msg["content"] = re.sub(
                     r"<think>.*?</think>\s*", "", content, flags=re.DOTALL
                 ).strip()
-                # tool_calls 存在时 content 清空也没关系；无 tool_calls 时正常替换
-                msg["content"] = cleaned
 
         if msg.get("content") is None:
             msg["content"] = ""
-
         if thinking:
             msg["_thinking"] = thinking
+            if not (msg.get("tool_calls") or []):
+                extracted = self._extract_tool_calls_from_thinking(thinking)
+                if extracted:
+                    print(f"[think-tool] 从推理中提取到 {len(extracted)} 个工具调用")
+                    msg["tool_calls"] = extracted
+
         msg["content"] = (msg.get("content") or "").strip()
         return msg
+
+    # ── think-tool 提取 ───────────────────────────────────────────────────
+    @staticmethod
+    def _extract_tool_calls_from_thinking(thinking: str, tools: list[dict] | None = None) -> list[dict]:
+        sig_map: list[tuple[frozenset, str]] = []
+        if tools:
+            for t in tools:
+                fn = t["function"]
+                req = frozenset(fn["parameters"].get("required", []))
+                if req:
+                    sig_map.append((req, fn["name"]))
+
+        # 找出 thinking 中所有合法 JSON 对象
+        tool_calls = []
+        for i, m in enumerate(re.finditer(r'\{.*?\}', thinking, re.DOTALL)):
+            raw = m.group(0).strip()
+            try:
+                obj = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(obj, dict) or not obj:
+                continue
+
+            # 格式 A/B：对象本身就是 {name, arguments} 结构
+            name = obj.get("name") or obj.get("function") or obj.get("tool")
+            args = obj.get("arguments") or obj.get("parameters")
+            if name and args is not None:
+                args_str = json.dumps(args, ensure_ascii=False) \
+                           if isinstance(args, dict) else str(args)
+                tool_calls.append({
+                    "id": f"think_tc_{i}",
+                    "type": "function",
+                    "function": {"name": name, "arguments": args_str},
+                })
+                continue
+
+            # 格式 C：对象本身就是参数，通过 key 签名反查工具名
+            if sig_map:
+                key_set = frozenset(obj.keys())
+                for req_keys, tool_name in sig_map:
+                    if req_keys.issubset(key_set):
+                        tool_calls.append({
+                            "id": f"think_tc_{i}",
+                            "type": "function",
+                            "function": {
+                                "name": tool_name,
+                                "arguments": json.dumps(obj, ensure_ascii=False),
+                            },
+                        })
+                        break
+
+        return tool_calls
+    # ── 多模态消息构造（静态，供 PageProcessor 使用）──────────────────────
+    @staticmethod
+    def build_multimodal_messages(prompt: str, images_b64: list[str]) -> list[dict]:
+        content = [
+            {"type": "image_url",
+             "image_url": {"url": f"data:image/png;base64,{b64}"}}
+            for b64 in images_b64
+        ]
+        content.append({"type": "text", "text": prompt})
+        return [{"role": "user", "content": content}]
+    def chat(self, messages: list, tools: Optional[list] = None,
+             think: bool = True) -> dict:
+        payload = self._build_payload(messages, tools, think)
+        resp = self._request_with_retry(payload)
+        resp.raise_for_status()
+        return self._parse_response(resp.json())
+
+    # ── batch 提交 ────────────────────────────────────────────────────────
+    def batch_submit(self, requests: list[dict],
+                     description: str = "") -> str:
+        import io
+        lines = []
+        for i, req in enumerate(requests):
+            payload = self._build_payload(
+                req["messages"],
+                req.get("tools"),
+                req.get("think", True),
+            )
+            lines.append(json.dumps({
+                "custom_id": f"req-{i}",
+                "method":    "POST",
+                "url":       "/v1/chat/completions",
+                "body":      payload,
+            }, ensure_ascii=False))
+
+        jsonl_bytes = "\n".join(lines).encode("utf-8")
+        with httpx.Client(timeout=self._cfg.TIMEOUT) as client:
+            upload = client.post(
+                self._cfg.API_URL.replace("/chat/completions", "/files"),
+                headers={"Authorization": f"Bearer {self._cfg.API_KEY}"},
+                files={"file": ("batch.jsonl", io.BytesIO(jsonl_bytes),
+                                "application/jsonl")},
+                data={"purpose": "batch"},
+            )
+            upload.raise_for_status()
+            file_id = upload.json()["id"]
+
+            batch = client.post(
+                self._cfg.API_URL.replace("/chat/completions", "/batches"),
+                headers=self._headers,
+                json={
+                    "input_file_id":     file_id,
+                    "endpoint":          "/v1/chat/completions",
+                    "completion_window": "24h",
+                    "metadata":          {"description": description},
+                },
+            )
+            batch.raise_for_status()
+            batch_id = batch.json()["id"]
+
+        print(f"[batch] 已提交，batch_id={batch_id}，共 {len(requests)} 条请求")
+        return batch_id
+
+    # ── batch 收集 ────────────────────────────────────────────────────────
+    def batch_collect(self, batch_id: str,
+                      poll_interval: int = 30) -> list[dict]:
+        batch_url = self._cfg.API_URL.replace(
+            "/chat/completions", f"/batches/{batch_id}"
+        )
+        with httpx.Client(timeout=self._cfg.TIMEOUT) as client:
+            while True:
+                info   = client.get(batch_url, headers=self._headers).json()
+                status = info["status"]
+                counts = info.get("request_counts", {})
+                print(f"[batch] 状态={status}  "
+                      f"完成={counts.get('completed','?')}/"
+                      f"{counts.get('total','?')}")
+                if status == "completed":
+                    break
+                if status in ("failed", "expired", "cancelled"):
+                    raise RuntimeError(f"Batch {batch_id} 终止，状态={status}")
+                self._sleep_interruptible(poll_interval)
+
+            file_id      = info["output_file_id"]
+            content_resp = client.get(
+                self._cfg.API_URL.replace("/chat/completions",
+                                         f"/files/{file_id}/content"),
+                headers=self._headers,
+            )
+            content_resp.raise_for_status()
+
+        raw_results: dict[int, dict] = {}
+        for line in content_resp.text.splitlines():
+            if not line.strip():
+                continue
+            item = json.loads(line)
+            idx  = int(item["custom_id"].split("-")[1])
+            raw_results[idx] = self._parse_response(item["response"]["body"])
+
+        return [raw_results[i] for i in sorted(raw_results)]
+
 
     def _request_with_retry(self, payload: dict):
         attempt = 0
@@ -98,12 +263,14 @@ class ChatClient:
     def _do_request(self, payload: dict):
         result: list = [None]
         error:  list = [None]
+        client_ref = [None]
         self._sem.acquire()
         try:
             def _worker():
                 try:
                     # 使用 httpx.Client + with 语句管理连接和超时
                     with httpx.Client(timeout=self._timeout) as client:
+                        client_ref[0] = client
                         result[0] = client.post(
                             self._cfg.API_URL,
                             json=payload,
@@ -116,8 +283,12 @@ class ChatClient:
             t.start()
             while t.is_alive():
                 t.join(timeout=0.1)
-                if self._interrupt.is_set():
+                if self._interrupt.is_set() or self._cancel.is_set():
+                    self._cancel.clear()
                     self._interrupt.clear()
+                    c = client_ref[0]
+                    if c:
+                        c.close()
                     raise KeyboardInterrupt
             if error[0]:
                 raise error[0]
@@ -236,7 +407,7 @@ class SearchTools:
             loc = '「' + '、'.join(scope_parts) + '」内' if scope_parts else '全库'
             return f"{loc}未找到「{keyword}」{excl_note}，请更换目录或关键词！"
         if total>1 and read_context and context_chars_coarse > 250:
-            return "有多处匹配，请调整keyword以锁定上下文！"
+            return "有多处匹配，请调整keyword为更完整的句子以锁定上下文！"
         if count_only:
             lines = [
                 f"命中 {total} 个文件{scope}{excl_note}，关键词「{keyword}」",
@@ -390,7 +561,7 @@ class SearchTools:
                 return False, (f"语言不匹配：目录「{subdir}」是中文文献，"
                                f"但关键词「{keyword}」包含外文。请用中文关键词。")
         if any(norm.startswith(x) for x in cfg.DE_DIRS):
-            if d["zh"]:
+            if d["zh"] and not norm.endswith("-ZH"):
                 return False, (f"语言不匹配：目录「{subdir}」是德文文献，"
                                f"但关键词「{keyword}」包含中文。请用德文关键词。")
         if any(norm.startswith(x) for x in cfg.EN_DIRS):
@@ -576,7 +747,7 @@ class ToolHandler:
                         "subdir":{"type": "string","description": (
                                 "Subdirectory, file path, or comma-separated list of paths (volumes) to search. "
                                "Leave empty to search the full library. "
-                         "Example: 'docs/MEW-ZENO' or 'docs/MEW,docs/MEW-ZENO' or 'en/MECW/MECW35-xxx.html'."),"default": ""},
+                         "Example: 'docs/MEW-ZENO' or 'MEW/,docs/MEW-ZENO' or 'en/MECW/MECW35-xxx.html'."),"default": ""},
                         "max_hits":{"type": "integer","description": (
                             f"Hit cap for full-library searches (default {Config.MAX_HITS}); "
                             "ignored when subdir points to a directory."
@@ -899,11 +1070,10 @@ class Agent:
                 messages=self._auto_compress_if_needed(messages)
                 msg = self._client.chat(messages, self._tools.TOOLS, think=show_think)
                 if not msg.get("tool_calls") and msg.get("_thinking"):
-                    parsed = self._extract_tool_calls_from_thinking(msg["_thinking"])
+                    parsed = self._client._extract_tool_calls_from_thinking(msg["_thinking"],self._tools.TOOLS)
                     if parsed:
                         msg["tool_calls"] = parsed
             except KeyboardInterrupt:
-                self._interrupt.clear()  # 清除标志，避免重复触发
                 result = self._wait_for_followup(messages)
                 if result is not None:
                     return result
@@ -942,7 +1112,6 @@ class Agent:
                     try:
                         result_str = future.result()
                     except KeyboardInterrupt:
-                        self._interrupt.clear()
                         for remaining_tc in futures.values():
                             messages.append({
                                 "role": "tool", "tool_call_id": remaining_tc["id"],
@@ -962,7 +1131,6 @@ class Agent:
                     })
                 self.prompt_usage=self._client.prompt_usage
             if interrupted:
-                self._interrupt.clear() 
                 result = self._wait_for_followup(messages)
                 if result is not None:
                     return result
@@ -972,8 +1140,15 @@ class Agent:
             return messages
         total     = self.prompt_usage
         threshold = self._cfg.COMPRESS_THRESHOLD
-        if total <= threshold and not self.user_compressing:
+        if total < threshold*0.8 and not self.user_compressing:
             return messages
+        if total  >=threshold *0.8:
+             print(f"[模型调用已接近上限，输入token{total}大于最大上下文允许的输入的80%：{threshold *0.8}]")
+             messages.append({
+                            "role": "user",
+                            "content": "模型输入已达上限的80%，请尽快根据工具调用结果（构思如何）生成答案！Input is approaching limit! Consider how to write the answer from results of tool usage ASAP!",
+                        })
+             return messages
         largest_i, largest_len = None, 0
         for i, m in enumerate(messages):
             if m.get("role") == "tool":
@@ -1002,73 +1177,55 @@ class Agent:
             compress_msg["content"] += f"\n\n[用户原始问题，请在压缩完成后继续回答：{last_user['content']}]"
         return [compress_msg]
     @staticmethod
-    def _pause_menu(context_note: str = "") -> str:
-        if context_note:
-            print(context_note)
+    def _pause_menu() -> str:
         print(
-            "  选项：\n"
-            "    z       压缩历史记录\n"
-            "    c       继续/重新发送当前请求\n"
-            "    回车    输入补充问题后继续\n"
-            "    p       保留记录返回主菜单\n"
-            "    r       撤销本次输入，返回主菜单\n"
-            "    n       清空记录，开始新对话"
+            "[已中断]\n"
+            "  c 继续  z 压缩历史  p 暂停返回  r 撤销本次输入  n 新对话\n"
+            "  或直接输入补充问题继续"
         )
         try:
             return input("  > ").strip()
         except (EOFError, KeyboardInterrupt):
             return "p"
+
     def _wait_for_followup(self, messages: list) -> Optional[AgentResult]:
+        self._interrupt.clear()
+        self._client._cancel.clear()
+        new_history = [m for m in messages if m["role"] != "system"]
+
         while True:
-            reply = self._pause_menu("[已中断]")
-            new_history = [m for m in messages if m.get("role") != "system"]
-            if reply.lower() == "c":
-                return None
-            if reply.lower()=="z":
-                self.user_compressing = True
-                return None
-            if reply.lower() == "p":
-                self._interrupt.clear()
-                return AgentResult(AgentSignal.PAUSE, history=new_history)
-
-            if reply.lower() == "n":
-                print("[原记录已清空，新对话开始]\n")
-                return AgentResult(AgentSignal.NEW_CONV)
-
-            if reply.lower() == "r":
-                last_user = next(
-                    (i for i in range(len(messages) - 1, -1, -1)
-                     if messages[i].get("role") == "user"),
-                    None,
-                )
-                if last_user is None:
-                    print("  [无可撤销的输入]\n")
-                    continue
-                revoked       = messages[last_user].get("content", "")[:40]
-                clean_history = [m for m in messages[:last_user]
-                                 if m.get("role") != "system"]
-                print(f"  [已撤销本次输入：{revoked}…  请重新输入]\n")
-                return AgentResult(AgentSignal.PAUSE, history=clean_history)
-            if reply:
-                messages.append({"role": "user", "content": reply})
-                print("  [继续处理补充问题…]")
-                return None
-            # 直接回车时提示输入补充问题
-            if not reply:
-                print("  [请输入补充问题，或输入 p 暂停返回主菜单]")
-                try:
-                    supplement = input("  补充 > ").strip()
-                    if supplement.lower() == "p":
-                        self._interrupt.clear()
-                        return AgentResult(AgentSignal.PAUSE, history=new_history)
-                    if supplement:
-                        messages.append({"role": "user", "content": supplement})
-                        print("  [继续处理补充问题…]")
-                        return None   
-                except (EOFError, KeyboardInterrupt):
-                    self._interrupt.clear()
+            reply = self._pause_menu()
+            match reply.lower():
+                case "c":
+                    return None
+                case "z":
+                    self.user_compressing = True
+                    return None
+                case "p":
                     return AgentResult(AgentSignal.PAUSE, history=new_history)
-                continue         
+                case "n":
+                    print("[原记录已清空，新对话开始]\n")
+                    return AgentResult(AgentSignal.NEW_CONV)
+                case "r":
+                    last_user = next(
+                        (i for i in range(len(messages) - 1, -1, -1)
+                         if messages[i]["role"] == "user"), None
+                    )
+                    if last_user is None:
+                        print("  [无可撤销的输入]")
+                        continue
+                    revoked = messages[last_user].get("content", "")[:40]
+                    print(f"  [已撤销：{revoked}…  请重新输入]")
+                    return AgentResult(
+                        AgentSignal.PAUSE,
+                        history=[m for m in messages[:last_user] if m["role"] != "system"],
+                    )
+                case "":
+                    continue
+                case _:
+                    messages.append({"role": "user", "content": reply})
+                    print("  [继续处理补充问题…]")
+                    return None
 
     def _cap_tool_result(self, text: str) -> str:
         limit =self._cfg.MAX_TOOL_RESULT_CHARS
@@ -1201,6 +1358,7 @@ class AppController:
                  tool_handler: ToolHandler, agent: Agent):
         self._cfg          = cfg
         self._interrupt    = interrupt
+        self._cancel=agent._client._cancel
         self._tool_handler = tool_handler
         self._agent        = agent
         self.show_tools = cfg.DISPLAY_TOOLS
@@ -1222,6 +1380,7 @@ class AppController:
                 if not self._dispatch_cmd(user_input):
                     self._run_agent(user_input)
         finally:
+            self._cancel.set()
             self._autosave()
 
     def _register_sigint(self):
@@ -1350,21 +1509,21 @@ class AppController:
 
 def _parse_args(cfg: Config) -> Config:
     parser = argparse.ArgumentParser(description="文献查询系统")
-    parser.add_argument("--model",                 type=str,   help="模型名称")
-    parser.add_argument("--api-url",               type=str,   help="API 地址")
-    parser.add_argument("--api-key",               type=str,   help="API 密钥")
-    parser.add_argument("--max-context-token",            type=int,   help="模型最大上下文窗口 token 数")
+    parser.add_argument("-m","--model",type=str,help="模型名称")
+    parser.add_argument("-u","--api-url",type=str,help="API 地址")
+    parser.add_argument("-k","--api-key",type=str,   help="API 密钥")
+    parser.add_argument("-c","--max-context-token",type=int,   help="模型最大上下文窗口 token 数")
     parser.add_argument("--max-tokens",            type=int,   help="最大输出 token 数")
     parser.add_argument("--max-hits",              type=int,   help="搜索最大命中数")
     parser.add_argument("--temperature",           type=float, help="温度，控制模型输出随机性")
     parser.add_argument("--top-p",                 type=float, help="top-p，控制模型关联token输出")
     parser.add_argument("--max-tool-result-chars", type=int,   help="工具结果最大字符数")
     parser.add_argument("--html-folder",           type=str,   help="文献库根目录")
-    parser.add_argument("--output",                type=str,   help="历史保存目录")
+    parser.add_argument("--output",type=str,   help="历史保存目录")
     
     parser.add_argument("--tools",     action="store_true",    help="启动时开启工具显示")
     parser.add_argument("--think",     action="store_true",    help="启动时开启思考模式")
-    parser.add_argument("--think-type",     type=str,    help="模型思考模式加载参数")
+    parser.add_argument("-t","--think-type",     type=str,    help="模型思考模式加载参数")
     parser.add_argument("--deep-read", action="store_true",    help="启动时开启深度阅读")
     args = parser.parse_args()
 

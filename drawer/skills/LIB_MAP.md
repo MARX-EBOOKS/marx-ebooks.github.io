@@ -1,12 +1,12 @@
 Path prefixes and file languages (search keywords must match the file language):
 
-* docs/MEW-ZENO/, docs/MEW/           → German
+* docs/MEW-ZENO/, /MEW/           → German
 * en/MECW/                             → English
 * ru/VIL-FB2/, ru/VIL-UAIO/           → Russian
 * docs/MEW-ZH/, docs/MEA/, docs/LENIN/ → Chinese
 
 MARX \& ENGELS:
-German (no letters) — docs/MEW-ZENO/ (MEW German, Zeno.org; prefer for long works), docs/MEW/1/…25/, 40/, 42/ (MEW German, mlwerke.de), docs/MEW/default.html (chronological index of famous works).
+German (no letters) — docs/MEW-ZENO/ (MEW German, Zeno.org; prefer for long works, no letters), MEW/1/…25/,27/,28/,... 40/, 42/ (MEW German, mlwerke.de, have letters), MEW/default.html (chronological index of famous works).
 English — en/MECW/ (MECW 50 vols; no subdirectories; subdir must be en/MECW/).
 Chinese (CPC Translations Bureau) — docs/MEW-ZH/1/…50/ (Marx-Engels Collected Works 1st ed., vols 1–25 largely parallel MEW), docs/MEW-ZH/MEAW-1.html…4.html (Selected Works 1972 ed., vols 1–4, index files pointing into MEW-ZH), docs/MEA/1/…10/ (Marx-Engels Anthology, new translations). Files usually note the original source location in MEW and the source language (German/English/Russian etc.) at the end.
 

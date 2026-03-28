@@ -1,0 +1,378 @@
+.seitenzahlen {font-size:0.6em;}
+.zitat {font-size:0.75em;margin:1.5em 0;}
+h1,h2,h3,h4,h5,h6 {text-align:center;margin:1em;}
+table {margin:1.5em;max-width:100vw !important;}
+BODY {-webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;font-size:1.25em;font-family:Arial,Helvetica,sans-serif,"Times New Roman";color:#2D3A53;background-color:#EEF0F5;line-height:200%;margin-right:5%;margin-left:5%;}
+a,a:focus-visible {color: #2563EB;text-decoration: none;}/*#1A0DAB;*/
+a:visited {color: #4B6CB7;}
+a:active {color: #1E40AF;text-decoration: underline;}/*#2563EB;#6B7280*/
+.table-wrapper {
+  overflow-x: auto;
+  max-width: 100%;
+}
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #020206;
+color:#ABABAB;
+}
+a {
+  color: #64ABD5;
+  text-decoration: none;
+}
+
+a:visited {
+  color:  #8597AE;
+}
+
+a:active  {
+  color: #a3d4ff;
+  text-decoration: underline;
+}
+h1,h2,h3,h4,h5,h6,b {
+ color:  #F0F0F0;
+}
+a b,b a {
+ color:   #64ABD5;
+  text-decoration: underline;
+}
+a:visited  b,b a:visited{
+  color:  #8597AE;
+}
+
+a:hover b, a:focus b ,b a:focus, b a:hover{
+  color: #a3d4ff;
+}
+
+a:active b,b a:active {
+  color:  #ff6b6b; 
+}
+
+}
+
+
+ p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{margin:0cm;
+	text-autospace:none;
+	font-size:11.0pt;
+	font-family:"Arial",sans-serif;}
+p.MsoHeading7, li.MsoHeading7, div.MsoHeading7
+	{mso-style-link:"Überschrift 7 Zchn";
+	margin-top:2.0pt;
+	margin-right:0cm;
+	margin-bottom:0cm;
+	margin-left:0cm;
+	line-height:115%;
+	page-break-after:avoid;
+	font-size:12.0pt;
+	font-family:"Calibri",sans-serif;
+	color:#595959;}
+p.MsoHeading8, li.MsoHeading8, div.MsoHeading8
+	{mso-style-link:"Überschrift 8 Zchn";
+	margin:0cm;
+	line-height:115%;
+	page-break-after:avoid;
+	font-size:12.0pt;
+	font-family:"Calibri",sans-serif;
+	color:#272727;
+	font-style:italic;}
+p.MsoHeading9, li.MsoHeading9, div.MsoHeading9
+	{mso-style-link:"Überschrift 9 Zchn";
+	margin:0cm;
+	line-height:115%;
+	page-break-after:avoid;
+	font-size:12.0pt;
+	font-family:"Calibri",sans-serif;
+	color:#272727;}
+p.MsoFootnoteText, li.MsoFootnoteText, div.MsoFootnoteText
+	{mso-style-link:"Fußnotentext Zchn";
+	margin:0cm;
+	text-autospace:none;
+	font-size:10.0pt;
+	font-family:"Arial",sans-serif;}
+p.MsoHeader, li.MsoHeader, div.MsoHeader
+	{mso-style-link:"Kopfzeile Zchn";
+	margin:0cm;
+	text-autospace:none;
+	font-size:11.0pt;
+	font-family:"Arial",sans-serif;}
+p.MsoFooter, li.MsoFooter, div.MsoFooter
+	{mso-style-link:"Fußzeile Zchn";
+	margin:0cm;
+	text-autospace:none;
+	font-size:11.0pt;
+	font-family:"Arial",sans-serif;}
+span.MsoFootnoteReference
+	{vertical-align:super;}
+p.MsoTitle, li.MsoTitle, div.MsoTitle
+	{mso-style-link:"Titel Zchn";
+	margin-top:0cm;
+	margin-right:0cm;
+	margin-bottom:4.0pt;
+	margin-left:0cm;
+	font-size:28.0pt;
+	font-family:"Calibri Light",sans-serif;
+	letter-spacing:-.5pt;}
+p.MsoTitleCxSpFirst, li.MsoTitleCxSpFirst, div.MsoTitleCxSpFirst
+	{mso-style-link:"Titel Zchn";
+	margin:0cm;
+	font-size:28.0pt;
+	font-family:"Calibri Light",sans-serif;
+	letter-spacing:-.5pt;}
+p.MsoTitleCxSpMiddle, li.MsoTitleCxSpMiddle, div.MsoTitleCxSpMiddle
+	{mso-style-link:"Titel Zchn";
+	margin:0cm;
+	font-size:28.0pt;
+	font-family:"Calibri Light",sans-serif;
+	letter-spacing:-.5pt;}
+p.MsoTitleCxSpLast, li.MsoTitleCxSpLast, div.MsoTitleCxSpLast
+	{mso-style-link:"Titel Zchn";
+	margin-top:0cm;
+	margin-right:0cm;
+	margin-bottom:4.0pt;
+	margin-left:0cm;
+	font-size:28.0pt;
+	font-family:"Calibri Light",sans-serif;
+	letter-spacing:-.5pt;}
+p.MsoBodyText, li.MsoBodyText, div.MsoBodyText
+	{mso-style-link:"Textkörper Zchn";
+	margin:0cm;
+	text-autospace:none;
+	font-size:11.0pt;
+	font-family:"Arial",sans-serif;}
+p.MsoSubtitle, li.MsoSubtitle, div.MsoSubtitle
+	{mso-style-link:"Untertitel Zchn";
+	margin-top:0cm;
+	margin-right:0cm;
+	margin-bottom:8.0pt;
+	margin-left:0cm;
+	line-height:115%;
+	font-size:14.0pt;
+	font-family:"Calibri",sans-serif;
+	color:#595959;
+	letter-spacing:.75pt;}
+a:link, span.MsoHyperlink
+	{color:blue;
+	text-decoration:underline;}
+a:visited, span.MsoHyperlinkFollowed
+	{color:purple;
+	text-decoration:underline;}
+p
+	{margin-right:0;
+	margin-left:0;
+	font-size:1.25em;
+	font-family:"Times New Roman",serif;}
+p.MsoListParagraph, li.MsoListParagraph, div.MsoListParagraph
+	{margin-top:0cm;
+	margin-right:0cm;
+	margin-bottom:8.0pt;
+	margin-left:36.0pt;
+	line-height:115%;
+	font-size:12.0pt;
+	font-family:"Calibri",sans-serif;}
+p.MsoListParagraphCxSpFirst, li.MsoListParagraphCxSpFirst, div.MsoListParagraphCxSpFirst
+	{margin-top:0cm;
+	margin-right:0cm;
+	margin-bottom:0cm;
+	margin-left:36.0pt;
+	line-height:115%;
+	font-size:12.0pt;
+	font-family:"Calibri",sans-serif;}
+p.MsoListParagraphCxSpMiddle, li.MsoListParagraphCxSpMiddle, div.MsoListParagraphCxSpMiddle
+	{margin-top:0cm;
+	margin-right:0cm;
+	margin-bottom:0cm;
+	margin-left:36.0pt;
+	line-height:115%;
+	font-size:12.0pt;
+	font-family:"Calibri",sans-serif;}
+p.MsoListParagraphCxSpLast, li.MsoListParagraphCxSpLast, div.MsoListParagraphCxSpLast
+	{margin-top:0cm;
+	margin-right:0cm;
+	margin-bottom:8.0pt;
+	margin-left:36.0pt;
+	line-height:115%;
+	font-size:12.0pt;
+	font-family:"Calibri",sans-serif;}
+p.MsoQuote, li.MsoQuote, div.MsoQuote
+	{mso-style-link:"Zitat Zchn";
+	margin-top:8.0pt;
+	margin-right:0cm;
+	margin-bottom:8.0pt;
+	margin-left:0cm;
+	text-align:center;
+	line-height:115%;
+	font-size:12.0pt;
+	font-family:"Calibri",sans-serif;
+	color:#404040;
+	font-style:italic;}
+p.MsoIntenseQuote, li.MsoIntenseQuote, div.MsoIntenseQuote
+	{mso-style-link:"Intensives Zitat Zchn";
+	margin-top:18.0pt;
+	margin-right:43.2pt;
+	margin-bottom:18.0pt;
+	margin-left:43.2pt;
+	text-align:center;
+	line-height:115%;
+	border:none;
+	padding:0cm;
+	font-size:12.0pt;
+	font-family:"Calibri",sans-serif;
+	color:#2F5496;
+	font-style:italic;}
+span.MsoIntenseEmphasis
+	{color:#2F5496;
+	font-style:italic;}
+span.MsoIntenseReference
+	{font-variant:small-caps;
+	color:#2F5496;
+	letter-spacing:.25pt;
+	font-weight:bold;}
+span.berschrift1Zchn
+	{mso-style-name:"Überschrift 1 Zchn";
+	mso-style-link:"Überschrift 1";
+	font-family:"Calibri Light",sans-serif;
+	color:#2F5496;}
+span.berschrift2Zchn
+	{mso-style-name:"Überschrift 2 Zchn";
+	mso-style-link:"Überschrift 2";
+	font-family:"Calibri Light",sans-serif;
+	color:#2F5496;}
+span.berschrift3Zchn
+	{mso-style-name:"Überschrift 3 Zchn";
+	mso-style-link:"Überschrift 3";
+	font-family:"Times New Roman",serif;
+	color:#2F5496;}
+span.berschrift4Zchn
+	{mso-style-name:"Überschrift 4 Zchn";
+	mso-style-link:"Überschrift 4";
+	font-family:"Times New Roman",serif;
+	color:#2F5496;
+	font-style:italic;}
+span.berschrift5Zchn
+	{mso-style-name:"Überschrift 5 Zchn";
+	mso-style-link:"Überschrift 5";
+	font-family:"Times New Roman",serif;
+	color:#2F5496;}
+span.berschrift6Zchn
+	{mso-style-name:"Überschrift 6 Zchn";
+	mso-style-link:"Überschrift 6";
+	font-family:"Times New Roman",serif;
+	color:#595959;
+	font-style:italic;}
+span.berschrift7Zchn
+	{mso-style-name:"Überschrift 7 Zchn";
+	mso-style-link:"Überschrift 7";
+	font-family:"Times New Roman",serif;
+	color:#595959;}
+span.berschrift8Zchn
+	{mso-style-name:"Überschrift 8 Zchn";
+	mso-style-link:"Überschrift 8";
+	font-family:"Times New Roman",serif;
+	color:#272727;
+	font-style:italic;}
+span.berschrift9Zchn
+	{mso-style-name:"Überschrift 9 Zchn";
+	mso-style-link:"Überschrift 9";
+	font-family:"Times New Roman",serif;
+	color:#272727;}
+span.TitelZchn
+	{mso-style-name:"Titel Zchn";
+	mso-style-link:Titel;
+	font-family:"Calibri Light",sans-serif;
+	letter-spacing:-.5pt;}
+span.UntertitelZchn
+	{mso-style-name:"Untertitel Zchn";
+	mso-style-link:Untertitel;
+	font-family:"Times New Roman",serif;
+	color:#595959;
+	letter-spacing:.75pt;}
+span.ZitatZchn
+	{mso-style-name:"Zitat Zchn";
+	mso-style-link:Zitat;
+	color:#404040;
+	font-style:italic;}
+span.IntensivesZitatZchn
+	{mso-style-name:"Intensives Zitat Zchn";
+	mso-style-link:"Intensives Zitat";
+	color:#2F5496;
+	font-style:italic;}
+p.msonormal0, li.msonormal0, div.msonormal0
+	{mso-style-name:msonormal;
+	margin-right:0cm;
+	margin-left:0cm;
+	font-size:12.0pt;
+	font-family:"Times New Roman",serif;}
+span.FunotentextZchn
+	{mso-style-name:"Fußnotentext Zchn";
+	mso-style-link:Fußnotentext;
+	font-family:"Arial",sans-serif;}
+span.KopfzeileZchn
+	{mso-style-name:"Kopfzeile Zchn";
+	mso-style-link:Kopfzeile;
+	font-family:"Arial",sans-serif;}
+span.FuzeileZchn
+	{mso-style-name:"Fußzeile Zchn";
+	mso-style-link:Fußzeile;
+	font-family:"Arial",sans-serif;}
+span.TextkrperZchn
+	{mso-style-name:"Textkörper Zchn";
+	mso-style-link:Textkörper;
+	font-family:"Arial",sans-serif;}
+p.TableParagraph, li.TableParagraph, div.TableParagraph
+	{mso-style-name:"Table Paragraph";
+	margin:0cm;
+	text-autospace:none;
+	font-size:11.0pt;
+	font-family:"Arial",sans-serif;}
+p.p1, li.p1, div.p1
+	{mso-style-name:p1;
+	margin:0cm;
+	font-size:8.5pt;
+	font-family:"Arial",sans-serif;
+	color:black;}
+p.msochpdefault, li.msochpdefault, div.msochpdefault
+	{mso-style-name:msochpdefault;
+	margin-right:0cm;
+	margin-left:0cm;
+	font-size:11.0pt;
+	font-family:"Calibri",sans-serif;}
+p.msopapdefault, li.msopapdefault, div.msopapdefault
+	{mso-style-name:msopapdefault;
+	margin-right:0cm;
+	margin-left:0cm;
+	text-autospace:none;
+	font-size:12.0pt;
+	font-family:"Times New Roman",serif;}
+span.s1
+	{mso-style-name:s1;
+	font-family:Helvetica;}
+span.s2
+	{mso-style-name:s2;
+	font-family:"Arial",sans-serif;}
+span.s3
+	{mso-style-name:s3;
+	font-family:Helvetica;}
+span.s4
+	{mso-style-name:s4;
+	font-family:Helvetica;
+	color:#B3B3B3;}
+span.s5
+	{mso-style-name:s5;
+	font-family:"Arial",sans-serif;}
+span.s6
+	{mso-style-name:s6;
+	font-family:"Arial",sans-serif;}
+span.s7
+	{mso-style-name:s7;
+	font-family:Helvetica;}
+.MsoChpDefault
+	{font-family:"Calibri",sans-serif;}
+.MsoPapDefault
+	{margin-bottom:8.0pt;
+	line-height:115%;}
+@page WordSection1
+	{size:595.05pt 840.85pt;
+	margin:70.9pt 70.9pt 70.9pt 70.9pt;}
+div.WordSection1
+	{page:WordSection1;}
+-->

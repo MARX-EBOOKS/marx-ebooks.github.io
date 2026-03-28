@@ -15,9 +15,5 @@ Der Ursprung der Familie, des Privateigentums und des Staats (Origin of the Fami
 Ökonomisch-philosophische Manuskripte aus dem Jahre 1844 (Marx's 1844 Manuscripts): German docs/MEW-ZENO/40/; Chinese docs/MEW-ZH/42/ or docs/MEA/1/; English en/MECW/MECW3-
 Die deutsche Ideologie (The German Ideology) / Thesen über Feuerbach (Theses on Feuerbach): German docs/MEW-ZENO/3/ or docs/MEW/3/; English en/MECW/MECW5-; Chinese docs/MEW-ZH/3/
 Grundrisse der Kritik der politischen Ökonomie (Grundrisse, 1857–58 Manuscripts): German docs/MEW/42/ (Part I); English en/MECW/MECW28-, MECW29-; Chinese docs/MEW-ZH/46/ or docs/MEA/30/ (Part I)
-Briefe (Letters): English en/MECW/MECW38-…/MECW50-; Chinese docs/MEW-ZH/27/…39/ or docs/MEA/10/ (partial)
-
-
-
-
+Briefe (Letters): German MEW/27/,MEW/28/,...,MEW/39/ English en/MECW/MECW38-…/MECW50-; Chinese docs/MEW-ZH/27/…39/ or docs/MEA/10/ (partial)
 

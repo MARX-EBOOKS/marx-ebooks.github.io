@@ -1,0 +1,18 @@
+{
+    "redirects": [
+      {
+        "source": "/epub/:id",
+        "destination": "https://491007.xyz/epub/:id",
+        "statusCode": 301
+      }
+    ]
+}
+{
+    "redirects": [
+      {
+        "source": "/en/:id",
+        "destination": "https://en.491007.xyz/:id",
+        "statusCode": 301
+      }
+    ]
+}

@@ -50,6 +50,32 @@
 
 26/ Theorien über den Mehrwert, Zweiter Teil,不全
 
+27/ Briefe Februar 1842 bis Dezember 1851
+
+28/ Briefe Januar 1852 bis Dezember 1855
+
+29/ Briefe Januar 1856 bis Dezember 1859
+
+30/ Briefe Januar 1860 bis September 1864
+
+31/ Briefe Oktober 1864 bis Dezember 1867
+
+32/ Briefe Januar 1868 bis Mitte Juli 1870
+
+33/ Briefe Juli 1870 bis Dezember 1874
+
+34/ Briefe Januar 1875 bis Dezember 1880
+
+35/ Briefe Januar 1881 bis März 1883
+
+36/ Briefe April 1883 bis Dezember 1887
+
+37/ Briefe Januar 1888 bis Dezember 1890
+
+38/ Briefe Januar 1891 bis Dezember 1892
+
+39/ Briefe Januar 1893 bis Juli 1895
+
 40/ Karl Marx: Schriften und Briefe, November 1837 bis August 1844
 
 42/ Karl Marx: Ökonomische Manuskripte, 1857/1858

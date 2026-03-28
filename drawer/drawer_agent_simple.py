@@ -25,6 +25,7 @@ class ChatClient:
     def __init__(self, cfg: Config, interrupt_flag: threading.Event):
         self._cfg       = cfg
         self._interrupt = interrupt_flag
+        self._cancel    = threading.Event()
         self._sem       = threading.Semaphore(cfg.MAX_CONCURRENT)
         self._timeout   = cfg.TIMEOUT
         self._headers   = {
@@ -101,12 +102,14 @@ class ChatClient:
     def _do_request(self, payload: dict):
         result: list = [None]
         error:  list = [None]
+        client_ref = [None]
         self._sem.acquire()
         try:
             def _worker():
                 try:
                     # 使用 httpx.Client + with 语句管理连接和超时
                     with httpx.Client(timeout=self._timeout) as client:
+                        client_ref[0] = client
                         result[0] = client.post(
                             self._cfg.API_URL,
                             json=payload,
@@ -119,8 +122,12 @@ class ChatClient:
             t.start()
             while t.is_alive():
                 t.join(timeout=0.1)
-                if self._interrupt.is_set():
+                if self._interrupt.is_set() or self._cancel.is_set():
+                    self._cancel.clear()
                     self._interrupt.clear()
+                    c = client_ref[0]
+                    if c:
+                        c.close()
                     raise KeyboardInterrupt
             if error[0]:
                 raise error[0]
@@ -604,7 +611,6 @@ class Agent:
             try:
                 msg = self._client.chat(messages, self._tools.TOOLS, think=show_think)
             except KeyboardInterrupt:
-                self._interrupt.clear()
                 result = self._wait_for_followup(messages)
                 if result is not None:
                     return result
@@ -626,7 +632,6 @@ class Agent:
                 try:
                     result_str = self._tools.call(fn_name, fn_args)
                 except KeyboardInterrupt:
-                    self._interrupt.clear()
                     idx = msg["tool_calls"].index(tc)
                     for rtc in msg["tool_calls"][idx:]:
                         messages.append({
@@ -650,7 +655,6 @@ class Agent:
                             "content": "模型输入已达到上限，停止工具调用，立刻根据工具调用结果（构思如何）生成答案！Input has overszied! Stop using tools and begin to figure out and write the answer fastly and  immediately according to your tool usage!",
                         })
             if interrupted:
-                self._interrupt.clear() 
                 result = self._wait_for_followup(messages)
                 if result is not None:
                     return result
@@ -676,6 +680,8 @@ class Agent:
             return "p"
 
     def _wait_for_followup(self, messages: list) -> Optional[AgentResult]:
+        self._interrupt.clear()
+        self._client._cancel.clear()
         while True:
             reply       = self._pause_menu("[已中断]")
             new_history = [m for m in messages if m.get("role") != "system"]
@@ -856,6 +862,7 @@ class AppController:
         self._interrupt    = interrupt
         self._tool_handler = tool_handler
         self._agent        = agent
+        self.cancel        = agent._client._cancel
         self.show_tools = cfg.DISPLAY_TOOLS
         self.show_think = cfg.ENABLE_THINKING
         self.history:   list = []
@@ -875,6 +882,7 @@ class AppController:
                 if not self._dispatch_cmd(user_input):
                     self._run_agent(user_input)
         finally:
+            self.cancel()
             self._autosave()
 
     # ── SIGINT ─────────────────────────────────────────────────────────────
@@ -1004,10 +1012,10 @@ class AppController:
 
 def _parse_args(cfg: Config) -> Config:
     parser = argparse.ArgumentParser(description="文献查询系统")
-    parser.add_argument("--model",                 type=str,   help="模型名称")
-    parser.add_argument("--api-url",               type=str,   help="API 地址")
-    parser.add_argument("--api-key",               type=str,   help="API 密钥")
-    parser.add_argument("--max-context-token",            type=int,   help="模型最大上下文窗口 token 数")
+    parser.add_argument("-m","--model",type=str,help="模型名称")
+    parser.add_argument("-u","--api-url",type=str,help="API 地址")
+    parser.add_argument("-k","--api-key",type=str,   help="API 密钥")
+    parser.add_argument("-c","--max-context-token",type=int,   help="模型最大上下文窗口 token 数")
     parser.add_argument("--max-tokens",            type=int,   help="最大输出 token 数")
     parser.add_argument("--max-hits",              type=int,   help="搜索最大命中数")
     parser.add_argument("--temperature",           type=float, help="温度，控制模型输出随机性")
@@ -1017,7 +1025,7 @@ def _parse_args(cfg: Config) -> Config:
     parser.add_argument("--output",                type=str,   help="历史保存目录")
     parser.add_argument("--tools",     action="store_true",    help="启动时开启工具显示")
     parser.add_argument("--think",     action="store_true",    help="启动时开启思考模式")
-    parser.add_argument("--think-type",     type=str,    help="模型思考模式加载参数")
+    parser.add_argument("-t","--think-type",     type=str,    help="模型思考模式加载参数")
     args = parser.parse_args()
 
     if args.model:                   cfg.MODEL                 = args.model

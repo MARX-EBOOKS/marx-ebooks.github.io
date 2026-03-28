@@ -14,12 +14,11 @@ class Config:
     MODEL=MODELS[0] #最终选择的模型，根据以上数组的编号选择对应模型
     MAX_TOKENS       = 64000 #最大输出token
     COMPRESS_HISTORY = True #是否压缩对话历史
-    COMPRESS_THRESHOLD =0.8 #对话历史压缩阈值
-    ENABLE_THINKING = True #思考模式默认状态
-    MODEL_THINK_CFG={"extra_body":{"TOP_K": 20, "enable_thinking":ENABLE_THINKING}
-                       ,"enable_thinking":ENABLE_THINKING,"reasoning":{"enabled":ENABLE_THINKING},"thinking":{"type":ENABLE_THINKING}} #模型思考模式配置方式的组合
-    #MODEL_THINK_TYPE="reasoning"
-    MODEL_THINK_TYPE="extra_body" #实际采用的配置方式
+    ENABLE_THINKING_default = True #思考模式默认状态
+    MODEL_THINK_TYPE="enable_thinking" #思考模式配置方式
+    #MODEL_THINK_TYPE="thinking"
+    #MODEL_THINK_TYPE="reasoning_effort"
+    #MODEL_THINK_TYPE="chat_template_kwargs"
     TEMPERATURE      = 1 #控制模型输出随机性
     TOP_P            = 0.9 #控制模型关联token输出
     MAX_RETRIES      = 2 #模型请求连接失败时重试数
@@ -45,13 +44,13 @@ class Config:
     #请确保以下目录均在同一主文件夹内
     ZH_DIRS = ["docs/MEW-ZH", "docs/MEA", "docs/LENIN"]
     DE_DIRS = [
-        "docs/MEW-ZENO", "docs/MEW",
+        "docs/MEW-ZENO", "MEW",
         *[f"docs/HEGEL/{v}" for v in (1, 2, 3, 4, 5, 7, 10, 11, 12, 13, 16, 18)],
     ]
     EN_DIRS = ["en/MECW"]
     RU_DIRS = ["ru/VIL-FB2", "ru/VIL-UAIO"]
     SPECIAL_DIRS: dict[str, tuple[str, str]] = {
-        "docs/MEW/":      ("important_works_me", "MEW.md"),
+        "MEW/":      ("important_works_me", "MEW.md"),
         "docs/MEW-ZENO/": ("",                   "MEW_ZENO.md"),
         "en/MECW/":       ("important_works_me", "MECW.md"),
         "docs/MEW-ZH/":   ("",                   "MEW_ZH.md"),
@@ -73,6 +72,22 @@ class Config:
             fname: self._load(fname)
             for _, fname in self.SPECIAL_DIRS.values()
         }
+        self.ENABLE_THINKING=self.ENABLE_THINKING_default
+
+    def get_think_payload(self,ENABLE_THINK) -> dict | None:
+        """返回当前配置对应的思考参数，供 _build_payload 插入 payload。"""
+        mapping = {
+            "extra_body":           {"enable_thinking":ENABLE_THINK, "top_k": 20},
+            "reasoning_content":ENABLE_THINK,
+            "think":                {"type": "think"},
+            "thinking":                {"type": "enabled" if ENABLE_THINK else "disabled"},
+            "reasoning_effort":     "high",
+            "chat_template_kwargs": {"enable_thinking":ENABLE_THINK},
+            "enable_thinking":ENABLE_THINK
+        }
+        if not ENABLE_THINK and self.THINK_TYPE in ["think","reasoning_effort"]:
+            return None
+        return mapping.get(self.MODEL_THINK_TYPE)
 
     def _load(self, filename: str) -> str:
         p = self.SKILLS_DIR / filename
