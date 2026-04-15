@@ -4,6 +4,8 @@ const LIBRARY_CONFIG = [
         label: 'MEW-ZENO',
         title: '马克思恩格斯德语长篇著作（自Zeno.org获取）',
         desc: 'Marx-Engels-Werke (Zeno.org)',
+        basePath: '/docs/MEW-ZENO/',
+        stylesheets: ['/docs/MEW-ZENO/mewde.css'],
         badge: 'DE',
         groups: [
             {
@@ -41,6 +43,8 @@ const LIBRARY_CONFIG = [
         label: 'MEW',
         title: '马克思恩格斯著作集（德）',
         desc: 'Marx-Engels-Werke, Bd.1–40',
+        basePath: '/MEW/',
+        stylesheets: ['/MEW/mewde.css'],
         badge: 'DE',
         groups: [
             {
@@ -110,6 +114,8 @@ label: 'Ergänzung (Bände 40-43)',
         label: 'MECW',
         title: 'Marx-Engels Collected Works',
         desc: 'English edition, Vol.1–50',
+        basePath: '/en/MECW/',
+        stylesheets: ['/en/MECW/MECW.css'],
         badge: 'EN',
         groups: [
             {
@@ -183,6 +189,8 @@ label: 'Ergänzung (Bände 40-43)',
         label: 'MEW-ZH',
         title: '马克思恩格斯全集（中文第一版）',
         desc: '马恩全集（1-50卷）',
+        basePath: '/docs/MEW-ZH/',
+        stylesheets: ['/docs/styles.css'],
         badge: 'ZH',
         groups: [
             {
@@ -258,6 +266,8 @@ label: 'Ergänzung (Bände 40-43)',
         label: 'MEA',
         title: '马克思恩格斯文集',
         desc: '马恩文集',
+        basePath: '/docs/MEA/',
+        stylesheets: ['/docs/styles.css'],
         badge: 'ZH',
         groups: [
             {
@@ -288,6 +298,8 @@ label: 'Ergänzung (Bände 40-43)',
         label: 'LPSS',
         title: 'Ленин, ПСС',
         desc: 'ПОЛНОЕ СОБРАНИЕ СОЧИНЕНИЙ ЛЕНИН ИЗДАНИЕ ПЯТОЕ',
+        basePath: '/ru/',
+        stylesheets: ['/vil.css'],
         badge: 'RU',
         groups: [
             {
@@ -371,6 +383,8 @@ label: 'Ergänzung (Bände 40-43)',
         label: 'LENIN',
         title: '列宁全集（中文第二版）',
         desc: '列宁全集（1-60卷）',
+        basePath: '/docs/LENIN',
+        stylesheets: ['/docs/styles.css'],
         badge: 'ZH',
         groups: [
             {
@@ -453,6 +467,8 @@ label: 'Ergänzung (Bände 40-43)',
         label: 'HEGEL',
         title: 'Hegel Werke 1-20',
         desc: '黑格尔著作集1-20卷',
+        basePath: '/docs/HEGEL/',
+        stylesheets: ['/docs/HEGEL/hegel.css'],
         badge: 'DE',
         groups: [
         {

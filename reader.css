@@ -9,33 +9,39 @@
   --bg-active: #dfd9cf;
   --border: #d8d2c8;
   --border-light: #e8e4dd;
-
   --text: #1c1917;
   --text-2: #57534e;
   --text-3: #a8a29e;
-  --text-inv: #fafaf8;
-
   --accent: #b45309;
   --accent-2: #92400e;
   --accent-bg: #fef3c7;
-  --accent-border: #fcd34d;
-
   --link: #1d4ed8;
   --link-hover: #1e40af;
-
   --code-bg: #f0ece4;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, .08);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, .10);
-
   --nav-h: 52px;
   --sidebar-w: 340px;
   --sidebar-r: 260px;
-
-  --font-serif: 'IBM Plex Serif', 'Noto Serif SC', 'Songti SC', 'SimSun', Georgia, serif;
-  --font-sans: 'IBM Plex Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: 'IBM Plex Mono', 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, 
+             "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", 
+             sans-serif;
+  
+  /* 正文衬线字体 - 中文优先思源宋体/宋体 */
+  --font-serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", 
+                Georgia, "Times New Roman", serif;
+  
+  /* 正文字体（无衬线版本，如果需要） */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", 
+               "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", 
+               "Noto Sans SC", sans-serif;
+  
+  /* 等宽字体 - 包含中文等宽回退 */
+  --font-mono: "SF Mono", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+               "Noto Sans Mono CJK SC", "PingFang SC", "Microsoft YaHei Mono", 
+               "Courier New", monospace;
+  /* 注意：删除 --font-serif 等字体变量，让前面 CSS 控制字体 */
 }
-
 [data-theme="dark"] {
   --bg: #141210;
   --bg-sidebar: #1c1917;
@@ -75,12 +81,11 @@ html {
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-sans);
-  line-height: 1.6;
-  overflow-x: hidden;
+  background: var(--bg) !important;
+  color: var(--text) !important;
+  /* 删除 font-family 和 line-height，让前面 CSS 控制 */
 }
+
 
 /* 进度条 */
 #progress-bar {
@@ -149,7 +154,36 @@ body {
   gap: 10px;
   flex-shrink: 0;
 }
+#navbar,
+#nav-tree,
+.nav-section-header,
+.nav-group-header,
+.nav-item,
+#toc-list,
+.toc-item,
+#mobile-menu,
+.mobile-menu-item,
+#sidebar-toggle,
+.nav-btn,
+.font-btn {
+  font-family: var(--font-ui) !important;
+}
 
+/* 更细粒度的菜单项控制，确保中文显示正常 */
+.nav-section-header {
+  font-family: var(--font-ui) !important;
+  font-weight: 600;
+  /* 中文需要略细一点的字重，避免700太粗 */
+  letter-spacing: 0.05em;
+  /* 中文字间距不宜过大 */
+}
+
+.nav-item,
+.toc-item {
+  font-family: var(--font-ui) !important;
+  /* 中文菜单项行高需要更大 */
+  line-height: 1.6;
+}
 .desktop-tools {
   display: flex;
   align-items: center;
@@ -472,25 +506,46 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .nav-section {
   margin-bottom: 2px;
 }
+.nav-section-items,
+.nav-group-items {
+  display: none;
+}
 
+.nav-section.open>.nav-section-items,
+.nav-group.open>.nav-group-items {
+  display: block;
+}
+
+.nav-section-header .chevron,
+.nav-group-header .chevron {
+  transition: transform 200ms;
+}
+
+.nav-section.open .chevron,
+.nav-group.open .chevron {
+  transform: rotate(90deg);
+}
 .nav-section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 10px 16px;
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-size: 12px;
+  /* 从 11px 略微增大 */
+  font-weight: 700;
+  /* 从 600 加重，视觉更实 */
+  letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: var(--text-3);
+  color: var(--text-2);
+  /* 从 text-3 提升到 text-2，更显眼 */
   user-select: none;
   transition: all 150ms;
   border-bottom: 1px solid transparent;
 }
 
 .nav-section-header:hover {
-  color: var(--text-2);
+  color: var(--text);
   background: rgba(0, 0, 0, 0.02);
 }
 
@@ -528,12 +583,15 @@ input[type="range"]::-webkit-slider-thumb:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 16px 10px 20px;
+  padding: 8px 16px 8px 24px;
+  /* 增加左缩进，强化层级感 */
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
+  /* 从 14px 降到 13px */
   color: var(--text-2);
   transition: all 150ms;
-  font-weight: 500;
+  font-weight: 400;
+  /* 从 500 降到 400，不抢眼 */
   background: transparent;
 }
 
@@ -843,8 +901,23 @@ input[type="range"]::-webkit-slider-thumb:hover {
   margin: 0 0 1.2em;
   text-align: justify;
   hyphens: auto;
+  /* 默认：英文段首缩进2字符 */
 }
-
+#content strong,
+#content b {
+  color: var(--text);
+  /* 强制主色，不要变浅 */
+  font-weight: 700;
+  /* 确保加粗程度 */
+  font-family: var(--font-sans);
+  /* 中文粗体用黑体更清晰 */
+}
+[data-theme="dark"] #content strong,
+[data-theme="dark"] #content b {
+  color: var(--text);
+  /* 深色模式也保持白色/主色，不变成灰色 */
+}
+/* 中文内容：取消缩进，改用段间距，关闭连字符 */
 /* 链接样式 —— 第二份风格（带下划线偏移） */
 #content a {
   color: var(--link);
