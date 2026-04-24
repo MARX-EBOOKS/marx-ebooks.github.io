@@ -1,0 +1,121 @@
+body {
+    font-family:"Times New Roman","Baskerville Old Face",Arial,Helvetica,serif;
+    margin-right: 5%;
+    margin-left: 5%;
+    font-size: 1.25em;
+-webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;
+    text-align: justify;
+    text-justify: inter-word;
+color:#2D3A53;
+background-color:#EEF0F5;
+line-height:2em;
+}
+p {text-indent:1em;margin:0;line-height:200%;}
+.mbppagebreak {
+    display: block;
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0
+    }
+em,i {
+font-style: italic;
+font-family:Garamond;
+}
+h1, h2 {
+    margin-top:2.5em;
+    margin-bottom: 2.5em;
+    font-weight: bold;
+    text-align:center;
+line-height:1.5em;
+}
+h3, h4 {
+    margin-top:2em;
+    margin-bottom: 1.5em;
+    font-weight: bold;
+    text-align:center;
+line-height:1.5em;
+}
+h5 {
+    margin-top: 1.5em;
+    margin-bottom:1em;
+    font-weight: bold;
+    font-size: 1em;
+line-height:1.5em;
+}
+h6 {
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    font-weight: bold;
+    text-align:center;
+    font-size: 1em;
+line-height:1.5em;
+}
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 1em auto;
+}
+
+hr {
+    margin: 1em auto 1em auto;
+    text-align:center;
+}
+.cover-image {{
+            max-width: 100%;
+            height: auto;
+            margin: 20px 0;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }}
+.remark {
+    display: block;
+    margin-left: 6.25%;
+    text-align: justify;
+}
+.addtion {
+    display: block;
+    font-size:0.9em;
+    
+}
+a,a:focus-visible {color:#2563EB;text-decoration: none;}/*#1A0DAB;*/
+a:visited {color:#4B6CB7}
+a:active {color: #1E40AF;text-decoration: underline;}/*#2563EB;#6B7280*/
+@media (prefers-color-scheme: dark) {
+  body {
+background-color: #020206;
+color:#ABABAB;
+}
+a {
+  color: #64ABD5;
+  text-decoration: none;
+}
+
+a:visited {
+  color:  #8597AE;
+}
+
+a:active  {
+  color: #a3d4ff;
+  text-decoration: underline;
+}
+h1,h2,h3,h4,h5,h6,b {
+ color:  #F0F0F0;
+}
+a b,b a {
+ color:   #64ABD5;
+  text-decoration: underline;
+}
+a:visited  b,b a:visited{
+  color:  #8597AE;
+}
+
+a:hover b, a:focus b ,b a:focus, b a:hover{
+  color: #a3d4ff;
+}
+
+a:active b,b a:active {
+  color:  #ff6b6b; 
+}
+
+}

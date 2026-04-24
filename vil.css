@@ -1,0 +1,115 @@
+BODY {color:#2D3A53;background-color:#EEF0F5;-webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;margin-left:5%;margin-right:5%;font-family:Arial,Helvetica,sans-serif,"Times New Roman";line-height:200%;font-size:1.25em;}
+TD P {margin-left:1%;margin-right:1%}
+.wde {margin-left:0;margin-right:0}
+TABLE{margin-left:0;margin-right:0}
+TABLE {max-width:100%;}
+H1,H2,H3,H4 {font-family:"Times New Roman",Times,serif;text-align: center;font-weight:normal;}
+H1,H2 {margin-top:1em;}
+div.nav {text-align:center;}
+FOOTER P,ASIDE P,SMALL P {margin-top:0; padding-top:0; margin-bottom:0; padding-bottom:0;font-size:0.75em;line-height:150%;}
+.TOC {max-width:100%;text-align:justify;margin:1em auto;text-indent:0;}
+FOOTER P,ASIDE P {text-indent:1em;}
+HR {text-align:center}
+SMALL HR {text-align:LEFT;}
+FOOTER HR,ASIDE HR {width:15%;margin-left:0;}
+BLOCKQUOTE {font-size:0.75em;margin:1em 0;line-height:150%;}
+blockquote p {line-height:150%;}
+.HD-1 {font-size:75%;text-align:center;margin-bottom:0.5em;}
+.rzr {letter-spacing:0.2em}
+.hug {font-size:300%}
+.sma {font-size:80%}
+.bor {border-width:1; border-style:solid}
+.bordn {border-width:1; border-style:solid; border-top-style:none}
+.borup {border-width:1; border-style:solid; border-bottom-style:none}
+a,a:focus-visible {color:#2563EB;text-decoration: none;}/*#1A0DAB;*/
+a:visited {color:#4B6CB7}
+a:active {color: #1E40AF;text-decoration: underline;}/*#2563EB;#6B7280*/
+.table-wrapper {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.chapter-1 {
+margin:1em 0;
+}
+.HD {
+margin:2em 0;
+}
+.HD, .chapter-1 {
+font-size:75%;
+  display: flex;
+  justify-content: space-between;  /* 左中右自动分布在两端和中间 */
+  align-items: center;    
+  padding-top: 2em;
+  padding-bottom:0.1em;   
+  font-family:Arial,Helvetica,sans-serif,"Times New Roman", serif;
+  border-top: 1px inset ;
+  border-bottom: 1px solid #2D3A53;
+}
+.chapter-l,.chapter-r {
+font-size:75%;
+  padding-top: 2em;
+  padding-bottom:0.1em;      /* 文字与第一条线的距离 */
+ margin: 1em 0;
+  font-family: "Times New Roman", serif;
+  /* 双线效果：粗细不同 */
+border-bottom: 2px solid #2D3A53;  
+box-shadow: 0 3px 0 0 #EEF0F5, 
+              0 4px 0 0 #2D3A53;
+  border-top: 1px inset;
+} 
+
+/* 左页码定位 */
+.lp,.chapter-l {
+text-align:left; 
+}
+/* 右页码定位 */
+.rp,.chapter-r {
+text-align:right; 
+}
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #020206;
+color:#ABABAB;
+}
+a {
+  color: #64ABD5;
+  text-decoration: none;
+}
+
+a:visited {
+  color:  #8597AE;
+}
+
+a:active  {
+  color: #a3d4ff;
+  text-decoration: underline;
+}
+h1,h2,h3,h4,h5,h6,b {
+ color:  #F0F0F0;
+}
+a b,b a {
+ color:   #64ABD5;
+  text-decoration: underline;
+}
+a:visited  b,b a:visited{
+  color:  #8597AE;
+}
+
+a:hover b, a:focus b ,b a:focus, b a:hover{
+  color: #a3d4ff;
+}
+
+a:active b,b a:active {
+  color:  #ff6b6b; 
+}
+.chapter-l,.chapter-r {
+border-bottom: 2px solid #ABABAB;  
+box-shadow: 0 3px 0 0 #020206, 
+              0 4px 0 0 #ABABAB;
+  border-top: 1px inset;
+}
+.HD, .chapter-1 {
+  border-top: 1px inset ;
+  border-bottom: 1px solid #ABABAB;
+}
+}

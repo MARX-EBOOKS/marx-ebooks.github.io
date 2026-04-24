@@ -1,0 +1,392 @@
+
+div,
+p{
+    display:block;
+}
+h1,
+h2,
+h3,h4,h5,h6{
+    text-align:center;
+}
+h1,h2,h3 {
+        padding-top:1.5em;
+        margin-bottom:1.5em;
+        line-height:160%;
+    }
+
+h2{
+    page-break-before:always;
+}
+h1{
+    font-size:200%;
+}
+
+h2{
+    font-size:150%;
+}
+
+h3{
+    font-size:120%;
+}
+table{
+    text-align:center;
+    width:100%;
+    border:1px;
+    border-collapse:collapse;
+}
+h1,
+.HT3H,
+.HT4H,
+.HT5H,
+.HT6H,
+.HT3HR,
+.HT4HR,
+.HT5HR,
+.HT6HR,
+.HT3HC,
+.HT4HC,
+.HT5HC,
+.HT6HC,
+.ParaTitC1,
+.ParaTitC2,
+.ParaTitC3,
+.ParaTitD1,
+.ParaTitD2,
+.ParaTitD3,
+.ParaTitL1,
+.ParaTitL2,
+.ParaTitL3
+{
+    /*font-family:'方正黑体_GBK';*/
+}
+
+
+sup,
+sub,
+p,
+.HT3S,
+.HT4S,
+.HT5S,
+.HT6S,
+.HT3SR,
+.HT4SR,
+.HT5SR,
+.HT6SR,
+.HT3SC,
+.HT4SC,
+.HT5SC,
+.HT6SC
+{
+    /*font-family:'方正书宋_GBK';*/
+}
+
+h2,
+.HT3K,
+.HT4K,
+.HT5K,
+.HT6K,
+.HT3KR,
+.HT4KR,
+.HT5KR,
+.HT6KR,
+.HT3KC,
+.HT4KC,
+.HT5KC,
+.HT6KC
+{
+    font-family:STKai, "MKai PRC", Kai, 楷体;
+}
+/*
+div > p{
+    margin-top:0em;
+    margin-bottom:0em;
+}
+*/
+h3,
+.HT3F,
+.HT4F,
+.HT5F,
+.HT6F,
+.HT3FR,
+.HT4FR,
+.HT5FR,
+.HT6FR,
+.HT3FC,
+.HT4FC,
+.HT5FC,
+.HT6FC
+{
+    font-family:'FZFSJT';
+}
+
+.HT3S,
+.HT3SR,
+.HT3SC,
+.HT3K,
+.HT3KR,
+.HT3KC,
+.HT3F,
+.HT3FR,
+.HT3FC,
+.HT3H,
+.HT3HR,
+.HT3HC{
+    font-size:135%;
+}
+
+.HT4S,
+.HT4SR,
+.HT4SC,
+.HT4K,
+.HT4KR,
+.HT4KC,
+.HT4F,
+.HT4FR,
+.HT4FC,
+.HT4H,
+.HT4HR,
+.HT4HC{
+    font-size:120%;
+}
+
+body,
+.HT5S,
+.HT5SR,
+.HT5SC,
+.HT5K,
+.HT5KR,
+.HT5KC,
+.HT5F,
+.HT5FR,
+.HT5FC,
+.HT5H,
+.HT5HR,
+.HT5HC{
+    font-size:100%;
+}
+
+sup,
+sub,
+.HT6S,
+.HT6SR,
+.HT6SC,
+.HT6K,
+.HT6KR,
+.HT6KC,
+.HT6F,
+.HT6FR,
+.HT6FC,
+.HT6H,
+.HT6HR,
+.HT6HC{
+    font-size:85%;
+}
+
+.HT3SR,
+.HT3FR,
+.HT3HR,
+.HT3KR,
+.HT4SR,
+.HT4FR,
+.HT4HR,
+.HT4KR,
+.HT5SR,
+.HT5FR,
+.HT5HR,
+.HT5KR,
+.HT6SR,
+.HT6FR,
+.HT6HR,
+.HT6KR{
+    text-align:right;
+    line-height:80%;
+}
+
+.HT3SC,
+.HT3FC,
+.HT3HC,
+.HT3KC,
+.HT4SC,
+.HT4FC,
+.HT4HC,
+.HT4KC,
+.HT5SC,
+.HT5FC,
+.HT5HC,
+.HT5KC,
+.HT6SC,
+.HT6FC,
+.HT6HC,
+.HT6KC{
+    text-align:center;
+    margin-top:0.5em;
+    margin-bottom:0.5em;
+}
+
+body{
+    color: #2D3A53;background-color: #EEF0F5;
+    line-height:200%;
+    font-size:1.25em;
+    font-family:"Times New Roman","宋体","Song S", Song, STSong;
+    text-align: justify;
+    margin: 0 5%;
+}
+
+a {
+    color: #2563EB;
+    text-decoration: underline;
+}
+
+/*#1A0DAB;*/
+a:visited {
+    color: #4B6CB7
+}
+
+a:hover,
+a:focus {
+    color: #1E40AF;
+}
+
+/*#2563EB;#6B7280*/
+.footnote{
+    font-size:0.75em;
+    line-height:150%;
+}
+p{
+    text-indent:2em;
+    line-height:200%;
+}
+
+.ParaTitC1,
+.ParaTitC2,
+.ParaTitC3,
+.ParaTitL1,
+.ParaTitL2,
+.ParaTitL3,
+.ParaTitD1,
+.ParaTitD2,
+.ParaTitD3{
+    margin-bottom:1em;
+    font-weight:bold;
+}
+.ParaTitC1,
+.ParaTitC2,
+.ParaTitC3{
+    text-align:center;
+}
+.ParaTitD1,
+.ParaTitD2,
+.ParaTitD3{
+    text-indent:2em;
+    text-align: left;
+}
+.ParaTitC1,
+.ParaTitD1,
+.ParaTitL1{
+    font-size:105%;
+}
+.ParaTitC2,
+.ParaTitD2,
+.ParaTitL2{
+    font-size:95%;
+}
+.ParaTitC3,
+.ParaTitD3,
+.ParaTitL3{
+    font-size:85%;
+}
+.bold{
+    font-weight:bold;
+}
+.italic{
+    font-style:italic;
+}
+.point,
+.underline{
+    text-decoration:underline;
+}
+
+.indexDiv,
+.refDiv{
+    line-height:100%;
+}
+
+.EXTCHARA{
+    font-family:'Sun-ExtA';
+}
+
+.EXTCHARB{
+    font-family:'Sun-ExtB';
+}
+
+.EXTCHARC{
+
+}
+.EXTCHARD{
+
+}
+.EXTCHARP{
+    font-family:'新宋体-商务';
+}
+.CPEXT{
+    font-family:'CPEXT-HY';
+}
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #020206;
+        color: #ABABAB;
+    }
+
+    a {
+        color: #64ABD5;
+        text-decoration: underline;
+    }
+
+    a:visited {
+        color: #8597AE;
+    }
+
+    a:hover,
+    a:focus {
+        color: #a3d4ff;
+        text-decoration: underline;
+    }
+
+    a:active {
+        color: #ff6b6b;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    b {
+        color: #F0F0F0;
+    }
+
+    a b,
+    b a {
+        color: #64ABD5;
+        text-decoration: underline;
+    }
+
+    a:visited b,
+    b a:visited {
+        color: #8597AE;
+    }
+
+    a:hover b,
+    a:focus b,
+    b a:focus,
+    b a:hover {
+        color: #a3d4ff;
+    }
+
+    a:active b,
+    b a:active {
+        color: #ff6b6b;
+    }
+
+}

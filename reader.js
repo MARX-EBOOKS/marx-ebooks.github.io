@@ -1,0 +1,408 @@
+(function () {
+    'use strict';
+    const $ = s => document.querySelector(s);
+
+    const state = {
+        fs: parseFloat(localStorage.fontSize) || 1,
+        rs: localStorage.rememberScroll !== 'false',
+        mob: innerWidth < 768
+    };
+
+    const FN_REF_RE = /^#(nref|cref|fn|FN|NA|FA|sd|ed|M|E|F|N|T|a|b|z|c|n|p)[-\d]+?/i;
+
+    // ── Utilities ─────────────────────────────────────────────────
+    const resolveUrl = href => { try { return new URL(href, location.href).href; } catch { return location.pathname.replace(/[^/]*$/, '') + href; } };
+    const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+    // ── Responsive Content ────────────────────────────────────────
+    function initResponsiveContent() {
+        try {
+            const content = $('#content');
+            if (!content) return;
+            content.querySelectorAll('table').forEach(table => {
+                if (table.parentElement?.classList.contains('table-wrapper')) return;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'table-wrapper';
+                wrapper.style.cssText = 'overflow-x:auto;max-width:100%;display:block;';
+                table.style.minWidth = '600px';
+                table.parentNode.insertBefore(wrapper, table);
+                wrapper.appendChild(table);
+            });
+            content.querySelectorAll('img').forEach(img => {
+                img.style.cssText = 'max-width:100%;height:auto;display:block;';
+            });
+        } catch (e) { console.warn('[Reader] Responsive init failed:', e); }
+    }
+
+    // ── Heading Anchors ───────────────────────────────────────────
+    function initHeadingAnchors() {
+        try {
+            const content = $('#content');
+            if (!content) return;
+            content.querySelectorAll('h2, h3').forEach((h, i) => {
+                if (!h.id) h.id = 'h' + i;
+                if (!h.querySelector('.anchor'))
+                    h.insertAdjacentHTML('beforeend', `<a class="anchor" href="#${h.id}">#</a>`);
+            });
+        } catch (e) { console.warn('[Reader] Heading anchors init failed:', e); }
+    }
+
+    // ── Progress Bar ──────────────────────────────────────────────
+    function initProgress() {
+        try {
+            const bar = $('#progress-bar');
+            if (!bar) return;
+            window.addEventListener('scroll', () => {
+                const h = document.documentElement.scrollHeight - innerHeight;
+                bar.style.width = (h > 0 ? (scrollY / h) * 100 : 0) + '%';
+            }, { passive: true });
+        } catch (e) { console.warn('[Reader] Progress init failed:', e); }
+    }
+
+    // ── Font & Theme Controls ─────────────────────────────────────
+    function initControls() {
+        try {
+            const slider = $('#font-slider');
+            const mobileSlider = $('#mobile-font-slider');
+            const setFont = s => {
+                s = Math.max(0.75, Math.min(1.5, s));
+                state.fs = s;
+                document.documentElement.style.setProperty('--fs-user', Math.round(16 * s) + 'px');
+                [slider, mobileSlider].forEach(el => { if (el) el.value = s; });
+                localStorage.setItem('fontSize', s);
+            };
+            setFont(state.fs);
+
+            // Unified font controls
+            [['#font-dec-btn', '#mobile-font-dec', -0.05], ['#font-inc-btn', '#mobile-font-inc', 0.05]].forEach(([d, m, delta]) => {
+                $(d)?.addEventListener('click', () => setFont(state.fs + delta));
+                $(m)?.addEventListener('click', () => setFont(state.fs + delta));
+            });
+            [slider, mobileSlider].forEach(s => s?.addEventListener('input', e => setFont(parseFloat(e.target.value))));
+
+            // Theme toggle
+            const updateThemeUI = () => {
+                const isDark = document.documentElement.dataset.theme === 'dark';
+                const sun = $('#icon-sun');
+                const moon = $('#icon-moon');
+                if (sun) sun.style.display = isDark ? 'none' : '';
+                if (moon) moon.style.display = isDark ? '' : 'none';
+                const ind = $('#mobile-theme-indicator');
+                if (ind) ind.textContent = isDark ? '\u25CF' : '\u25CB';
+            };
+            updateThemeUI();
+
+            const toggleTheme = () => {
+                const isDark = document.documentElement.dataset.theme === 'dark';
+                const newTheme = isDark ? 'light' : 'dark';
+                document.documentElement.dataset.theme = newTheme;
+                localStorage.theme = newTheme;
+                updateThemeUI();
+            };
+            $('#theme-btn')?.addEventListener('click', toggleTheme);
+            $('#mobile-theme')?.addEventListener('click', toggleTheme);
+
+            // Remember scroll toggle
+            const remBtn = $('#remember-btn');
+            const mobileRemInd = $('#mobile-remember-indicator');
+            const updateRemember = () => {
+                remBtn?.classList.toggle('active', state.rs);
+                if (mobileRemInd) mobileRemInd.textContent = state.rs ? '\u25CF' : '\u25CB';
+            };
+            updateRemember();
+
+            const toggleRemember = () => {
+                state.rs = !state.rs;
+                localStorage.rememberScroll = state.rs;
+                updateRemember();
+            };
+            remBtn?.addEventListener('click', toggleRemember);
+            $('#mobile-remember')?.addEventListener('click', toggleRemember);
+
+            $('#mobile-menu-toggle')?.addEventListener('click', () => {
+                $('#mobile-menu')?.classList.toggle('open');
+            });
+        } catch (e) { console.warn('[Reader] Controls init failed:', e); }
+    }
+
+    // ── Scroll Memory ─────────────────────────────────────────────
+    function initScrollMemory() {
+        try {
+            const key = 'scroll_' + location.pathname;
+            if (state.rs) {
+                const saved = localStorage.getItem(key);
+                if (saved) requestAnimationFrame(() => window.scrollTo(0, parseInt(saved)));
+            }
+            window.addEventListener('scroll', debounce(() => {
+                if (state.rs) localStorage.setItem(key, scrollY);
+            }, 300), { passive: true });
+        } catch (e) { console.warn('[Reader] Scroll memory init failed:', e); }
+    }
+
+    // ── Footnote Popup ────────────────────────────────────────────
+    class FootnotePopup {
+        constructor() {
+            this.tip = $('#fn-tooltip');
+            this._active = false;
+            this._trigger = null;
+            this._cache = new Map();      // url → doc block (cross-page)
+            this._sameCache = new Map();   // id → {block, target}
+            this._dismiss = this._doDismiss.bind(this);
+            this._reposition = () => { if (this._active) this._position(); };
+        }
+
+        async show(a, e) {
+            if (!this.tip) return;
+            const href = a.getAttribute('href');
+            if (!href) return;
+
+            let targetId, pageUrl = null, isCross = false;
+            if (href.startsWith('#')) targetId = href.slice(1);
+            else if (href.includes('#')) { targetId = href.slice(href.indexOf('#') + 1); pageUrl = resolveUrl(href.slice(0, href.indexOf('#'))); isCross = true; }
+            else return;
+
+            this._trigger = a;
+            const result = await this._resolveTarget(targetId, pageUrl, isCross);
+            if (!result) return;
+            const { block, target } = result;
+
+            this._render(block, target, href, isCross);
+            this._position(e);
+            this.tip.classList.add('visible');
+            this._active = true;
+            document.addEventListener('click', this._dismiss, true);
+            document.addEventListener('keydown', this._dismiss);
+            window.addEventListener('scroll', this._reposition, { passive: true });
+        }
+
+        async _resolveTarget(targetId, pageUrl, isCross) {
+            if (isCross && pageUrl) {
+                let doc = this._cache.get(pageUrl);
+                if (!doc) {
+                    try {
+                        const res = await fetch(pageUrl);
+                        if (!res.ok) return null;
+                        doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+                        this._cache.set(pageUrl, doc);
+                    } catch { return null; }
+                }
+                const target = doc.getElementById(targetId) || doc.querySelector('a[name="' + CSS.escape(targetId) + '"]');
+                if (!target) return null;
+                return { target, block: this._toBlock(target) };
+            }
+
+            // Same-page
+            const cached = this._sameCache.get(targetId);
+            if (cached) return { target: cached.target || cached.block, block: cached.block };
+
+            let block = document.getElementById(targetId);
+            let target;
+            if (block) {
+                target = block.querySelector('#' + CSS.escape(targetId)) || block.querySelector('a[name="' + CSS.escape(targetId) + '"]') || block;
+            }
+            if (!block) {
+                target = document.getElementById(targetId) || document.querySelector('a[name="' + CSS.escape(targetId) + '"]');
+                if (!target) return null;
+                block = this._toBlock(target);
+            }
+            return { target, block };
+        }
+
+        _toBlock(target) {
+            const tag = target.tagName;
+            const notes = '.fni, .footnote, .endnote, .fn, .note';
+            if (tag === 'LI' || tag === 'DD' || tag === 'DIV' || ((tag === 'P' || tag === 'SPAN') && target.matches(notes))) return target;
+            return target.closest(notes) || target.closest('li, dd') || target.closest('p, div') || target;
+        }
+
+        _render(block, target, href, isCross) {
+            const viewer = this.tip.querySelector('.fn-popup-content');
+            const jumpLink = this.tip.querySelector('.fn-jump-link');
+            if (!viewer) return;
+
+            const clone = block.cloneNode(true);
+            const tid = target.id || target.getAttribute('name');
+            if (tid) {
+                let t = clone.querySelector('#' + CSS.escape(tid));
+                if (t) { t.removeAttribute('id'); t.setAttribute('data-fn-scroll', ''); }
+                if (!t) {
+                    t = clone.querySelector('[name="' + CSS.escape(tid) + '"]');
+                    if (t) t.setAttribute('data-fn-scroll', '');
+                }
+            }
+            viewer.innerHTML = '';
+            viewer.appendChild(clone);
+            requestAnimationFrame(() => {
+                const marked = viewer.querySelector('[data-fn-scroll]');
+                if (marked) marked.scrollIntoView({ block: 'start', behavior: 'instant' });
+            });
+
+            if (jumpLink) {
+                jumpLink.href = isCross ? resolveUrl(href) : href;
+                jumpLink.textContent = isCross ? '\u2197 Go to note (other page)' : '\u2193 Jump to footnote';
+                jumpLink.classList.toggle('cross-page', isCross);
+                jumpLink.style.display = '';
+                jumpLink.onclick = () => this.forceClose();
+            }
+        }
+
+        async preloadCrossPage() {
+            const urls = new Set();
+            document.querySelectorAll('a[data-fn-ref], #content sup a[href]').forEach(a => {
+                const href = a.getAttribute('href') || '';
+                if (!href.includes('#') || href.startsWith('#') || href.startsWith('http') || href.startsWith('//')) return;
+                urls.add(resolveUrl(href.slice(0, href.indexOf('#'))));
+            });
+            if (!urls.size) return;
+            await Promise.allSettled([...urls].map(async url => {
+                if (this._cache.has(url)) return;
+                try {
+                    const res = await fetch(url);
+                    if (res.ok) this._cache.set(url, new DOMParser().parseFromString(await res.text(), 'text/html'));
+                } catch { }
+            }));
+        }
+
+        preloadSamePage() {
+            document.querySelectorAll('a[data-fn-ref], #content sup a[href]').forEach(a => {
+                const href = a.getAttribute('href') || '';
+                if (!href.startsWith('#') || href.length <= 1 || href.startsWith('http') || href.startsWith('//')) return;
+                const id = href.slice(1);
+                if (this._sameCache.has(id)) return;
+                let block = document.getElementById(id);
+                let target;
+                if (block) target = block.querySelector('#' + CSS.escape(id)) || block.querySelector('a[name="' + CSS.escape(id) + '"]');
+                if (!block) {
+                    target = document.getElementById(id) || document.querySelector('a[name="' + CSS.escape(id) + '"]');
+                    if (!target) return;
+                    block = this._toBlock(target);
+                }
+                if (block) this._sameCache.set(id, { target: target?.cloneNode(true) || null, block: block.cloneNode(true) });
+            });
+        }
+
+        _position(e) {
+            if (!this._trigger) return;
+            const rect = this._trigger.getBoundingClientRect();
+            const tipW = 340;
+            const maxH = Math.min(320, innerHeight * 0.45);
+            let left = rect.right + 8;
+            if (left + tipW > innerWidth - 12) left = Math.max(12, rect.left - tipW - 8);
+            let top = rect.top + scrollY - 10;
+            const minTop = scrollY + 4;
+            const maxTop = scrollY + innerHeight - maxH - 4;
+            this.tip.style.top = (top < minTop ? minTop : top > maxTop ? Math.max(minTop, maxTop) : top) + 'px';
+            this.tip.style.left = left + 'px';
+            this.tip.style.maxHeight = maxH + 'px';
+        }
+
+        _doDismiss(e) {
+            if (e?.type === 'keydown' && e.key !== 'Escape') return;
+            if (e?.type === 'click' && this.tip.contains(e.target)) return;
+            this.tip.classList.remove('visible');
+            const viewer = this.tip.querySelector('.fn-popup-content');
+            if (viewer) viewer.innerHTML = '';
+            const jumpLink = this.tip.querySelector('.fn-jump-link');
+            if (jumpLink) jumpLink.style.display = 'none';
+            this._active = false;
+            this._trigger = null;
+            document.removeEventListener('click', this._dismiss, true);
+            document.removeEventListener('keydown', this._dismiss);
+            window.removeEventListener('scroll', this._reposition);
+        }
+
+        forceClose() { if (this._active) this._doDismiss(); }
+    }
+
+    function isFootnoteLink(a) {
+        if (a.hasAttribute('data-fn-ref') || a.hasAttribute('data-fn-cross')) return true;
+        const href = a.getAttribute('href') || '';
+        if (!href.includes('#') || href.startsWith('http') || href.startsWith('//')) return false;
+        const inSup = a.closest('sup') || a.querySelector('sup');
+        if (!inSup) return false;
+        const fragment = href.startsWith('#') ? href : href.slice(href.indexOf('#'));
+        return FN_REF_RE.test(fragment);
+    }
+
+    function initFootnotes() {
+        try {
+            const popup = new FootnotePopup();
+            const start = () => { popup.preloadCrossPage(); popup.preloadSamePage(); };
+            if ('requestIdleCallback' in window) requestIdleCallback(start, { timeout: 2000 });
+            else setTimeout(start, 500);
+
+            document.addEventListener('click', e => {
+                const a = e.target.closest('a');
+                if (!a || !isFootnoteLink(a)) return;
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                popup.show(a, e);
+            });
+
+            window.__FN_POPUP__ = popup;
+        } catch (e) { console.warn('[Reader] Footnotes init failed:', e); }
+    }
+
+    // ── Global Events ─────────────────────────────────────────────
+    function initGlobalEvents() {
+        try {
+            window.addEventListener('resize', () => {
+                const was = state.mob;
+                state.mob = innerWidth < 768;
+                if (was !== state.mob) window.__NAV__?.menu?.close();
+            });
+
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Escape') {
+                    window.__NAV__?.menu?.close();
+                    $('#mobile-menu')?.classList.remove('open');
+                    window.__FN_POPUP__?.forceClose();
+                }
+                if ((e.key === 's' || e.key === 'S') && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    window.__NAV__?.menu?.toggle();
+                }
+            });
+
+            document.addEventListener('click', e => {
+                const a = e.target.closest('a[href]');
+                if (!a || !a.closest('#content')) return;
+                if (a.hasAttribute('data-fn-ref') || a.hasAttribute('data-fn-cross') || a.classList.contains('fn-ref')) return;
+                const href = a.getAttribute('href') || '';
+                if (FN_REF_RE.test(href)) return;
+
+                // Same-page hash navigation
+                if (href.startsWith('#') && href.length > 1) {
+                    e.preventDefault();
+                    const target = document.getElementById(href.slice(1));
+                    if (target) target.scrollIntoView({ behavior: 'smooth' });
+                    return;
+                }
+                if (href.includes('#') && !href.startsWith('http') && !href.startsWith('//')) {
+                    try {
+                        const resolved = new URL(href, location.href);
+                        if (resolved.pathname === location.pathname) {
+                            e.preventDefault();
+                            const target = document.getElementById(resolved.hash.slice(1));
+                            if (target) target.scrollIntoView({ behavior: 'smooth' });
+                        }
+                    } catch { /* let browser handle */ }
+                }
+            });
+        } catch (e) { console.warn('[Reader] Global events init failed:', e); }
+    }
+
+    // ── Boot ──────────────────────────────────────────────────────
+    function init() {
+        initResponsiveContent();
+        initProgress();
+        initHeadingAnchors();
+        initControls();
+        initScrollMemory();
+        initFootnotes();
+        initGlobalEvents();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+})();

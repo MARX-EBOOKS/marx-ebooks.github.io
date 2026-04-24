@@ -1,0 +1,65 @@
+.style1 {color: #FF0000;font-family: "黑体";}
+.style2 {font-weight:bold;font-size: 1.25em;}
+.date,.style3 {font-size: 0.75em;text-align:center;margin-top:0;margin-bottom:0.5em;}
+.TCC {width: 20%;font-size: 0.75em;text-align:justify;margin:1em auto;}
+.TOC {width: 85%;text-align:justify;margin:1em auto;}
+table.TOC {width: 75%;text-align:justify;margin:auto;}
+.quote,blockquote,.footnote {font-size: 0.75em;margin: 1.5em 0;line-height:150%;}
+table {margin: 1.5em;max-width:97vw;!important}
+table.quote,table.footnote,blockquote table  {font-size: 0.75em; margin: 1.5em;}
+h1,h2 {font-family: "黑体"; text-align:center;margin:1.5em;line-height:200%;}
+h3,h4,h5,h6 {font-family: "黑体"; text-align:center;margin:1em;line-height:200%;}
+body {margin-right:4%; margin-left:4%;max-width: 100%;font-family: "华文中宋","黑体";color:#2D3A53;background-color:#FAFAF8;line-height:200%;font-size:1.25em;text-align:justify;}/*#F7F7F5;#000000;#F9FAFB*/
+p {margin: 0;line-height:200%;}
+p.cq,span.cq,div.cq {text-align:center;display: block;}
+div[align="right"] table,div.quote[align="right"] {margin: 1.5em 0 1.5em auto;}
+div[align="right"] table.quote,div.quote[align="right"] {display:table;}
+div[align="right"] table.quote td {text-align:left;}
+span[align="center"] {display: block;}
+a,a:focus-visible {color:#2563EB;text-decoration: none;}/*#1A0DAB;*/
+a:visited {color:#4B6CB7}
+a:active {color: #1E40AF;text-decoration: underline;}/*#2563EB;#6B7280*/
+.table-wrapper {
+  overflow-x: auto;
+  max-width: 100%;
+}
+@media (prefers-color-scheme: dark) {
+  body {
+background-color: #020206;
+color:#ABABAB;
+}
+a {
+  color: #64ABD5;
+  text-decoration: none;
+}
+
+a:visited {
+  color:  #8597AE;
+}
+
+a:active  {
+  color: #a3d4ff;
+  text-decoration: underline;
+}
+h1,h2,h3,h4,h5,h6,b {
+ color:  #F0F0F0;
+}
+a b,b a {
+ color:   #64ABD5;
+  text-decoration: underline;
+}
+a:visited  b,b a:visited{
+  color:  #8597AE;
+}
+
+a:hover b, a:focus b ,b a:focus, b a:hover{
+  color: #a3d4ff;
+}
+
+a:active b,b a:active {
+  color:  #ff6b6b; 
+}
+
+}
+
+

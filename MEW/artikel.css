@@ -1,0 +1,366 @@
+/* CSS-Datei für Artikel auf www.mlwerke.de
+  a work in progress                     */
+
+/* DIVisions:
+        1. NaviTop
+        2. Vorspann
+        3. Textteil
+        4. Fussnoten
+        5. Abspann
+        6. NaviBottom
+
+*/
+
+/* ========= divisions ================================= */
+BODY            {
+        margin-top:1.5mm;
+        margin-left: 2% ;             /* 20mm;       */
+        margin-right:1% ;            /* 5mm;       */
+        background-color: floralwhite;
+-webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;
+}
+
+DIV#NaviTop , DIV#NaviBottom   {
+        font-family: Arial, Helvetica, Zurich, Swiss, sans-serif; 
+        font-size: 9pt;
+        background-color: #CCFFCC;  /* blaßgrün, war: lavender */
+        color:            #006633;  /* waldgrün */
+            }
+DIV#Vorspann , DIV#Abspann  {
+        background-color: cornsilk;
+        border-top:       solid #330033 1px;
+          }
+DIV#Textteil{
+        background-color: floralwhite;
+        border-top:       solid #330033 1px;
+          }
+DIV#Fussnoten          {
+        background-color: floralwhite;
+        border-top:       solid #330033 1px;
+        /* margin-left:      1em; */
+        margin-top:       2em;  }
+
+/* ========== block styles ======================================================== */
+
+header, footer, article, section, nav, figure {display: block;}
+
+P, TD, DT, DL, LI       {
+        font-family: Georgia, "Times New Roman", Times, serif;
+        font-size: 11pt;
+        color: #330033;
+        }
+P       {text-indent: 1em;
+        }
+bLockquote, p.FirstPub, p.RedNote p.TextQuelle  {
+        font-family: Georgia, "Times New Roman", Times, serif;
+        font-size: 9pt;
+        color: #330033;
+        padding-left: 1em ;
+        }
+blockquote > p {
+	margin-left: 0;
+    }
+    /*
+DIV#Fussnoten {
+    font-family:  Arial, Helvetica, Zurich, Swiss, sans-serif;
+    font-size: 9pt;
+    margin-left: 1em;
+    text-indent: -2em;
+          }
+*/
+DIV.Fussnote{
+	/*
+	    padding-left: 2em;
+	    */
+    }
+    
+DIV.Fussnote > p {
+  	  font-family:  Arial, Helvetica, Zurich, Swiss, sans-serif;
+      font-size: 9pt;
+      padding-left: 1em;
+    }	    
+    
+DIV.Fussnote > p:firstchild {
+      text-indent: -2em;
+	}    
+
+DIV.Fussnote > blockquote {
+     font-family: Georgia, "Times New Roman", Times, serif;
+     font-size: 9pt;
+     /* padding-left: 1em;	 */
+	}
+DIV.Fussnote > blockquote > p {
+     font-family: inherit;
+     font-size: 9pt;
+     margin-left: 0;
+     padding-left: 0;	
+	}
+	
+p.FirstPub {
+	       text-indent: 0;
+         font-style: italic;
+            }
+
+p.TextQuelle {
+         font-family:  Arial, Helvetica, Zurich, Swiss, sans-serif;
+         font-size: 9pt;
+         margin-left: 0;
+         text-indent: 0;
+	
+} 
+ 
+
+p.RedNote {
+         font-style: italic;
+           }
+           
+p.BriefOrtDatum {
+	margin-left: 66%;
+	text-indent: 0;
+}
+p.BriefAnrede {
+	margin-left: 0%;
+	text-indent: 0;
+}
+
+p.BriefGrussformel {
+	margin-left: 55%;
+	text-indent: -1em;
+}
+
+p.BriefSignatur {
+	margin-left: 66%;
+	text-indent: -1em;
+}
+           
+
+h1, h2, h3, h4, h5, h6, p.AutorInfo {
+        font-family: Arial, Helvetica, Zurich, Swiss, Verdana, sans-serif;
+        color: #330040;
+        }
+H1   {font-size: 25pt;
+        font-weight:400;
+        }
+H2, p.AutorInfo                {
+        font-size:17.5pt;
+        font-weight:400;
+        text-indent: 0;
+        }
+H3                      {
+        font-size:14pt;
+        font-weight:400;
+}
+H4 {}
+H5 {}
+H6 {}
+
+math { color: blue;
+	   background-color: cornsilk;
+	   margin-left:  20em;
+	  }
+
+p.TrennzeileStern {margin-left: 0;
+	                 text-indent: 0;
+	                 text-align:  center;
+	                }
+p.TrennzeileStrich {margin-left: 0;
+                  	border-top:  solid #330033 1px;
+                  }
+	                  	                 
+*.BildLinks   {
+                float: left;
+                display:  inline-block;
+                overflow: visible;
+                margin: 4px  4px 4px 0;
+                padding: 0.3em 0.3em 0.3em 0 ;
+                background-color: aliceblue;
+                font-family:Arial; font-size:xx-small;
+              }
+*.BildRechts   {
+                float: right;
+                display:  inline-block;
+                overflow: visible;
+                margin: 4px 0 4px 4px;
+                padding: 0.3em 0 0.3em 0.3em ;
+                background-color: aliceblue;
+                font-family:Arial; font-size:xx-small;
+              }
+*.BildLinks > img, *.BildRechts > img {
+                      max-width: 99%;
+               }
+
+/* =========== LIST styles =========================== */    
+UL.dynlinklist { list-style-type: none; }
+UL.dynlinklist li {width: 2em; height: 2em; float: left;}
+UL.dynlinklist a {background-color: lightgreen; padding: 0.25em; margin: 0.25em; }
+
+   *.LitListe  li a{
+              font-family:  Arial, Helvetica, Zurich, Swiss, sans-serif;
+              font-size: 9pt;
+              margin-left: 2em;
+              text-indent: -2em;
+   }
+                 
+    ul.navcontainer 
+            {
+            margin: 0;
+            padding: 0;
+            list-style-type: none;
+            text-align: center;
+            }
+            
+    ul.navcontainer  li { display: inline; }
+    
+    ul.navcontainer  li a
+            {
+            text-decoration: none;
+            padding: .2em 1em;
+            color: #fff;
+            background-color: #036;
+            }
+    
+    ul.navcontainer  li a:hover
+            {
+            color: #fff;
+            background-color: #369;
+            }   
+  
+    p.navpointer {
+	   width: 100%;
+	   margin: 0; padding: 0; 
+    	color: #FF6347;
+		text-align: justify;
+    }  
+                        
+/* ========== Table styles =========================================== */
+
+/*
+table    {display: table; }
+tr       {display: table-row;}
+thead    {display: table-header-group;}
+tbody    {display: table-row-group;}
+tfoot    {display: table-header-group;}
+col      {display: table-column;} 
+colgroup {display: table-column-group;}
+td, th   {display: table-cell;}
+caption  {display: table-caption;}
+*/
+      table   {
+         background-color: cornsilk; 
+			   border: 1px solid #330033 ; 
+				 }
+				 
+      table.TocTable {background-color: cornsilk;}
+      
+      .colZahl {text-align: right;}
+      .colMarker {
+			text-align: center;
+			font-weight: bold;
+		}
+      th {vertical-align: baseline;}
+
+		.TableWide {
+			border: 1px solid #330033 ; 
+		}
+		.TableLeft {
+			float: left;
+			margin: 5px 5px 5px 0;
+			padding: 3px;
+			border: 1px solid #330033 ; 
+		}
+		.TableRight {
+			float: right;
+			margin: 5px 5px 0 5px;
+			padding: 3px;
+			border: 1px solid #330033 ; 
+		}
+      .TabHeadRow {
+      	border-bottom: 1px;
+			font-weight: bold;
+      }
+		.TabTotalRow {
+			border-top: 1px;
+			font-style: italic;
+		}
+/* ========== inline styles ========================================== */
+SMALL           {
+        font-size:  80%;
+}
+I                       {
+        font-style:italic;
+}
+B                       {
+        font-weight:bold;
+}
+U                       {
+        text-decoration:underline;
+}
+
+   .sCapsRight {
+      font-variant:small-caps; 
+		text-align: right;   	
+   }
+
+abbr, *[title] { 
+	    cursor: help; border-bottom: 1px dotted gray;}
+	      }
+
+/*			
+ { 
+	    cursor: help; border-bottom: 1px dotted gray;}
+	      }
+*/
+SPAN.top        {
+        font-size:7.5pt;
+        vertical-align:35%;
+}
+
+SPAN.bottom     {
+        font-size:7.5pt;
+}
+*.gesperrt {
+                letter-spacing: 0.2em;
+               }
+span.Fremdworte {
+              font-family: Arial, Helvatica, Swiss, Zurich, sans-serif;
+              }
+a.FNzeichen     {
+              vertical-align: text-top;
+              font-size: smaller;
+        }
+a.FNzeichen:before          {
+             content: "[";
+            }
+a.FNzeichen:after{
+              content: "]";
+            }
+.Seitenzahl, .Seitensprung, .SeiteZurueck, .SeiteVor    {
+              color:   #808080;  /* gray; */
+              background: #eeeeee; /* helles Grau */
+              text-decoration: none;
+            }
+.Seitenzahl:before, .Seitenzahl:after          {
+             content: "|";
+            }
+
+A:link     {
+        color:#6000FF;
+        background-color: transparent;
+        text-decoration:underline;
+      }
+
+A:visited       {
+        color:#8080C0;
+        background-color: transparent;
+        text-decoration: underline;
+      }
+
+a:active   {
+        color: Red;
+        background-color: transparent;
+        text-decoration: none;
+    }
+
+A.an    {
+        text-decoration: none;
+   }
