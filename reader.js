@@ -10,11 +10,9 @@
 
     const FN_REF_RE = /^#(nref|cref|fn|FN|NA|FA|sd|ed|M|E|F|N|T|a|b|z|c|n|p)[-\d]+?/i;
 
-    // ── Utilities ─────────────────────────────────────────────────
     const resolveUrl = href => { try { return new URL(href, location.href).href; } catch { return location.pathname.replace(/[^/]*$/, '') + href; } };
     const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
-    // ── Responsive Content ────────────────────────────────────────
     function initResponsiveContent() {
         try {
             const content = $('#content');
@@ -34,7 +32,6 @@
         } catch (e) { console.warn('[Reader] Responsive init failed:', e); }
     }
 
-    // ── Heading Anchors ───────────────────────────────────────────
     function initHeadingAnchors() {
         try {
             const content = $('#content');
@@ -47,7 +44,6 @@
         } catch (e) { console.warn('[Reader] Heading anchors init failed:', e); }
     }
 
-    // ── Progress Bar ──────────────────────────────────────────────
     function initProgress() {
         try {
             const bar = $('#progress-bar');
@@ -59,7 +55,6 @@
         } catch (e) { console.warn('[Reader] Progress init failed:', e); }
     }
 
-    // ── Font & Theme Controls ─────────────────────────────────────
     function initControls() {
         try {
             const slider = $('#font-slider');
@@ -73,14 +68,12 @@
             };
             setFont(state.fs);
 
-            // Unified font controls
             [['#font-dec-btn', '#mobile-font-dec', -0.05], ['#font-inc-btn', '#mobile-font-inc', 0.05]].forEach(([d, m, delta]) => {
                 $(d)?.addEventListener('click', () => setFont(state.fs + delta));
                 $(m)?.addEventListener('click', () => setFont(state.fs + delta));
             });
             [slider, mobileSlider].forEach(s => s?.addEventListener('input', e => setFont(parseFloat(e.target.value))));
 
-            // Theme toggle
             const updateThemeUI = () => {
                 const isDark = document.documentElement.dataset.theme === 'dark';
                 const sun = $('#icon-sun');
@@ -102,11 +95,10 @@
             $('#theme-btn')?.addEventListener('click', toggleTheme);
             $('#mobile-theme')?.addEventListener('click', toggleTheme);
 
-            // Remember scroll toggle
             const remBtn = $('#remember-btn');
             const mobileRemInd = $('#mobile-remember-indicator');
             const updateRemember = () => {
-                remBtn?.classList.toggle('active', state.rs);
+                remBtn?.classList.toggle('clean-btn--active', state.rs);
                 if (mobileRemInd) mobileRemInd.textContent = state.rs ? '\u25CF' : '\u25CB';
             };
             updateRemember();
@@ -120,12 +112,11 @@
             $('#mobile-remember')?.addEventListener('click', toggleRemember);
 
             $('#mobile-menu-toggle')?.addEventListener('click', () => {
-                $('#mobile-menu')?.classList.toggle('open');
+                $('#mobile-menu')?.classList.toggle('dropdown--open');
             });
         } catch (e) { console.warn('[Reader] Controls init failed:', e); }
     }
 
-    // ── Scroll Memory ─────────────────────────────────────────────
     function initScrollMemory() {
         try {
             const key = 'scroll_' + location.pathname;
@@ -139,14 +130,13 @@
         } catch (e) { console.warn('[Reader] Scroll memory init failed:', e); }
     }
 
-    // ── Footnote Popup ────────────────────────────────────────────
     class FootnotePopup {
         constructor() {
             this.tip = $('#fn-tooltip');
             this._active = false;
             this._trigger = null;
-            this._cache = new Map();      // url → doc block (cross-page)
-            this._sameCache = new Map();   // id → {block, target}
+            this._cache = new Map();
+            this._sameCache = new Map();
             this._dismiss = this._doDismiss.bind(this);
             this._reposition = () => { if (this._active) this._position(); };
         }
@@ -168,7 +158,7 @@
 
             this._render(block, target, href, isCross);
             this._position(e);
-            this.tip.classList.add('visible');
+            this.tip.classList.add('popover--visible');
             this._active = true;
             document.addEventListener('click', this._dismiss, true);
             document.addEventListener('keydown', this._dismiss);
@@ -191,7 +181,6 @@
                 return { target, block: this._toBlock(target) };
             }
 
-            // Same-page
             const cached = this._sameCache.get(targetId);
             if (cached) return { target: cached.target || cached.block, block: cached.block };
 
@@ -216,8 +205,8 @@
         }
 
         _render(block, target, href, isCross) {
-            const viewer = this.tip.querySelector('.fn-popup-content');
-            const jumpLink = this.tip.querySelector('.fn-jump-link');
+            const viewer = this.tip.querySelector('.popover__body');
+            const jumpLink = this.tip.querySelector('.popover__jump');
             if (!viewer) return;
 
             const clone = block.cloneNode(true);
@@ -240,7 +229,7 @@
             if (jumpLink) {
                 jumpLink.href = isCross ? resolveUrl(href) : href;
                 jumpLink.textContent = isCross ? '\u2197 Go to note (other page)' : '\u2193 Jump to footnote';
-                jumpLink.classList.toggle('cross-page', isCross);
+                jumpLink.classList.toggle('popover__jump--cross', isCross);
                 jumpLink.style.display = '';
                 jumpLink.onclick = () => this.forceClose();
             }
@@ -299,10 +288,10 @@
         _doDismiss(e) {
             if (e?.type === 'keydown' && e.key !== 'Escape') return;
             if (e?.type === 'click' && this.tip.contains(e.target)) return;
-            this.tip.classList.remove('visible');
-            const viewer = this.tip.querySelector('.fn-popup-content');
+            this.tip.classList.remove('popover--visible');
+            const viewer = this.tip.querySelector('.popover__body');
             if (viewer) viewer.innerHTML = '';
-            const jumpLink = this.tip.querySelector('.fn-jump-link');
+            const jumpLink = this.tip.querySelector('.popover__jump');
             if (jumpLink) jumpLink.style.display = 'none';
             this._active = false;
             this._trigger = null;
@@ -343,7 +332,6 @@
         } catch (e) { console.warn('[Reader] Footnotes init failed:', e); }
     }
 
-    // ── Global Events ─────────────────────────────────────────────
     function initGlobalEvents() {
         try {
             window.addEventListener('resize', () => {
@@ -355,7 +343,7 @@
             document.addEventListener('keydown', e => {
                 if (e.key === 'Escape') {
                     window.__NAV__?.menu?.close();
-                    $('#mobile-menu')?.classList.remove('open');
+                    $('#mobile-menu')?.classList.remove('dropdown--open');
                     window.__FN_POPUP__?.forceClose();
                 }
                 if ((e.key === 's' || e.key === 'S') && (e.ctrlKey || e.metaKey)) {
@@ -371,7 +359,6 @@
                 const href = a.getAttribute('href') || '';
                 if (FN_REF_RE.test(href)) return;
 
-                // Same-page hash navigation
                 if (href.startsWith('#') && href.length > 1) {
                     e.preventDefault();
                     const target = document.getElementById(href.slice(1));
@@ -392,7 +379,6 @@
         } catch (e) { console.warn('[Reader] Global events init failed:', e); }
     }
 
-    // ── Boot ──────────────────────────────────────────────────────
     function init() {
         initResponsiveContent();
         initProgress();

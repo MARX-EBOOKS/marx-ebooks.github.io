@@ -130,15 +130,17 @@ class PathMatcher {
     if (!patterns?.length) return false;
     const norm = p => p.replace(/\\/g, '/').replace(/\/+$/, '');
     const np = norm(relPath);
+    
     return patterns.some(pat => {
       const cp = norm(pat);
       if (np === cp || np.startsWith(cp + '/')) return true;
+      if (patterns == this.only && cp.startsWith(np+'/')) return true; 
       if (pat.includes('*')) return new RegExp('^' + pat.replace(/\*/g, '.*') + '$').test(np);
       return false;
     });
   }
 
-  shouldBuild(relPath) { return !this.only.length || this.matches(relPath, this.only); }
+  shouldBuild(relPath) {return !this.only.length || this.matches(relPath, this.only); }
   isCopyOnly(relPath) { return this.matches(relPath, this.copyOnly); }
 }
 
@@ -148,7 +150,7 @@ class FileScanner {
     this.root = root;
     this.pm = pathMatcher;
     this.SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.github', '.vscode', '.idea', 'assets']);
-    this.SKIP_FILES = new Set(['build.js', 'build.cjs', 'libmap.js', 'package.json', 'package-lock.json', 'yarn.lock', '.DS_Store']);
+    this.SKIP_FILES = new Set(['build.js', 'nav.js', 'reader.js', 'reader.css', 'build.cjs','libmap.js', 'package.json', 'package-lock.json', 'yarn.lock', '.DS_Store', 'index.json']);
   }
 
   async *scan(base = '') {
@@ -359,7 +361,6 @@ class HTMLProcessor {
 // ── PrevNextResolver ────────────────────────────────────────────
 class PrevNextResolver {
   constructor(root) { this.root = root; this.cache = new Map(); }
-
   async getLocalPrevNext(filePath) {
     const dir = path.dirname(filePath);
     if (this.cache.has(dir)) return this.cache.get(dir);
@@ -418,7 +419,7 @@ class VolumeIndexBuilder {
   }
 
   collectVolumePaths(libraryConfig) {
-    const pm = new PathMatcher([], this.config.args.copyOnly || []);
+    const pm = new PathMatcher(this.config.args.only||[], this.config.args.copyOnly || []);
     const paths = new Set();
     this._eachItem(libraryConfig, (_col, _group, item) => {
       const p = item.path || '';
@@ -446,7 +447,7 @@ class VolumeIndexBuilder {
   }
 
   async buildAll(libraryConfig, dist) {
-    const pm = new PathMatcher([], this.config.args.copyOnly || []);
+    const pm = new PathMatcher(this.config.args.only ||[], this.config.args.copyOnly || []);
     const volumes = this._collectVolumes(libraryConfig).filter(v => !pm.isCopyOnly(v.dir));
     let generated = 0;
     for (const vol of volumes) {
@@ -693,7 +694,7 @@ class PageRenderer {
     const themeScript = `(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);var f=parseFloat(localStorage.getItem('fontSize'));if(f&&f!==1)document.documentElement.style.setProperty('--fs-user',Math.round(16*f)+'px');})();`;
     const styles = `body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);}.index-container{max-width:1200px;margin:0 auto;padding:60px 20px;text-align:center;}.index-title{font-size:2.5rem;font-weight:600;margin-bottom:12px;font-family:var(--font-serif);}.library-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px;text-align:left;margin-top:40px;}.library-card{display:block;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;text-decoration:none;color:inherit;transition:all 200ms;}.library-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:var(--shadow-md);}.card-badge{font-size:11px;font-weight:700;padding:4px 8px;background:var(--accent-bg);color:var(--accent);border-radius:4px;font-family:var(--font-mono);}.card-title{font-size:1.25rem;font-weight:600;margin:12px 0 8px;color:var(--text);}.card-desc{font-size:0.95rem;color:var(--text-2);line-height:1.6;margin:0;}`;
 
-    return `<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${esc(this.config.args.logoText)}</title><script>${themeScript}</script><link rel="stylesheet" href="${SITE}/assets/reader.css"><style>${styles}</style></head><body><div class="index-container"><h1 class="index-title">${esc(this.config.args.logoText)}</h1><p>MLCLASSIC</p><div class="library-grid">${cards}</div></div></body></html>`;
+    return `<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${esc(this.config.args.logoText)}</title><script>${themeScript}</script><link rel="stylesheet" href="${SITE}/assets/reader.css"><style>${styles}</style></head><body><div class="index-container"><h1 class="index-title">${esc(this.config.args.logoText)}</h1><p>Proletarier aller Länder, vereinigt euch!<br>Пролетарии всех стран, соединяйтесь!<br>全世界无产者，联合起来！</p><div class="library-grid">${cards}</div></div></body></html>`;
   }
 }
 
@@ -748,6 +749,13 @@ class BuildEngine {
         await fs.copyFile(src, path.join(DIST, 'assets', asset));
         console.log(`   ${asset}`);
       } else { console.warn(`   Not found: ${src}`); }
+    }
+    if (config.args.logo!=null){
+          const logosrc = path.join(__dirname, config.args.logo);
+    if (fsSync.existsSync(logosrc)) {
+          await fs.copyFile(logosrc, path.join(config.DIST, config.args.logo));
+          console.log(`   ${logosrc}`);
+        } else { console.warn(`   Not found: ${src}`); }
     }
 
     // Browser-wrapped libmap.js

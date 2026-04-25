@@ -490,7 +490,7 @@ window.LIBRARY_CONFIG = [
         basePath: '/docs/HEGEL/',
         stylesheets: ['/docs/HEGEL/hegel.css'],
         badge: 'DE',
-        path: '/docs/HEGEL/index.html',
+        path: '/docs/HEGEL/index.html#de',
         groups: [
             {
                 label: 'Hegel Werke 1-20',

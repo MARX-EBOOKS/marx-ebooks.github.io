@@ -29,10 +29,10 @@ function generateTemplate(opts) {
   } = opts;
 
   const prevBtn = prev
-    ? `<a href="./${esc(prev.file)}" class="doc-nav-btn" id="prev-btn"><span class="dir">\u2190</span><span class="doc-name">${esc(prev.title)}</span></a>`
+    ? `<a href="./${esc(prev.file)}" class="pagination-link" id="prev-btn"><span class="pagination-link__dir">\u2190</span><span class="pagination-link__label">${esc(prev.title)}</span></a>`
     : '<div></div>';
   const nextBtn = next
-    ? `<a href="./${esc(next.file)}" class="doc-nav-btn next" id="next-btn"><span class="doc-name">${esc(next.title)}</span><span class="dir">\u2192</span></a>`
+    ? `<a href="./${esc(next.file)}" class="pagination-link pagination-link--next" id="next-btn"><span class="pagination-link__dir">\u2192</span><span class="pagination-link__label">${esc(next.title)}</span></a>`
     : '<div></div>';
 
   const logoPath = logo ? `<img src="${esc(logo)}"/>` : '';
@@ -49,90 +49,105 @@ ${volPreload}
 <link rel="stylesheet" href="${site}/assets/reader.css">
 ${headExtras.join('\n')}
 <script>window.__PAGE_META__=${JSON.stringify(meta)};<\/script>
-<style>
-.crumb { text-decoration: none; color: var(--text-2); transition: color 150ms; }
-.crumb:hover { text-decoration: none; color: var(--text); }
-.crumb.current { color: var(--text); cursor: default; pointer-events: none; }
-.crumb-sep { margin: 0 6px; color: var(--text-3); opacity: 0.5; }
-</style>
 </head>
 <body data-site="${esc(site)}">
-<div id="progress-bar"></div>
-<nav id="navbar">
-  <div class="nav-left">
-    <button type="button" class="nav-btn active" id="sidebar-toggle" title="TOC (Ctrl+S)">
+<div class="scroll-indicator" id="progress-bar"></div>
+<nav class="navbar" id="navbar">
+  <div class="navbar__brand">
+    <button type="button" class="clean-btn" id="sidebar-toggle" title="TOC (Ctrl+S)">
       ${SVG.menu}
     </button>
-    <a id="nav-logo" href="/" style="text-decoration:none;">
+    <a class="navbar__logo" href="/" style="text-decoration:none;">
       ${logoPath}
-      <span class="logo-text">${esc(logoText)}</span>
+      <span>${esc(logoText)}</span>
     </a>
   </div>
-  <div id="nav-actions">
-    <div class="desktop-tools">
-      <div class="font-control-group">
-        <button type="button" class="nav-btn font-btn" id="font-dec-btn" title="Decrease font">A\u2212</button>
+  <div class="navbar__items" id="nav-actions">
+    <div class="navbar__item">
+      <div class="font-control">
+        <button type="button" class="font-btn" id="font-dec-btn" title="Decrease font">A\u2212</button>
         <input type="range" id="font-slider" min="0.75" max="1.5" step="0.05" value="1">
-        <button type="button" class="nav-btn font-btn" id="font-inc-btn" title="Increase font">A+</button>
+        <button type="button" class="font-btn" id="font-inc-btn" title="Increase font">A+</button>
       </div>
-      <button type="button" class="nav-btn active" id="remember-btn" title="Remember scroll position">
+      <button type="button" class="clean-btn" id="remember-btn" title="Remember scroll position">
         ${SVG.bookmark}
       </button>
-      <button type="button" class="nav-btn" id="theme-btn" title="Toggle theme">
+      <button type="button" class="clean-btn" id="theme-btn" title="Toggle theme">
         ${SVG.sun}${SVG.moon}
       </button>
     </div>
-    <button type="button" class="nav-btn mobile-menu-btn" id="mobile-menu-toggle" title="Settings">
+    <button type="button" class="clean-btn navbar__toggle" id="mobile-menu-toggle" title="Settings">
       ${SVG.dots}
     </button>
   </div>
 </nav>
-<div id="mobile-menu" class="mobile-dropdown">
-  <div class="mobile-menu-header">Font Size</div>
-  <div class="mobile-font-slider-wrapper">
-    <button type="button" class="font-adjust-btn" id="mobile-font-dec">\u2212</button>
+<div class="dropdown" id="mobile-menu">
+  <div class="dropdown__label">Font Size</div>
+  <div class="dropdown__row">
+    <button type="button" class="stepper" id="mobile-font-dec">\u2212</button>
     <input type="range" id="mobile-font-slider" min="0.75" max="1.5" step="0.05" value="1">
-    <button type="button" class="font-adjust-btn" id="mobile-font-inc">+</button>
+    <button type="button" class="stepper" id="mobile-font-inc">+</button>
   </div>
-  <div class="mobile-divider"></div>
-  <div class="mobile-menu-item" id="mobile-remember">
+  <div class="dropdown__rule"></div>
+  <div class="dropdown__item" id="mobile-remember">
     <span>Remember Position</span>
-    <span class="toggle-indicator" id="mobile-remember-indicator">\u25CF</span>
+    <span class="toggle-indicator" id="mobile-remember-indicator">\u25CB</span>
   </div>
-  <div class="mobile-menu-item" id="mobile-theme">
+  <div class="dropdown__item" id="mobile-theme">
     <span>Dark Mode</span>
     <span class="toggle-indicator" id="mobile-theme-indicator">\u25CB</span>
   </div>
 </div>
-<div id="sidebar-backdrop"></div>
-<div id="shell">
-<aside id="lsidebar">
-  <div id="nav-tree"></div>
+<div class="sidebar-overlay" id="sidebar-backdrop"></div>
+<div class="doc-wrapper" id="shell">
+<aside class="doc-sidebar" id="lsidebar">
+  <nav class="sidebar-nav" id="nav-tree"></nav>
 </aside>
-  <main id="main">
+  <main class="doc-main" id="main">
     <div id="doc-view" style="display:block">
-      <header id="doc-header">
-        <div id="doc-pathbar" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;font-size:13px;">
+      <header class="doc-header" id="doc-header">
+        <div class="doc-header__pathbar" id="doc-pathbar">
           ${breadcrumb || '<span style="color:var(--text-3);">Library</span>'}
         </div>
       </header>
-      <div id="content">
+      <div class="doc-content">
+        <div class="prose" id="content">
 ${bodyHtml}
+        </div>
+        <nav class="doc-footer" id="doc-footer">
+          ${prevBtn}
+          ${nextBtn}
+        </nav>
       </div>
-      <nav id="doc-footer">
-        ${prevBtn}
-        ${nextBtn}
-      </nav>
     </div>
   </main>
 </div>
-<div id="fn-tooltip">
-  <div class="fn-popup-content"></div>
-  <a class="fn-jump-link" href="#" style="display:none"></a>
+<div class="popover" id="fn-tooltip">
+  <div class="popover__body"></div>
+  <a class="popover__jump" href="#" style="display:none"></a>
 </div>
 <script src="${site}/assets/libmap.js"></script>
 <script src="${site}/assets/nav.js"></script>
 <script src="${site}/assets/reader.js"></script>
+<script>(function(){
+  function syncFill(el){
+    var min=parseFloat(el.min)||0,max=parseFloat(el.max)||100,val=parseFloat(el.value)||0;
+    var pct=((val-min)/(max-min)*100).toFixed(2)+'%';
+    el.style.setProperty('--_fill',pct);
+  }
+  document.querySelectorAll('input[type="range"]').forEach(function(el){
+    syncFill(el);
+    el.addEventListener('input',function(){syncFill(this);});
+  });
+  // re-sync when nav.js updates slider value programmatically
+  var orig=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+  if(orig&&orig.set){
+    Object.defineProperty(HTMLInputElement.prototype,'value',{
+      set:function(v){orig.set.call(this,v);if(this.type==='range')syncFill(this);},
+      get:orig.get,configurable:true
+    });
+  }
+})();<\/script>
 </body>
 </html>`;
 }
