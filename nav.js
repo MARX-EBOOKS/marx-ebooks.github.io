@@ -422,9 +422,9 @@
         const hasChildren = n.children.length > 0;
         const childHtml = hasChildren ? `<ul>${this._renderNodes(n.children)}</ul>` : '';
         const caretHtml = hasChildren
-          ? `<button class="toc-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button>`
+          ? `<button class="toc-caret" type="button" aria-label="Expand section" tabindex="0">\u25be</button>`
           : '';
-        return `<li class="toc-item${hasChildren ? ' toc-item--collapsible' : ''}" data-collapsed="true">
+        return `<li class="toc-item${hasChildren ? ' toc-item--collapsible' : ''}" data-collapsed="false">
   <a href="${href}" class="toc-link">${esc(n.text)}</a>
   ${caretHtml}
   ${childHtml}

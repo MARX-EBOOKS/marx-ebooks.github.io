@@ -422,7 +422,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 /* The link — takes remaining space, leaving room for caret */
 .sidebar-link {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   flex: 1 1 auto;
   min-width: 0;
@@ -431,12 +431,13 @@ input[type="range"]:focus::-webkit-slider-thumb {
   color: var(--text-2);
   text-decoration: none !important;
   font-size: 14px;
+  line-height: 1.45;
   transition: background 120ms, color 120ms;
   cursor: pointer;
   order: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .sidebar-link:hover {
@@ -461,7 +462,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 }
 .sidebar-item-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   width: 100%;
   padding: 0;
 }
@@ -477,6 +478,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 .sidebar-item-row .sidebar-caret {
   flex-shrink: 0;
   margin-left: 2px;
+  margin-top: 4px;
 }
 
 /* The caret toggle button — sits on the RIGHT */
@@ -510,7 +512,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 /* Category label (non-link collapsible header) */
 .sidebar-category-label {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
   padding: 6px 10px;
   flex: 1 1 auto;
@@ -523,10 +525,11 @@ input[type="range"]:focus::-webkit-slider-thumb {
   font-weight: 500;
   text-decoration: none;
   font-size: 14px;
+  line-height: 1.45;
   order: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .sidebar-category-label:hover {
@@ -941,13 +944,14 @@ input[type="range"]:focus::-webkit-slider-thumb {
 }
 
 .pagination-link__label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 14px;
   font-weight: 500;
   color: var(--text);
   max-width: 100%;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.45;
 }
 
 .pagination-link:hover .pagination-link__label {
@@ -1045,20 +1049,20 @@ input[type="range"]:focus::-webkit-slider-thumb {
   position: relative;
   display: flex;
   flex-wrap: nowrap;
-  align-items: center;
+  align-items: flex-start;
   margin: 2px 0;
 }
 
 .doc-toc .toc-item--collapsible {
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
 }
 
 /* TOC link */
 .doc-toc .toc-link {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   flex: 1 1 auto;
   min-width: 0;
@@ -1068,12 +1072,13 @@ input[type="range"]:focus::-webkit-slider-thumb {
   text-decoration: none !important;
   border-bottom: 1px solid var(--accent-border);
   font-size: 1em;
+  line-height: 1.45;
   transition: background 120ms, color 120ms;
   position: relative;
   order: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Top-level items have no separator between them — only nested ones */
@@ -1122,6 +1127,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   font-family: var(--font-ui);
   order: 1;
   margin-left: 2px;
+  margin-top: 4px;
 }
 
 .doc-toc .toc-caret:hover {

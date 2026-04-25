@@ -111,8 +111,14 @@
             remBtn?.addEventListener('click', toggleRemember);
             $('#mobile-remember')?.addEventListener('click', toggleRemember);
 
-            $('#mobile-menu-toggle')?.addEventListener('click', () => {
-                $('#mobile-menu')?.classList.toggle('dropdown--open');
+            // Fix dropdown positioning: `position: fixed` ensures correct placement
+            // on mobile Safari/Chrome regardless of body overflow or viewport quirks.
+            const mobileMenu = $('#mobile-menu');
+            if (mobileMenu) mobileMenu.style.position = 'fixed';
+
+            $('#mobile-menu-toggle')?.addEventListener('click', (e) => {
+                e.stopPropagation(); // prevent event from bubbling to document click-outside handler
+                mobileMenu?.classList.toggle('dropdown--open');
             });
         } catch (e) { console.warn('[Reader] Controls init failed:', e); }
     }
@@ -337,7 +343,10 @@
             window.addEventListener('resize', () => {
                 const was = state.mob;
                 state.mob = innerWidth < 768;
-                if (was !== state.mob) window.__NAV__?.menu?.close();
+                if (was !== state.mob) {
+                    window.__NAV__?.menu?.close();
+                    $('#mobile-menu')?.classList.remove('dropdown--open');
+                }
             });
 
             document.addEventListener('keydown', e => {
@@ -349,6 +358,14 @@
                 if ((e.key === 's' || e.key === 'S') && (e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
                     window.__NAV__?.menu?.toggle();
+                }
+            });
+
+            // Close mobile dropdown when clicking outside of it
+            document.addEventListener('click', e => {
+                const menu = $('#mobile-menu');
+                if (menu?.classList.contains('dropdown--open') && !menu.contains(e.target)) {
+                    menu.classList.remove('dropdown--open');
                 }
             });
 

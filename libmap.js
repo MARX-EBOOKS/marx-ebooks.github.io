@@ -201,6 +201,26 @@ window.LIBRARY_CONFIG = [
         ]
     },
     {
+        id: 'mega',
+        label: 'MEGA2',
+        title: 'KARL MARX FRIEDRICH ENGELS GESAMTAUSGABE (MEGA)',
+        desc: 'ZWEITE ABTEILUNG',
+        basePath: '/MEGA/',
+        stylesheets: ['/MEGA/II/MEGA.css'],
+        badge: 'ZH',
+        path: '/MEGA/II/index.html',
+        groups: [
+            {
+                label: 'II. Abteilung: "DAS KAPITAL" UND VORARBEITEN',
+                items: [{ label: 'II/1: Ökonomische Manuskripte 1857/58 (Grundrisse der Kritik der politischen Ökonomie)', path: '/MEGA/II/1/index.html' },
+                { label: 'II/5: Das Kapital. Kritik der Politischen Ökonomie, Erster Band Hamburg 1867', path: '/MEGA/II/5/index.html' },
+                { label: 'II/10: Das Kapital. Kritik der Politischen Ökonomie. Erster Band, Hamburg 1890', path: '/MEGA/II/10/index.html' },
+                { label: 'II/13: Das Kapital. Kritik der politischen Ökonomie. Zweiter Band, Druckfassung 1885', path: '/MEGA/II/13/index.html' },
+                { label: 'II/15: Das Kapital. Kritik der politischen Ökonomie. Dritter Band, Druckfassung 1894', path: '/MEGA/II/15/index.html' },],
+            },
+        ],
+    },
+    {
         id: 'mew-zh',
         label: '马恩全集',
         title: '马克思恩格斯全集（中文第一版）',
@@ -513,9 +533,9 @@ window.LIBRARY_CONFIG = [
             {
                 label: 'English Translations',
                 items: [
-                    { label: 'Phenomenology of Spirit (by Terry Pinkard)', path: 'docs/HEGEL/HGPS/nav.html' },
-                    { label: 'Science of Logic (Greater Logic, by A.V.Miller)', path: 'docs/HEGEL/HGSL/nav.html' },
-                    { label: 'Shorter Logic (by K.Brinkmann & D.O. Dahlstrom)', path: 'docs/HEGEL/HEPL/nav.html' },]
+                    { label: 'Phenomenology of Spirit (by Terry Pinkard)', path: 'docs/HEGEL/HGPS/index.html' },
+                    { label: 'Science of Logic (Greater Logic, by A.V.Miller)', path: 'docs/HEGEL/HGSL/index.html' },
+                    { label: 'Shorter Logic (by K.Brinkmann & D.O. Dahlstrom)', path: 'docs/HEGEL/HEPL/index.html' },]
             },
             {
                 label: '中译本',

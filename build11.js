@@ -750,13 +750,6 @@ class BuildEngine {
         console.log(`   ${asset}`);
       } else { console.warn(`   Not found: ${src}`); }
     }
-    if (config.args.logo!=null){
-          const logosrc = path.join(__dirname, config.args.logo);
-    if (fsSync.existsSync(logosrc)) {
-          await fs.copyFile(logosrc, path.join(config.DIST, config.args.logo));
-          console.log(`   ${logosrc}`);
-        } else { console.warn(`   Not found: ${src}`); }
-    }
 
     // Browser-wrapped libmap.js
     const libmapSrc = path.resolve(args.config);
