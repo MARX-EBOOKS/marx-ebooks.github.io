@@ -379,6 +379,8 @@ input[type="range"]:focus::-webkit-slider-thumb {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
   box-shadow: none;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
 }
 
 .doc-sidebar::-webkit-scrollbar { width: 5px; }
@@ -775,7 +777,6 @@ input[type="range"]:focus::-webkit-slider-thumb {
   border-left: 3px solid var(--accent);
   background: var(--bg-card);
   color: var(--text-2);
-  font-style: italic;
 }
 
 .prose code {
@@ -872,7 +873,8 @@ input[type="range"]:focus::-webkit-slider-thumb {
    DOC HEADER (pathbar inside content)
    ═══════════════════════════════════════════════════════════════ */
 .doc-header {
-  margin-bottom: 32px;
+  max-width: 880px;
+  margin: 0 auto 32px;
   padding: 48px 32px 0;
 }
 
@@ -884,6 +886,14 @@ input[type="range"]:focus::-webkit-slider-thumb {
   font-size: 13px;
   font-family: var(--font-ui) !important;
   overflow: hidden;
+}
+
+/* Prevent child items from wrapping or shrinking, so the breadcrumb
+   stays on one line as a whole; if too long it clips rather than
+   breaking across columns. */
+.doc-header__pathbar > * {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .doc-header__pathbar .crumb {
@@ -907,7 +917,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   font-weight: 500;
 }
 
-.doc-header__pathbar .sep {
+.doc-header__pathbar .crumb-sep {
   margin: 0 4px;
   color: var(--text-3);
   opacity: 0.5;
@@ -1056,6 +1066,13 @@ input[type="range"]:focus::-webkit-slider-thumb {
   padding-bottom: 0.4em;
   border-bottom: 2px solid var(--accent);
   color: var(--text);
+  text-align: center;
+}
+
+/* Center headings extracted from original volume index page */
+.vol-index-headings :is(h1, h2, h3, h4, h5, h6) {
+  margin:0.5em auto;
+  text-align: center;
 }
 
 /* TOC inside volume index page */

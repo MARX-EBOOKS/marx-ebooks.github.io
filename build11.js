@@ -130,17 +130,17 @@ class PathMatcher {
     if (!patterns?.length) return false;
     const norm = p => p.replace(/\\/g, '/').replace(/\/+$/, '');
     const np = norm(relPath);
-    
+
     return patterns.some(pat => {
       const cp = norm(pat);
       if (np === cp || np.startsWith(cp + '/')) return true;
-      if (patterns == this.only && cp.startsWith(np+'/')) return true; 
+      if (patterns == this.only && cp.startsWith(np + '/')) return true;
       if (pat.includes('*')) return new RegExp('^' + pat.replace(/\*/g, '.*') + '$').test(np);
       return false;
     });
   }
 
-  shouldBuild(relPath) {return !this.only.length || this.matches(relPath, this.only); }
+  shouldBuild(relPath) { return !this.only.length || this.matches(relPath, this.only); }
   isCopyOnly(relPath) { return this.matches(relPath, this.copyOnly); }
 }
 
@@ -150,7 +150,7 @@ class FileScanner {
     this.root = root;
     this.pm = pathMatcher;
     this.SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.github', '.vscode', '.idea', 'assets']);
-    this.SKIP_FILES = new Set(['build.js', 'nav.js', 'reader.js', 'reader.css', 'build.cjs','libmap.js', 'package.json', 'package-lock.json', 'yarn.lock', '.DS_Store', 'index.json']);
+    this.SKIP_FILES = new Set(['build.js', 'nav.js', 'reader.js', 'reader.css', 'build.cjs', 'libmap.js', 'package.json', 'package-lock.json', 'yarn.lock', '.DS_Store', 'index.json']);
   }
 
   async *scan(base = '') {
@@ -332,7 +332,7 @@ class HTMLProcessor {
         }
       });
 
-      return modified ? $.html() : html;
+      return modified ? $('body').html() : html;
     } catch (e) { return HTMLProcessor._fnRegex(html); }
   }
 
@@ -419,7 +419,7 @@ class VolumeIndexBuilder {
   }
 
   collectVolumePaths(libraryConfig) {
-    const pm = new PathMatcher(this.config.args.only||[], this.config.args.copyOnly || []);
+    const pm = new PathMatcher(this.config.args.only || [], this.config.args.copyOnly || []);
     const paths = new Set();
     this._eachItem(libraryConfig, (_col, _group, item) => {
       const p = item.path || '';
@@ -446,8 +446,56 @@ class VolumeIndexBuilder {
     return [...volumes.values()];
   }
 
+  // TOC generation (migrated from nav.js for build-time rendering)
+  _buildTreeHtml(headings) {
+    const root = { level: 0, children: [] };
+    const stack = [root];
+    for (const h of headings) {
+      const node = { ...h, children: [] };
+      while (stack.length > 1 && stack[stack.length - 1].level >= h.level) stack.pop();
+      stack[stack.length - 1].children.push(node);
+      stack.push(node);
+    }
+    return this._renderNodes(root.children);
+  }
+
+  _renderNodes(nodes) {
+    return nodes.map(n => {
+      const href = n.id ? `${this.esc(n.file || '')}#${this.esc(n.id)}` : this.esc(n.file || '');
+      const hasChildren = n.children.length > 0;
+      const childHtml = hasChildren ? `<ul>${this._renderNodes(n.children)}</ul>` : '';
+      const caretHtml = hasChildren
+        ? `<button class="toc-caret" type="button" aria-label="Expand section" tabindex="0">\u25be</button>`
+        : '';
+      return `<li class="toc-item${hasChildren ? ' toc-item--collapsible' : ''}" data-collapsed="false">
+  <div class="toc-item-row">
+    <a href="${href}" class="toc-link">${this.esc(n.text)}</a>
+    ${caretHtml}
+  </div>
+  ${childHtml}
+</li>`;
+    }).join('');
+  }
+
+  _headingsToToc(files) {
+    const all = [];
+    for (const f of files) {
+      const headings = f.headings || [];
+      if (!headings.length && f.title) {
+        all.push({ text: f.title, level: 1, file: f.file || '', id: null });
+      } else {
+        for (const h of headings) all.push({
+          text: h.text || '', level: h.level || 2,
+          file: h.filename || f.file || '', id: h.id || null
+        });
+      }
+    }
+    if (!all.length) return '<li style="color:var(--text-3);font-size:12px;padding:8px 20px">No contents</li>';
+    return this._buildTreeHtml(all);
+  }
+
   async buildAll(libraryConfig, dist) {
-    const pm = new PathMatcher(this.config.args.only ||[], this.config.args.copyOnly || []);
+    const pm = new PathMatcher(this.config.args.only || [], this.config.args.copyOnly || []);
     const volumes = this._collectVolumes(libraryConfig).filter(v => !pm.isCopyOnly(v.dir));
     let generated = 0;
     for (const vol of volumes) {
@@ -463,6 +511,8 @@ class VolumeIndexBuilder {
 
     let navHtml = null, files = [], title = vol.label;
     let preNavHtml = '';   // everything before the first <nav>
+    let lang = 'zh';       // extracted from original <html lang="...">
+    let headExtras = '';   // original CSS links/styles from source index.html
 
     // ── 1. ALWAYS try index.json first ──
     const jsonPath = path.join(sourceDir, 'index.json');
@@ -490,8 +540,10 @@ class VolumeIndexBuilder {
     const htmlPath = path.join(sourceDir, 'index.html');
     if (fsSync.existsSync(htmlPath)) {
       const rawHtml = await fs.readFile(htmlPath, 'utf-8');
-      const { title: htmlTitle, body } = HTMLProcessor.extractHtmlParts(rawHtml);
+      const { title: htmlTitle, body, lang: htmlLang, headExtras: htmlHeadExtras } = HTMLProcessor.extractHtmlParts(rawHtml);
       if (htmlTitle) title = htmlTitle;
+      if (htmlLang) lang = htmlLang;
+      if (htmlHeadExtras) headExtras = htmlHeadExtras;
       if (body) {
         const navIdx = body.search(/<nav\b/i);
         preNavHtml = (navIdx === -1) ? body.trim() : body.slice(0, navIdx).trim();
@@ -553,28 +605,55 @@ class VolumeIndexBuilder {
     await ensure(path.dirname(outputJs));
     await fs.writeFile(outputJs, `window.VOLUME_DATA=${JSON.stringify(data)};`, 'utf-8');
 
-    // ── 4. Generate index.html ──
+    // ── 4. Generate index.html (build-time rendering) ──
     if (this.config.generateTemplate) {
       const depth = vol.dir.split('/').length;
       const rootPrefix = Array(depth).fill('..').join('/');
+
+      // Build TOC HTML at build time (migrated from nav.js)
+      const tocHtml = data.headings?.length
+        ? this._buildTreeHtml(data.headings)
+        : this._headingsToToc(data.files || []);
+
+      // Extract h1-h6 heading tags from preNavHtml for centered title block
+      let titleBlockHtml = '';
+      let remainingPreNav = preNavHtml;
+      if (preNavHtml) {
+        const headingRegex = /<h[1-6]\b[^>]*>[\s\S]*?<\/h[1-6]>/gi;
+        const headingMatches = preNavHtml.match(headingRegex);
+        if (headingMatches && headingMatches.length) {
+          titleBlockHtml = `<div class="vol-index-headings">${headingMatches.join('')}</div>`;
+          remainingPreNav = preNavHtml.replace(headingRegex, '').trim();
+        }
+      }
+      const innerHTMLhead = titleBlockHtml || `<h2 class="vol-index-title">${this.esc(data.title || 'Contents')}</h2>`;
+      const bodyHtml = innerHTMLhead
+        + (remainingPreNav ? remainingPreNav : '')
+        + `<nav class="doc-toc doc-toc--continuous" aria-label="Volume Contents"><ul>${tocHtml}</ul></nav>`;
+
+      // Build breadcrumb from volume path (e.g. /chinese/MEW12/ → chinese / MEW12)
+      const breadcrumbParts = data.volumePath.replace(/^\/|\/$/g, '').split('/');
+      const breadcrumbHtml = breadcrumbParts.map((part, i) => i === breadcrumbParts.length - 1
+        ? `<span class="crumb crumb--active">${this.esc(part)}</span>`
+        : `<a class="crumb" href="${this.config.SITE ? this.config.SITE + '/' : '/'}${breadcrumbParts.slice(0, i + 1).join('/')}/index.html">${this.esc(part)}</a>`
+      ).join('<span class="crumb-sep">/</span>');
 
       const meta = {
         path: vol.path,
         collection: vol.collectionId,
         title,
-        lang: 'zh',
+        lang,
         isVolumeIndex: true,
         indexJsPath: './index.js'
       };
-      if (preNavHtml) meta.preNavHtml = preNavHtml;
 
       await fs.writeFile(outputHtml, this.config.generateTemplate({
         title,
-        bodyHtml: '',                 // browser fills via index.js
-        headExtras: [],
+        bodyHtml,
+        headExtras: headExtras ? headExtras.split('\n').filter(Boolean) : [],
         meta,
         root: this.config.SITE || rootPrefix || '.',
-        breadcrumb: '',
+        breadcrumb: breadcrumbHtml,
         hasToc: false,
         hasVolIndex: true,
         volJsPath: './index.js',

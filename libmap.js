@@ -10,7 +10,8 @@ window.LIBRARY_CONFIG = [
         path: '/docs/readme.html',
         groups: [
             { label: '说明', path: '/docs/readme.html' },
-            { label: 'Impressum', path: '/docs/impressum.html' },],
+            { label: 'Impressum', path: '/docs/impressum.html' },
+            { label: 'Introduction of MECW', path: '/en/index.html' }],
     },
     {
         id: 'mew-zeno',
@@ -127,8 +128,8 @@ window.LIBRARY_CONFIG = [
     {
         id: 'mecw',
         label: 'MECW',
-        title: 'Marx & Engels Collected Works',
-        desc: 'Marx & Engels Collected Works English edition, Vol.1–50',
+        title: 'Marx & Engels Collected Works (From wikirouge.net)',
+        desc: 'Marx & Engels Collected Works English edition, Vol.1–50 (From wikirouge.net)',
         basePath: '/en/MECW/',
         stylesheets: ['/en/MECW/MECW.css'],
         badge: 'EN',
@@ -197,6 +198,9 @@ window.LIBRARY_CONFIG = [
                     { label: 'Volume 49: Letters, 1890-1892', path: '/en/MECW/49/index.html' },
                     { label: 'Volume 50: Letters, 1892-1895', path: '/en/MECW/50/index.html' }
                 ]
+            },
+            {
+                label: 'Mirror of MIA', path: '/en/archive/marx/works/index.html'
             }
         ]
     },
@@ -206,12 +210,14 @@ window.LIBRARY_CONFIG = [
         title: 'KARL MARX FRIEDRICH ENGELS GESAMTAUSGABE (MEGA)',
         desc: 'ZWEITE ABTEILUNG',
         basePath: '/MEGA/',
-        stylesheets: ['/MEGA/II/MEGA.css'],
         badge: 'DE',
-        path: '/MEGA/II/index.html',
+        path: '/MEGA/index.html',
         groups: [
             {
                 label: 'II. Abteilung: "DAS KAPITAL" UND VORARBEITEN',
+                stylesheets: ['/MEGA/II/MEGA.css'],
+                basePath: '/MEGA/II/',
+                path: '/MEGA/II/index.html',
                 items: [{ label: 'II/1: Ökonomische Manuskripte 1857/58 (Grundrisse der Kritik der politischen Ökonomie)', path: '/MEGA/II/1/index.html' },
                 { label: 'II/5: Das Kapital. Kritik der Politischen Ökonomie, Erster Band Hamburg 1867', path: '/MEGA/II/5/index.html' },
                 { label: 'II/10: Das Kapital. Kritik der Politischen Ökonomie. Erster Band, Hamburg 1890', path: '/MEGA/II/10/index.html' },
@@ -341,6 +347,10 @@ window.LIBRARY_CONFIG = [
         badge: 'RU',
         path: '/ru/index.html',
         groups: [
+            {
+                label: 'Разделить HTML с uaio.ru по главам',
+                path: '/ru/VIL-UAIO/index.html',
+            },
             {
                 label: 'Том 1–27',
                 items: [
@@ -556,5 +566,25 @@ window.LIBRARY_CONFIG = [
         title: 'Github仓库',
         desc: 'Github仓库地址',
         path: 'https://github.com/MARX-ZH-CN/marx-zh-cn.github.io'
-    }
+    },
+    {
+        id: 'link',
+        label: 'Source links',
+        title: 'Source links',
+        desc: '友情链接',
+        basePath: null,
+        path: '/docs/index.html',
+        groups: [{ label: 'Gesamtausgabe (MEGA) - De Gruyter Brill', path: "https://www.degruyterbrill.com/serial/mega-b/html" },
+            { label: 'MEGAdigital', path: "https://megadigital.bbaw.de/" },
+            { label: 'Karl Dietz Verlag Berlin', path: "https://dietzberlin.de/" },
+            { label: 'Zeno.org', path: "http://www.zeno.org/" },
+            {label: 'Read and Search Online - Lawrence Wishart', path: "https://lwbooks.co.uk/marx-engels-collected-works/read-and-search-online" },
+            { label: 'Suhrkamp', path: "https://www.suhrkamp.de/" },
+            { label: 'Talpa-Verlag', path: "https://talpa.de/" },
+            { label: 'Cambridge University Press', path: "https://www.cambridge.org/" },
+            { label: 'Taylor & Francis Group', path: "https://www.taylorfrancis.com/" },
+            { label: 'UAIO.ru', path: 'http://uaio.ru/5/' },
+            { label: 'litres.ru', path: 'https://www.litres.ru/series/polnoe-sobranie-sochineniy-v-55-ti-tomah-397761/' },
+            { label: 'mybook.ru', path: 'https://mybook.ru/series/polnoe-sobranie-sochinenij-v-55-ti-tomah/' }],
+    },
 ];

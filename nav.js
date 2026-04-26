@@ -39,11 +39,11 @@
       this.menuLoaded = true;
       this._highlightCurrent();
 
-      if (location.pathname.endsWith('/index.html')) {
-        await this._renderVolumeIndex();
-      }
-      if (location.pathname.endsWith('/')) {
-        await this._renderVolumeIndex();
+      // Bind toggles & highlight for build-time rendered volume-index TOC
+      const docToc = document.querySelector('.doc-toc');
+      if (docToc) {
+        this._initTocToggles(docToc);
+        this._highlightTocCurrent(docToc);
       }
     }
 
@@ -273,6 +273,17 @@
         if (fileLink) {
           fileLink.classList.add('sidebar-link--active');
           this._expandTo(fileLink, tree);
+        } else {
+          // Fallback: page has only id-bearing headings (no file-level node).
+          // Highlight the first heading link for this file so the sidebar
+          // never goes completely blank.
+          const anyLink = [...tree.querySelectorAll('.sidebar-link')].find(a => {
+            return (a.dataset.file || '') === currentFile;
+          });
+          if (anyLink) {
+            anyLink.classList.add('sidebar-link--active');
+            this._expandTo(anyLink, tree);
+          }
         }
         return;
       }
@@ -286,14 +297,13 @@
 
     _expandTo(el, container) {
       let parent = el.closest('li');
-      while (parent) {
+      while (parent && container.contains(parent)) {
         if (parent.classList.contains('sidebar-item--collapsible')) {
           parent.setAttribute('data-collapsed', 'false');
           const caret = parent.querySelector('.sidebar-caret');
           if (caret) caret.textContent = '\u25be';
         }
         parent = parent.parentElement?.closest('.sidebar-item');
-        if (!parent || parent.closest('.sidebar-menu') !== container) break;
       }
     }
 
@@ -443,82 +453,6 @@
       }
     }
 
-    _buildTreeHtml(headings) {
-      const root = { level: 0, children: [] };
-      const stack = [root];
-      for (const h of headings) {
-        const node = { ...h, children: [] };
-        while (stack.length > 1 && stack[stack.length - 1].level >= h.level) stack.pop();
-        stack[stack.length - 1].children.push(node);
-        stack.push(node);
-      }
-      return this._renderNodes(root.children);
-    }
-
-    _renderNodes(nodes) {
-      return nodes.map(n => {
-        const href = n.id ? `${esc(n.file)}#${esc(n.id)}` : esc(n.file);
-        const hasChildren = n.children.length > 0;
-        const childHtml = hasChildren ? `<ul>${this._renderNodes(n.children)}</ul>` : '';
-        const caretHtml = hasChildren
-          ? `<button class="toc-caret" type="button" aria-label="Expand section" tabindex="0">\u25be</button>`
-          : '';
-        // Docusaurus-style wrapped row: <li><div><a/><button/></div><ul/></li>
-        return `<li class="toc-item${hasChildren ? ' toc-item--collapsible' : ''}" data-collapsed="false">
-  <div class="toc-item-row">
-    <a href="${href}" class="toc-link">${esc(n.text)}</a>
-    ${caretHtml}
-  </div>
-  ${childHtml}
-</li>`;
-      }).join('');
-    }
-
-    _headingsToToc(files) {
-      const all = [];
-      for (const f of files) {
-        const headings = f.headings || [];
-        if (!headings.length && f.title) {
-          all.push({ text: f.title, level: 1, file: f.file || '', id: null });
-        } else {
-          for (const h of headings) all.push({
-            text: h.text || '', level: h.level || 2,
-            file: h.filename || f.file || '', id: h.id || null
-          });
-        }
-      }
-      if (!all.length) return '<li style="color:var(--text-3);font-size:12px;padding:8px 20px">No contents</li>';
-      return this._buildTreeHtml(all);
-    }
-
-    // ── Volume Index Page ──────────────────────────────────────
-    async _renderVolumeIndex() {
-      const meta = window.__PAGE_META__ || {};
-      const data = await this._fetchVolData(resolveUrl(meta.indexJsPath || './index.js'));
-      if (!data) return;
-      const content = $('#content');
-      if (!content) return;
-      if (data.title) document.title = `${data.title} \u2014 ${(meta.title || '').split(' \u2014 ').pop() || ''}`;
-      this._updateBreadcrumb(data);
-      const headings = data.headings || [];
-      const tocHtml = headings.length ? this._buildTreeHtml(headings) : this._headingsToToc(data.files || []);
-      const innerHTMLhead = meta.preNavHtml ? `${meta.preNavHtml}` : `<h2 class="vol-index-title">${esc(data.title || 'Contents')}</h2>`;
-      content.innerHTML = innerHTMLhead + `<nav class="doc-toc doc-toc--continuous" aria-label="Volume Contents"><ul>${tocHtml}</ul></nav>`;
-
-      this._initTocToggles(content.querySelector('.doc-toc'));
-      this._highlightTocCurrent(content.querySelector('.doc-toc'));
-
-      content.querySelectorAll('table').forEach(table => {
-        if (table.parentElement?.classList.contains('table-wrapper')) return;
-        const wrapper = document.createElement('div');
-        wrapper.className = 'table-wrapper';
-        wrapper.style.cssText = 'overflow-x:auto;max-width:100%;display:block;';
-        table.style.minWidth = '600px';
-        table.parentNode.insertBefore(wrapper, table);
-        wrapper.appendChild(table);
-      });
-    }
-
     _initTocToggles(container) {
       if (!container) return;
       container.querySelectorAll('.toc-item--collapsible').forEach(li => {
@@ -539,18 +473,6 @@
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFn(); }
         });
       });
-    }
-
-    _updateBreadcrumb(data) {
-      const pathbar = $('#doc-pathbar');
-      if (!pathbar || !data.volumePath) return;
-      const parts = data.volumePath.replace(/^\/|\/$/g, '').split('/');
-      const site = document.body.dataset.site || '';
-      const crumbs = parts.map((part, i) => i === parts.length - 1
-        ? `<span class="crumb crumb--active">${part}</span>`
-        : `<a class="crumb" href="${site}/${parts.slice(0, i + 1).join('/')}/index.html">${part}</a>`
-      ).join('<span class="sep">/</span>');
-      pathbar.innerHTML = crumbs || '<span style="color:var(--text-3);">Library</span>';
     }
 
     // ── Highlight Current ─────────────────────────────────────────
