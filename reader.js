@@ -396,6 +396,70 @@
         } catch (e) { console.warn('[Reader] Global events init failed:', e); }
     }
 
+    // Wrap flat TOC items (<li><a/><button/></li>) into the wrapped
+    // layout (<li><div class="toc-item-row"><a/><button/></div></li>)
+    // so the button is never pushed to the next line.
+    function initTocRowWrap() {
+        try {
+            document.querySelectorAll('.doc-toc > ul > .toc-item, .doc-toc > ol > .toc-item').forEach(li => {
+                // Already wrapped — skip
+                if (li.querySelector(':scope > .toc-item-row')) return;
+                const a = li.querySelector(':scope > a.toc-link');
+                const btn = li.querySelector(':scope > button.toc-caret');
+                if (!a) return;
+                const row = document.createElement('div');
+                row.className = 'toc-item-row';
+                row.appendChild(a);
+                if (btn) row.appendChild(btn);
+                li.insertBefore(row, li.firstChild);
+            });
+        } catch (e) { console.warn('[Reader] TOC row wrap init failed:', e); }
+    }
+
+    // Lightweight heading tracker for volume-index pages (used when
+    // nav.js EPUB tracker is not active).  Keeps the TOC link that
+    // corresponds to the heading currently in the viewport highlighted.
+    function initHeadingTracker() {
+        try {
+            const toc = document.querySelector('.doc-toc');
+            if (!toc) return;
+            const headings = Array.from(document.querySelectorAll('#content h1[id], #content h2[id], #content h3[id], #content h4[id], #content h5[id], #content h6[id]'));
+            if (!headings.length) return;
+            const links = toc.querySelectorAll('a.toc-link');
+            if (!links.length) return;
+
+            let lastId = null;
+            const onScroll = () => {
+                let activeId = null;
+                for (let i = headings.length - 1; i >= 0; i--) {
+                    if (headings[i].getBoundingClientRect().top <= 200) {
+                        activeId = headings[i].id; break;
+                    }
+                }
+                if (!activeId && headings.length) activeId = headings[0].id;
+                if (activeId && activeId !== lastId) {
+                    lastId = activeId;
+                    links.forEach(a => a.classList.remove('toc-link--active'));
+                    const match = toc.querySelector(`a[href$="#${CSS.escape(activeId)}"]`);
+                    if (match) {
+                        match.classList.add('toc-link--active');
+                        // Expand parent branches
+                        let parent = match.closest('.toc-item--collapsible');
+                        while (parent) {
+                            parent.setAttribute('data-collapsed', 'false');
+                            const caret = parent.querySelector(':scope > .toc-item-row > .toc-caret, :scope > .toc-caret');
+                            if (caret) caret.textContent = '\u25be';
+                            parent = parent.parentElement?.closest('.toc-item--collapsible');
+                        }
+                    }
+                }
+            };
+
+            window.addEventListener('scroll', onScroll, { passive: true });
+            requestAnimationFrame(onScroll);
+        } catch (e) { console.warn('[Reader] Heading tracker init failed:', e); }
+    }
+
     function init() {
         initResponsiveContent();
         initProgress();
@@ -404,6 +468,8 @@
         initScrollMemory();
         initFootnotes();
         initGlobalEvents();
+        initTocRowWrap();
+        initHeadingTracker();
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

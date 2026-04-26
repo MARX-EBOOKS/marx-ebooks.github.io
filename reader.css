@@ -123,15 +123,26 @@ body {
   flex-shrink: 0;
 }
 
-.navbar__logo {
+/* Navbar logo — explicit color on all pseudo-states to prevent
+   visited / active / hover from turning blue */
+.navbar__logo,
+.navbar__logo:link,
+.navbar__logo:visited,
+.navbar__logo:hover,
+.navbar__logo:active {
   display: flex;
   align-items: center;
   gap: 10px;
   text-decoration: none;
-  color: var(--text);
+  color: var(--text) !important;
   font-weight: 600;
   font-size: 16px;
   letter-spacing: -0.3px;
+}
+
+/* Force span inside logo to inherit parent color explicitly */
+.navbar__logo span {
+  color: inherit !important;
 }
 
 .navbar__logo img {
@@ -452,6 +463,15 @@ input[type="range"]:focus::-webkit-slider-thumb {
   font-weight: 500;
 }
 
+/* Light-theme reading indicator — uses dark text on a deeper
+   accent background so the active heading is clearly visible,
+   mirroring the strong contrast seen in dark mode. */
+:root:not([data-theme="dark"]) .sidebar-link--active {
+  color: var(--text);
+  background: var(--accent-bg);
+  font-weight: 600;
+}
+
 .sidebar-link--active::before {
   content: "";
   position: absolute;
@@ -614,10 +634,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
    BREADCRUMB (inside sidebar top for epub mode)
    ═══════════════════════════════════════════════════════════════ */
 .breadcrumb {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
+  display: block;
   padding: 10px 16px 14px;
   font-size: 12px;
   font-family: var(--font-ui);
@@ -627,9 +644,20 @@ input[type="range"]:focus::-webkit-slider-thumb {
   top: 0;
   background: var(--bg-sidebar);
   z-index: 10;
+  line-height: 1.5;
 }
 
 .breadcrumb--faded { display: none; }
+
+/* Breadcrumb children flow like normal text — they sit on the same
+   line and wrap only at word boundaries, never breaking inside
+   a word or isolating the separator on its own line. */
+.breadcrumb > a,
+.breadcrumb > span {
+  display: inline;
+  vertical-align: baseline;
+  white-space: normal;
+}
 
 .breadcrumb a {
   color: var(--accent);
@@ -1044,22 +1072,42 @@ input[type="range"]:focus::-webkit-slider-thumb {
   margin: 0;
 }
 
-/* TOC item row — flex with caret on right */
+/* TOC item — two layout modes:
+   1. Flat (legacy): li > a + button   (flex row, may wrap button)
+   2. Wrapped (preferred): li > div > a + button  (never wraps button)
+   ------------------------------------------------------------------ */
 .doc-toc .toc-item {
   position: relative;
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: flex-start;
   margin: 2px 0;
 }
 
-.doc-toc .toc-item--collapsible {
+/* Legacy flat layout — keep for backwards compatibility */
+.doc-toc .toc-item:not(:has(> .toc-item-row)) {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+/* Wrapped layout: li > div.toc-item-row > a + button */
+.doc-toc .toc-item-row {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  padding: 0;
+}
+
+.doc-toc .toc-item--collapsible:has(> .toc-item-row) {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.doc-toc .toc-item--collapsible:not(:has(> .toc-item-row)) {
   flex-direction: row;
   align-items: flex-start;
   flex-wrap: wrap;
 }
 
-/* TOC link */
+/* TOC link — shared styles */
 .doc-toc .toc-link {
   display: flex;
   align-items: flex-start;
@@ -1079,6 +1127,12 @@ input[type="range"]:focus::-webkit-slider-thumb {
   white-space: normal;
   word-break: break-word;
   overflow-wrap: break-word;
+}
+
+/* Inside wrapped row — link naturally stretches */
+.doc-toc .toc-item-row .toc-link {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* Top-level items have no separator between them — only nested ones */
@@ -1109,7 +1163,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   border-radius: 0 2px 2px 0;
 }
 
-/* TOC caret — on the RIGHT */
+/* TOC caret — shared styles */
 .doc-toc .toc-caret {
   display: inline-flex;
   width: 22px; height: 22px;
@@ -1130,16 +1184,29 @@ input[type="range"]:focus::-webkit-slider-thumb {
   margin-top: 4px;
 }
 
+/* Inside wrapped row — fixed width, hugging the right edge */
+.doc-toc .toc-item-row .toc-caret {
+  flex-shrink: 0;
+  margin-left: 2px;
+  margin-top: 4px;
+}
+
 .doc-toc .toc-caret:hover {
   background: var(--bg-hover);
   color: var(--text);
 }
 
+/* Flat layout: caret is direct child of li */
 .doc-toc .toc-item[data-collapsed="false"] > .toc-caret {
   transform: rotate(90deg);
 }
 
-/* Nested TOC list */
+/* Wrapped layout: caret is inside .toc-item-row */
+.doc-toc .toc-item[data-collapsed="false"] > .toc-item-row > .toc-caret {
+  transform: rotate(90deg);
+}
+
+/* Nested TOC list — shared */
 .doc-toc ul ul,
 .doc-toc ol ol,
 .doc-toc li > ul,
@@ -1150,10 +1217,16 @@ input[type="range"]:focus::-webkit-slider-thumb {
   padding-left: 16px;
   border-left: 2px solid var(--accent-border);
   margin-left: 11px;
+}
+
+/* Flat layout: nested list needs flex-basis & order to drop below */
+.doc-toc .toc-item:not(:has(> .toc-item-row)) > ul,
+.doc-toc .toc-item:not(:has(> .toc-item-row)) > ol {
   order: 2;
   flex-basis: 100%;
 }
 
+/* Collapse states — flat layout (direct children of li) */
 .doc-toc .toc-item[data-collapsed="true"] > ul,
 .doc-toc .toc-item[data-collapsed="true"] > ol {
   max-height: 0;
@@ -1161,6 +1234,17 @@ input[type="range"]:focus::-webkit-slider-thumb {
 
 .doc-toc .toc-item[data-collapsed="false"] > ul,
 .doc-toc .toc-item[data-collapsed="false"] > ol {
+  max-height: 3000px;
+}
+
+/* Collapse states — wrapped layout (siblings of .toc-item-row) */
+.doc-toc .toc-item[data-collapsed="true"] > .toc-item-row ~ ul,
+.doc-toc .toc-item[data-collapsed="true"] > .toc-item-row ~ ol {
+  max-height: 0;
+}
+
+.doc-toc .toc-item[data-collapsed="false"] > .toc-item-row ~ ul,
+.doc-toc .toc-item[data-collapsed="false"] > .toc-item-row ~ ol {
   max-height: 3000px;
 }
 
@@ -1311,6 +1395,25 @@ input[type="range"]:focus::-webkit-slider-thumb {
   .navbar__item { display: none; }
 
   .navbar__toggle { display: flex; }
+
+  /* Cards side-by-side on mobile (2 columns) */
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .card__heading {
+    font-size: 1.05rem;
+    margin: 8px 0 4px;
+  }
+
+  .card__body {
+    font-size: 0.85rem;
+  }
 
   .popover {
     position: fixed;

@@ -81,7 +81,7 @@
       this._currentVol.data = data;
 
       let html = '';
-      html += `<nav class="breadcrumb" aria-label="Breadcrumb">`;
+      html += `<div class="breadcrumb" aria-label="Breadcrumb">`;
       if (col.path && !col.path.startsWith('http')) {
         const href = site ? `${site}/${col.path.replace(/^\//, '')}` : col.path;
         html += `<a href="${esc(href)}">${esc(col.label)}</a>`;
@@ -93,7 +93,7 @@
       const volLink = site ? `${site}/${volHref.replace(/^\//, '')}` : volHref;
       html += `<span class="breadcrumb__sep">/</span>`;
       html += `<a href="${esc(volLink)}">${esc(volTitle)}</a>`;
-      html += `</nav>`;
+      html += `</div>`;
 
       const headings = data.headings || [];
       if (!headings.length && data.files?.length) {
@@ -161,8 +161,14 @@
         const childHtml = hasChildren
           ? `<ul class="sidebar-menu sidebar-menu--nested">${this._renderSidebarNodes(n.children, currentFile)}</ul>`
           : '';
-        const active = isCurrentFile && n.id && n.id === this._activeHeadingId
-          ? ' sidebar-link--active' : '';
+        // Active logic:
+        // - When a heading ID is tracked, highlight the matching heading link.
+        // - When no heading ID is tracked (e.g. at top of article), highlight
+        //   the file-level link (data-id="") for the current file.
+        const active = isCurrentFile && (
+          (this._activeHeadingId && n.id === this._activeHeadingId) ||
+          (!this._activeHeadingId && !n.id)
+        ) ? ' sidebar-link--active' : '';
         const caretHtml = hasChildren
           ? `<button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button>`
           : '';
@@ -210,18 +216,19 @@
       if (this._mode !== 'epub') return;
       const content = $('#content');
       if (!content) return;
-      const headings = content.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      const headings = Array.from(content.querySelectorAll('h1, h2, h3, h4, h5, h6')).filter(h => h.id);
       if (!headings.length) return;
 
-      let lastId = null;
+      let lastId = undefined;
       const onScroll = () => {
         let activeId = null;
         for (let i = headings.length - 1; i >= 0; i--) {
           const rect = headings[i].getBoundingClientRect();
           if (rect.top <= 200) { activeId = headings[i].id; break; }
         }
-        if (!activeId && headings.length) activeId = headings[0].id;
-        if (activeId && activeId !== lastId) {
+        // When activeId is null (above the first heading) we still want to
+        // update so the file-level link gets highlighted.
+        if (activeId !== lastId) {
           lastId = activeId;
           this._activeHeadingId = activeId;
           this._updateActiveHeading(activeId);
@@ -229,7 +236,22 @@
       };
 
       window.addEventListener('scroll', onScroll, { passive: true });
-      requestAnimationFrame(onScroll);
+      // Run immediately so the correct heading is highlighted
+      // even before the user scrolls.
+      requestAnimationFrame(() => {
+        onScroll();
+        // Also sync sidebar scroll position on open so the active
+        // heading is centred in the viewport.
+        this._syncTocScroll();
+      });
+    }
+
+    _syncTocScroll() {
+      if (!this.navTree) return;
+      const active = this.navTree.querySelector('.sidebar-link.sidebar-link--active');
+      if (!active) return;
+      this._expandTo(active, this.navTree.querySelector('.sidebar-menu'));
+      requestAnimationFrame(() => active.scrollIntoView({ block: 'center', behavior: 'smooth' }));
     }
 
     _updateActiveHeading(id) {
@@ -237,7 +259,24 @@
       const tree = this.navTree.querySelector('.sidebar-menu');
       if (!tree) return;
       tree.querySelectorAll('.sidebar-link').forEach(a => a.classList.remove('sidebar-link--active'));
-      if (!id) return;
+
+      const currentFile = location.pathname.split('/').pop();
+
+      if (!id) {
+        // No heading in range → highlight the file-level link (data-id="")
+        // so the article itself is marked as "reading".
+        const fileLink = [...tree.querySelectorAll('.sidebar-link')].find(a => {
+          const f = a.dataset.file || '';
+          const hid = a.dataset.id || '';
+          return f === currentFile && !hid;
+        });
+        if (fileLink) {
+          fileLink.classList.add('sidebar-link--active');
+          this._expandTo(fileLink, tree);
+        }
+        return;
+      }
+
       const match = tree.querySelector(`.sidebar-link[data-id="${CSS.escape(id)}"]`);
       if (match) {
         match.classList.add('sidebar-link--active');
@@ -424,9 +463,12 @@
         const caretHtml = hasChildren
           ? `<button class="toc-caret" type="button" aria-label="Expand section" tabindex="0">\u25be</button>`
           : '';
+        // Docusaurus-style wrapped row: <li><div><a/><button/></div><ul/></li>
         return `<li class="toc-item${hasChildren ? ' toc-item--collapsible' : ''}" data-collapsed="false">
-  <a href="${href}" class="toc-link">${esc(n.text)}</a>
-  ${caretHtml}
+  <div class="toc-item-row">
+    <a href="${href}" class="toc-link">${esc(n.text)}</a>
+    ${caretHtml}
+  </div>
   ${childHtml}
 </li>`;
       }).join('');
@@ -480,8 +522,10 @@
     _initTocToggles(container) {
       if (!container) return;
       container.querySelectorAll('.toc-item--collapsible').forEach(li => {
-        const caret = li.querySelector(':scope > .toc-caret');
         const nested = li.querySelector(':scope > ul, :scope > ol');
+        // Caret may be inside .toc-item-row (wrapped layout) or direct child (legacy)
+        const caret = li.querySelector(':scope > .toc-item-row > .toc-caret')
+          || li.querySelector(':scope > .toc-caret');
         if (!nested || !caret) return;
 
         const toggleFn = (e) => {
@@ -604,7 +648,9 @@
       while (parent) {
         if (parent.classList && parent.classList.contains('toc-item--collapsible')) {
           parent.setAttribute('data-collapsed', 'false');
-          const caret = parent.querySelector(':scope > .toc-caret');
+          // Caret may be inside .toc-item-row (wrapped) or direct child (legacy)
+          const caret = parent.querySelector(':scope > .toc-item-row > .toc-caret')
+            || parent.querySelector(':scope > .toc-caret');
           if (caret) caret.textContent = '\u25be';
         }
         parent = parent.parentElement;
@@ -641,11 +687,9 @@
     }
 
     _scrollTocToActive() {
-      if (!this.navTree) return;
-      const active = this.navTree.querySelector('.sidebar-link.sidebar-link--active');
-      if (!active) return;
-      this._expandTo(active, this.navTree.querySelector('.sidebar-menu'));
-      requestAnimationFrame(() => active.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+      // Delegates to the unified sync helper so the active heading
+      // is always centred when the user opens the menu.
+      this._syncTocScroll();
     }
 
     _scrollToReadingLegacy() {

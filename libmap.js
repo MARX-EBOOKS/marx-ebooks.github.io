@@ -207,7 +207,7 @@ window.LIBRARY_CONFIG = [
         desc: 'ZWEITE ABTEILUNG',
         basePath: '/MEGA/',
         stylesheets: ['/MEGA/II/MEGA.css'],
-        badge: 'ZH',
+        badge: 'DE',
         path: '/MEGA/II/index.html',
         groups: [
             {
@@ -319,7 +319,7 @@ window.LIBRARY_CONFIG = [
                 label: '资本论及手稿（5-8卷）',
                 items: [{ label: '马恩全集第二版第44卷 （《资本论》第一卷）', path: '/docs/MEA/5/index.html' },
                 { label: '第6卷 （《资本论》第二卷）', path: '/docs/MEA/6/index.html' },
-                { label: '第7卷 （《资本论》第三卷）', path: '/docs/MEA/index.html' },
+                { label: '第7卷 （《资本论》第三卷）', path: '/docs/MEA/7/index.html' },
                 { label: '第8卷 （《资本论》手稿选编）', path: '/docs/MEA/8/index.html' },
                 { label: '马恩全集第二版第30卷 （1857-1858手稿上半部分）', path: '/docs/MEA/30/index.html' },],
             },
@@ -526,8 +526,7 @@ window.LIBRARY_CONFIG = [
                     { label: 'Werke 12 (Vorlesungen über die Philosophie der Geschichte)', path: 'docs/HEGEL/12/index.html' },
                     { label: 'Werke 13-15 (Vorlesungen über die Ästhetik)', path: 'docs/HEGEL/13/index.html' },
                     { label: 'Werke 16-17 (Vorlesungen über die Philosophie der Religion)', path: 'docs/HEGEL/16/index.html' },
-                    { label: 'Werke 18-20 (Vorlesungen über die Geschichte der Philosophie)', path: 'docs/HEGEL/18/index.html' },
-                    { label: '', path: 'docs/HEGEL/index.html' },
+                    { label: 'Werke 18-20 (Vorlesungen über die Geschichte der Philosophie)', path: 'docs/HEGEL/18/index.html' }
                 ],
             },
             {
