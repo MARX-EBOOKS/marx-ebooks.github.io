@@ -260,7 +260,7 @@ class HTMLProcessor {
           .replace(/\(\d+?\)/g, '').replace(/\s*FN\d+?\s*/g, '').trim();
         if (!text || skip.has(text)) return;
         let id = $(el).attr('id') || null;
-        if (!id && i !== 0) id = `h-${i}`;
+        if (!id) id = 'h' + i;
         headings.push({ tag: el.tagName.toLowerCase(), text, level: parseInt(el.tagName[1]), id });
       });
       return headings;
@@ -271,7 +271,7 @@ class HTMLProcessor {
     const headings = [];
     const skip = new Set(['Karl Marx', 'Friedrich Engels', 'Karl Marx/Friedrich Engels']);
     const re = /<(h[1-6])[^>]*(?:\s+id=["']([^"']*)["'])?[^>]*>([\s\S]*?)<\/\1>/gi;
-    let m, i = 0;
+    let m, i = -1;
     while ((m = re.exec(bodyHtml)) !== null) {
       i++;
       let text = m[3].replace(/<[^>]+>/g, '').trim()
@@ -280,7 +280,7 @@ class HTMLProcessor {
       if (!text || skip.has(text)) continue;
       headings.push({
         tag: m[1].toLowerCase(), text, level: parseInt(m[1][1]),
-        id: m[2] || (i > 1 ? `h-${i}` : null)
+        id: m[2] || ('h' + i)
       });
     }
     return headings;
@@ -480,11 +480,8 @@ class VolumeIndexBuilder {
   _headingsToToc(files) {
     const all = [];
     for (const f of files) {
-      const headings = f.headings || [];
-      if (!headings.length && f.title) {
-        all.push({ text: f.title, level: 1, file: f.file || '', id: null });
-      } else {
-        for (const h of headings) all.push({
+      for (const h of (f.headings || [])) {
+        all.push({
           text: h.text || '', level: h.level || 2,
           file: h.filename || f.file || '', id: h.id || null
         });
@@ -575,18 +572,13 @@ class VolumeIndexBuilder {
     // ── 3. Build VOLUME_DATA ──
     const allHeadings = [];
     for (const f of files) {
-      const fileHeadings = f.headings || [];
-      if (!fileHeadings.length && f.title) {
-        allHeadings.push({ level: 1, text: f.title, id: null, file: f.file || '' });
-      } else {
-        for (const h of fileHeadings) {
-          allHeadings.push({
-            level: h.level || 2,
-            text: h.text || '',
-            id: h.id || null,
-            file: h.filename || f.file || ''
-          });
-        }
+      for (const h of (f.headings || [])) {
+        allHeadings.push({
+          level: h.level || 2,
+          text: h.text || '',
+          id: h.id || null,
+          file: h.filename || f.file || ''
+        });
       }
     }
 

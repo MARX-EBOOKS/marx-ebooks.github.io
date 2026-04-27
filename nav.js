@@ -38,6 +38,8 @@
       }
       this.menuLoaded = true;
       this._highlightCurrent();
+      this._initTocRail();
+      this._initScrollTracking();
 
       // Bind toggles & highlight for build-time rendered volume-index TOC
       const docToc = document.querySelector('.doc-toc');
@@ -96,20 +98,8 @@
       html += `</div>`;
 
       const headings = data.headings || [];
-      if (!headings.length && data.files?.length) {
-        const flat = [];
-        for (const f of data.files) {
-          if (!f.headings?.length && f.title) {
-            flat.push({ level: 1, text: f.title, id: null, file: f.file || '' });
-          } else {
-            for (const h of (f.headings || [])) {
-              flat.push({ level: h.level || 2, text: h.text || '', id: h.id || null, file: h.filename || f.file || '' });
-            }
-          }
-        }
-        html += this._buildSidebarTree(flat, 'epub-toc');
-      } else if (headings.length) {
-        html += this._buildSidebarTree(headings, 'epub-toc');
+      if (headings.length) {
+        html += this._renderSidebarTree(this._buildHeadingTree(headings), 'epub-toc');
       }
 
       html += `<div class="section-divider"><span>Other Works</span></div>`;
@@ -140,17 +130,166 @@
       io.observe(tocTree);
     }
 
-    _buildSidebarTree(headings, clsPrefix) {
+    // ── Shared heading helpers ──────────────────────────────────
+    _getDomHeadings() {
+      const content = $('#content');
+      if (!content) return [];
+      return Array.from(content.querySelectorAll('h1, h2, h3, h4, h5, h6')).filter(h => h.id);
+    }
+
+    _getActiveHeadingId(headings, threshold = 200) {
+      if (!headings?.length) return null;
+      for (let i = headings.length - 1; i >= 0; i--) {
+        if (headings[i].getBoundingClientRect().top <= threshold) {
+          return headings[i].id;
+        }
+      }
+      return headings[0].id;
+    }
+
+    _getEpubHeadings() {
+      if (!this._currentVol?.data?.headings) return [];
+      const currentFile = location.pathname.split('/').pop().replace(/\.html$/i, '');
+      return this._currentVol.data.headings.filter(h => {
+        const hFile = (h.file || '').replace(/\.html$/i, '');
+        return hFile === currentFile && h.id;
+      });
+    }
+
+    // Unified heading source: JSON provides text/level, DOM provides id.
+    // For headings whose JSON id is null, we borrow the id from the
+    // corresponding DOM heading (matched by order). Both arrays follow
+    // the same document order and skip logic, so index pairing is safe.
+    _getPageHeadings() {
+      if (this._mode !== 'epub') {
+        return this._getDomHeadings().map(h => ({
+          level: parseInt(h.tagName[1]),
+          text: h.textContent.trim(),
+          id: h.id
+        }));
+      }
+
+      const currentFile = location.pathname.split('/').pop().replace(/\.html$/i, '');
+      const jsonHeadings = (this._currentVol?.data?.headings || []).filter(h => {
+        const hFile = (h.file || '').replace(/\.html$/i, '');
+        return hFile === currentFile;
+      });
+
+      const domHeadings = this._getDomHeadings();
+
+      return jsonHeadings.map((jh, i) => ({
+        level: jh.level,
+        text: jh.text,
+        id: jh.id || (domHeadings[i] ? domHeadings[i].id : null)
+      })).filter(h => h.id);
+    }
+
+    _renderTocTree(nodes) {
+      if (!nodes.length) return '';
+      return '<ul class="theme-doc-toc-desktop-list">' + nodes.map(n => {
+        const cls = 'theme-doc-toc-desktop-link theme-doc-toc-desktop-link--lvl' + n.level;
+        const children = this._renderTocTree(n.children);
+        return `<li class="${cls}"><a href="#${n.id}" class="theme-doc-toc-desktop-link__a">${esc(n.text)}</a>${children}</li>`;
+      }).join('') + '</ul>';
+    }
+
+    // ── Unified scroll tracking (single listener) ───────────────
+    _initScrollTracking() {
+      if (this._scrollTrackingReady) return;
+      const content = $('#content');
+      if (!content) return;
+
+      let headings = this._getDomHeadings();
+      if (!headings.length) {
+        const mo = new MutationObserver((mutations, observer) => {
+          if (this._getDomHeadings().length) {
+            observer.disconnect();
+            this._initScrollTracking();
+          }
+        });
+        mo.observe(content, { subtree: true, attributes: true, attributeFilter: ['id'] });
+        return;
+      }
+
+      this._scrollTrackingReady = true;
+      let lastId = null;
+      const onScroll = () => {
+        const activeId = this._getActiveHeadingId(headings, 200);
+        if (activeId !== lastId) {
+          lastId = activeId;
+          this._activeHeadingId = activeId;
+          this._updateActiveHeading(activeId);
+          this._updateTocRailHighlight(activeId);
+        }
+
+      };
+
+      window.addEventListener('scroll', onScroll, { passive: true });
+      requestAnimationFrame(() => {
+        onScroll();
+        if (innerWidth < 997) this._syncTocScroll();
+      });
+    }
+
+    _updateTocRailHighlight(activeId) {
+      const nav = document.getElementById('toc-desktop-nav');
+      if (!nav || !nav.innerHTML) return;
+      nav.querySelectorAll('.theme-doc-toc-desktop-link').forEach(li => {
+        li.classList.remove('theme-doc-toc-desktop-link--active');
+      });
+      if (!activeId) return;
+      const match = nav.querySelector(`a[href="#${activeId}"]`)?.closest('li');
+      if (match) match.classList.add('theme-doc-toc-desktop-link--active');
+    }
+
+    // ── Desktop TOC Rail ("On this page") ───────────────────────
+    _initTocRail() {
+      const nav = document.getElementById('toc-desktop-nav');
+      if (!nav) return;
+
+      // Reset on every call so page switches always rebuild
+      nav.innerHTML = '';
+
+      const headings = this._getPageHeadings();
+      if (!headings.length) {
+        const content = $('#content');
+        if (content) {
+          const mo = new MutationObserver((mutations, observer) => {
+            if (this._getPageHeadings().length) {
+              observer.disconnect();
+              this._initTocRail();
+            }
+          });
+          mo.observe(content, { subtree: true, attributes: true, attributeFilter: ['id'] });
+        }
+        return;
+      }
+
+      nav.innerHTML = this._renderTocTree(this._buildHeadingTree(headings));
+
+      // If scroll tracking is already running, highlight current position immediately
+      if (this._scrollTrackingReady) {
+        const activeId = this._getActiveHeadingId(this._getDomHeadings(), 200);
+        if (activeId) this._updateTocRailHighlight(activeId);
+      }
+    }
+
+    // Build nested heading tree from flat array (shared by sidebar + TOC rail)
+    _buildHeadingTree(headings) {
       const root = { level: 0, children: [] };
       const stack = [root];
-      const currentFile = location.pathname.split('/').pop();
       for (const h of headings) {
         const node = { ...h, children: [] };
         while (stack.length > 1 && stack[stack.length - 1].level >= h.level) stack.pop();
         stack[stack.length - 1].children.push(node);
         stack.push(node);
       }
-      return `<ul class="sidebar-menu ${clsPrefix}">${this._renderSidebarNodes(root.children, currentFile)}</ul>`;
+      return root.children;
+    }
+
+    _renderSidebarTree(nodes, clsPrefix) {
+      const currentFile = location.pathname.split('/').pop().replace(/\.html$/i, '');
+      return `<ul class="sidebar-menu ${clsPrefix}">${this._renderSidebarNodes(nodes, currentFile)}</ul>`;
     }
 
     _renderSidebarNodes(nodes, currentFile) {
@@ -161,10 +300,6 @@
         const childHtml = hasChildren
           ? `<ul class="sidebar-menu sidebar-menu--nested">${this._renderSidebarNodes(n.children, currentFile)}</ul>`
           : '';
-        // Active logic:
-        // - When a heading ID is tracked, highlight the matching heading link.
-        // - When no heading ID is tracked (e.g. at top of article), highlight
-        //   the file-level link (data-id="") for the current file.
         const active = isCurrentFile && (
           (this._activeHeadingId && n.id === this._activeHeadingId) ||
           (!this._activeHeadingId && !n.id)
@@ -214,36 +349,8 @@
 
     _initReadingTracker() {
       if (this._mode !== 'epub') return;
-      const content = $('#content');
-      if (!content) return;
-      const headings = Array.from(content.querySelectorAll('h1, h2, h3, h4, h5, h6')).filter(h => h.id);
-      if (!headings.length) return;
-
-      let lastId = undefined;
-      const onScroll = () => {
-        let activeId = null;
-        for (let i = headings.length - 1; i >= 0; i--) {
-          const rect = headings[i].getBoundingClientRect();
-          if (rect.top <= 200) { activeId = headings[i].id; break; }
-        }
-        // When activeId is null (above the first heading) we still want to
-        // update so the file-level link gets highlighted.
-        if (activeId !== lastId) {
-          lastId = activeId;
-          this._activeHeadingId = activeId;
-          this._updateActiveHeading(activeId);
-        }
-      };
-
-      window.addEventListener('scroll', onScroll, { passive: true });
-      // Run immediately so the correct heading is highlighted
-      // even before the user scrolls.
-      requestAnimationFrame(() => {
-        onScroll();
-        // Also sync sidebar scroll position on open so the active
-        // heading is centred in the viewport.
-        this._syncTocScroll();
-      });
+      if (innerWidth >= 997) return;
+      this._initScrollTracking();
     }
 
     _syncTocScroll() {
@@ -260,39 +367,60 @@
       if (!tree) return;
       tree.querySelectorAll('.sidebar-link').forEach(a => a.classList.remove('sidebar-link--active'));
 
-      const currentFile = location.pathname.split('/').pop();
+      const rawFile = location.pathname.split('/').pop();
+      const currentFile = rawFile ? rawFile.replace(/\.html$/i, '') : 'index';
 
-      if (!id) {
-        // No heading in range → highlight the file-level link (data-id="")
-        // so the article itself is marked as "reading".
+      // Desktop: always highlight file-level only, ignore heading id
+      if (innerWidth >= 997) {
         const fileLink = [...tree.querySelectorAll('.sidebar-link')].find(a => {
-          const f = a.dataset.file || '';
+          const f = (a.dataset.file || '').replace(/\.html$/i, '');
           const hid = a.dataset.id || '';
           return f === currentFile && !hid;
         });
         if (fileLink) {
           fileLink.classList.add('sidebar-link--active');
           this._expandTo(fileLink, tree);
-        } else {
-          // Fallback: page has only id-bearing headings (no file-level node).
-          // Highlight the first heading link for this file so the sidebar
-          // never goes completely blank.
-          const anyLink = [...tree.querySelectorAll('.sidebar-link')].find(a => {
-            return (a.dataset.file || '') === currentFile;
-          });
-          if (anyLink) {
-            anyLink.classList.add('sidebar-link--active');
-            this._expandTo(anyLink, tree);
-          }
         }
         return;
       }
 
-      const match = tree.querySelector(`.sidebar-link[data-id="${CSS.escape(id)}"]`);
-      if (match) {
-        match.classList.add('sidebar-link--active');
-        this._expandTo(match, tree);
+      // Helper: pick the best link for current file when id is null or unmatched
+      const fallbackToFile = () => {
+        const fileLink = [...tree.querySelectorAll('.sidebar-link')].find(a => {
+          const f = (a.dataset.file || '').replace(/\.html$/i, '');
+          const hid = a.dataset.id || '';
+          return f === currentFile && !hid;
+        });
+        if (fileLink) {
+          fileLink.classList.add('sidebar-link--active');
+          this._expandTo(fileLink, tree);
+          return;
+        }
+        const candidates = [...tree.querySelectorAll('.sidebar-link')].filter(a => {
+          return (a.dataset.file || '').replace(/\.html$/i, '') === currentFile && a.dataset.id;
+        });
+        if (candidates.length) {
+          // Prefer the deepest (last) candidate — usually the most specific heading
+          const deepest = candidates[candidates.length - 1];
+          deepest.classList.add('sidebar-link--active');
+          this._expandTo(deepest, tree);
+        }
+      };
+
+      if (!id) {
+        fallbackToFile();
+        return;
       }
+
+      let match = tree.querySelector(`.sidebar-link[data-id="${id}"]`);
+      // If exact id miss (e.g. build/reader id mismatch), fallback to deepest candidate
+      if (!match) {
+        fallbackToFile();
+        return;
+      }
+
+      match.classList.add('sidebar-link--active');
+      this._expandTo(match, tree);
     }
 
     _expandTo(el, container) {
@@ -418,8 +546,11 @@
       const groupPath = (group.path || '').replace(/^\//, '');
       if (!items.length) {
         if (!groupPath) return `<li class="sidebar-item"><span class="sidebar-category-label">${label}</span></li>`;
-        const href = site ? `${site}/${groupPath}` : `/${groupPath}`;
-        return `<li class="sidebar-item"><a href="${esc(href)}" data-path="${esc('/' + groupPath)}" class="sidebar-link">${label}</a></li>`;
+        const isExt = groupPath.startsWith('http');
+        const href = isExt ? groupPath : (site ? `${site}/${groupPath}` : `/${groupPath}`);
+        const dataPath = isExt ? '' : ` data-path="${esc('/' + groupPath)}"`;
+
+        return `<li class="sidebar-item"><a href="${esc(href)}"${dataPath} class="sidebar-link">${label}</a></li>`;
       }
       const itemsHtml = items.map(item => {
         const rawPath = (item.path || '').replace(/^\//, '');
@@ -506,14 +637,29 @@
     }
 
     _highlightEpubCurrent() {
-      const currentFile = location.pathname.split('/').pop();
+      const currentFile = location.pathname.split('/').pop().replace(/\.html$/i, '');
       const currentHash = location.hash.slice(1);
       const tree = this.navTree?.querySelector('.sidebar-menu');
       if (!tree) return;
 
+      // Desktop: only match file-level node (no id), ignore hash
+      if (innerWidth >= 997) {
+        const fileLink = [...tree.querySelectorAll('.sidebar-link')].find(a => {
+          const f = (a.dataset.file || '').replace(/\.html$/i, '');
+          const id = a.dataset.id || '';
+          return f === currentFile && !id;
+        });
+        if (fileLink) {
+          fileLink.classList.add('sidebar-link--active');
+          this._expandTo(fileLink, tree);
+          requestAnimationFrame(() => fileLink.scrollIntoView({ block: 'center', behavior: 'instant' }));
+        }
+        return;
+      }
+
       let best = null, bestScore = 0;
       tree.querySelectorAll('.sidebar-link').forEach(a => {
-        const file = a.dataset.file || '';
+        const file = (a.dataset.file || '').replace(/\.html$/i, '');
         const id = a.dataset.id || '';
         const href = a.getAttribute('href') || '';
         let score = 0;
@@ -590,9 +736,10 @@
     toggle() { this.sidebar.classList.contains('doc-sidebar--open') ? this.close() : this.open(); }
 
     open() {
+      if (innerWidth >= 997) return;   // Desktop: sidebar always visible, no overlay
       this.sidebar.classList.add('doc-sidebar--open');
       this.backdrop?.classList.add('sidebar-overlay--visible');
-      if (innerWidth < 768) document.body.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
       $('#sidebar-toggle')?.classList.add('clean-btn--active');
       if (this._mode === 'epub') {
         this._scrollTocToActive();
@@ -602,6 +749,7 @@
     }
 
     close() {
+      if (innerWidth >= 997) return;   // Desktop: no-op
       this.sidebar.classList.remove('doc-sidebar--open');
       this.backdrop?.classList.remove('sidebar-overlay--visible');
       document.body.style.overflow = '';

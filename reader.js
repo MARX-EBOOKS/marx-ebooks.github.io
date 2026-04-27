@@ -36,10 +36,13 @@
         try {
             const content = $('#content');
             if (!content) return;
-            content.querySelectorAll('h2, h3').forEach((h, i) => {
+            const skip = new Set(['Karl Marx', 'Friedrich Engels', 'Karl Marx/Friedrich Engels']);
+            content.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((h, i) => {
+                const text = h.textContent.trim();
+                if (skip.has(text)) return;
                 if (!h.id) h.id = 'h' + i;
                 if (!h.querySelector('.anchor'))
-                    h.insertAdjacentHTML('beforeend', `<a class="anchor" href="#${h.id}">#</a>`);
+                    h.insertAdjacentHTML('beforeend', `<a class="anchor" href="#${h.id}" aria-hidden="true" hidden=""></a>`);
             });
         } catch (e) { console.warn('[Reader] Heading anchors init failed:', e); }
     }
@@ -459,6 +462,7 @@
             requestAnimationFrame(onScroll);
         } catch (e) { console.warn('[Reader] Heading tracker init failed:', e); }
     }
+
 
     function init() {
         initResponsiveContent();

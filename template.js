@@ -104,20 +104,25 @@ ${headExtras.join('\n')}
   <nav class="sidebar-nav" id="nav-tree"></nav>
 </aside>
   <main class="doc-main" id="main">
-    <div id="doc-view" style="display:block">
-      <header class="doc-header" id="doc-header">
-        <div class="doc-header__pathbar" id="doc-pathbar">
-          ${breadcrumb || '<span style="color:var(--text-3);">Library</span>'}
-        </div>
-      </header>
-      <div class="doc-content">
-        <div class="prose" id="content">
+    <div class="doc-main-inner">
+      <div id="doc-view" style="display:block">
+        <header class="doc-header" id="doc-header">
+          <div class="doc-header__pathbar" id="doc-pathbar">
+            ${breadcrumb || '<span style="color:var(--text-3);">Library</span>'}
+          </div>
+        </header>
+        <div class="doc-content">
+          <div class="prose" id="content">
 ${bodyHtml}
+          </div>
+          <nav class="doc-footer" id="doc-footer">
+            ${prevBtn}
+            ${nextBtn}
+          </nav>
         </div>
-        <nav class="doc-footer" id="doc-footer">
-          ${prevBtn}
-          ${nextBtn}
-        </nav>
+      </div>
+      <div class="theme-doc-toc-desktop" id="toc-desktop">
+        <nav class="theme-doc-toc-desktop-nav" id="toc-desktop-nav"></nav>
       </div>
     </div>
   </main>
