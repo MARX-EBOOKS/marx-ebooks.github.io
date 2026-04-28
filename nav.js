@@ -175,13 +175,20 @@
         return hFile === currentFile;
       });
 
-      const domHeadings = this._getDomHeadings();
+      // Use raw DOM headings (including those without id) so that a missing
+      // id in the middle of the page doesn't throw off the pairing index.
+      const content = $('#content');
+      const domHeadingsAll = content ? Array.from(content.querySelectorAll('h1, h2, h3, h4, h5, h6')) : [];
+      let domIdx = 0;
 
-      return jsonHeadings.map((jh, i) => ({
-        level: jh.level,
-        text: jh.text,
-        id: jh.id || (domHeadings[i] ? domHeadings[i].id : null)
-      })).filter(h => h.id);
+      return jsonHeadings.map((jh) => {
+        let id = jh.id;
+        if (!id && domIdx < domHeadingsAll.length) {
+          id = domHeadingsAll[domIdx].id || null;
+        }
+        domIdx++;
+        return { level: jh.level, text: jh.text, id };
+      }).filter(h => h.id);
     }
 
     _renderTocTree(nodes) {
@@ -193,7 +200,7 @@
       }).join('') + '</ul>';
     }
 
-    // ── Unified scroll tracking (single listener) ───────────────
+    // ── Unified scroll tracking (single listener drives both rails) ──
     _initScrollTracking() {
       if (this._scrollTrackingReady) return;
       const content = $('#content');
@@ -218,29 +225,18 @@
         if (activeId !== lastId) {
           lastId = activeId;
           this._activeHeadingId = activeId;
-          this._updateActiveHeading(activeId);
-          this._updateTocRailHighlight(activeId);
+          this._updateNavTracking(activeId);   // highlight both rails
+          this._syncNavScroll(activeId);         // scroll the visible rail into view
         }
-
       };
 
       window.addEventListener('scroll', onScroll, { passive: true });
       requestAnimationFrame(() => {
         onScroll();
-        if (innerWidth < 997) this._syncTocScroll();
+        this._syncNavScroll(lastId);
       });
     }
 
-    _updateTocRailHighlight(activeId) {
-      const nav = document.getElementById('toc-desktop-nav');
-      if (!nav || !nav.innerHTML) return;
-      nav.querySelectorAll('.theme-doc-toc-desktop-link').forEach(li => {
-        li.classList.remove('theme-doc-toc-desktop-link--active');
-      });
-      if (!activeId) return;
-      const match = nav.querySelector(`a[href="#${activeId}"]`)?.closest('li');
-      if (match) match.classList.add('theme-doc-toc-desktop-link--active');
-    }
 
     // ── Desktop TOC Rail ("On this page") ───────────────────────
     _initTocRail() {
@@ -267,10 +263,13 @@
 
       nav.innerHTML = this._renderTocTree(this._buildHeadingTree(headings));
 
-      // If scroll tracking is already running, highlight current position immediately
+      // If scroll tracking is already running, highlight & scroll current position immediately
       if (this._scrollTrackingReady) {
         const activeId = this._getActiveHeadingId(this._getDomHeadings(), 200);
-        if (activeId) this._updateTocRailHighlight(activeId);
+        if (activeId) {
+          this._updateNavTracking(activeId);
+          this._syncNavScroll(activeId);
+        }
       }
     }
 
@@ -353,7 +352,11 @@
       this._initScrollTracking();
     }
 
-    _syncTocScroll() {
+    // ── Unified scroll sync (mobile sidebar only; desktop TOC never auto-scrolls) ──
+    _syncNavScroll(activeId) {
+      // Desktop: TOC rail never auto-scrolls — stays completely static
+      if (innerWidth >= 997) return;
+      // Mobile: scroll sidebar into view when menu opens
       if (!this.navTree) return;
       const active = this.navTree.querySelector('.sidebar-link.sidebar-link--active');
       if (!active) return;
@@ -361,7 +364,15 @@
       requestAnimationFrame(() => active.scrollIntoView({ block: 'center', behavior: 'smooth' }));
     }
 
-    _updateActiveHeading(id) {
+    // Desktop TOC rail: scroll the active item into the center of the rail viewport
+
+    // ── Unified nav tracking (single entry for both sidebar & TOC rail) ──
+    _updateNavTracking(id) {
+      this._updateSidebarTracking(id);
+      this._updateTocRailTracking(id);
+    }
+
+    _updateSidebarTracking(id) {
       if (!this.navTree) return;
       const tree = this.navTree.querySelector('.sidebar-menu');
       if (!tree) return;
@@ -370,21 +381,20 @@
       const rawFile = location.pathname.split('/').pop();
       const currentFile = rawFile ? rawFile.replace(/\.html$/i, '') : 'index';
 
-      // Desktop: always highlight file-level only, ignore heading id
+      // Desktop: always highlight the shallowest (first) heading for this file
       if (innerWidth >= 997) {
-        const fileLink = [...tree.querySelectorAll('.sidebar-link')].find(a => {
+        const fileLinks = [...tree.querySelectorAll('.sidebar-link')].filter(a => {
           const f = (a.dataset.file || '').replace(/\.html$/i, '');
-          const hid = a.dataset.id || '';
-          return f === currentFile && !hid;
+          return f === currentFile;
         });
-        if (fileLink) {
-          fileLink.classList.add('sidebar-link--active');
-          this._expandTo(fileLink, tree);
+        if (fileLinks.length) {
+          fileLinks[0].classList.add('sidebar-link--active');
+          this._expandTo(fileLinks[0], tree);
         }
         return;
       }
 
-      // Helper: pick the best link for current file when id is null or unmatched
+      // Mobile: track by heading id
       const fallbackToFile = () => {
         const fileLink = [...tree.querySelectorAll('.sidebar-link')].find(a => {
           const f = (a.dataset.file || '').replace(/\.html$/i, '');
@@ -400,27 +410,30 @@
           return (a.dataset.file || '').replace(/\.html$/i, '') === currentFile && a.dataset.id;
         });
         if (candidates.length) {
-          // Prefer the deepest (last) candidate — usually the most specific heading
           const deepest = candidates[candidates.length - 1];
           deepest.classList.add('sidebar-link--active');
           this._expandTo(deepest, tree);
         }
       };
 
-      if (!id) {
-        fallbackToFile();
-        return;
-      }
+      if (!id) { fallbackToFile(); return; }
 
       let match = tree.querySelector(`.sidebar-link[data-id="${id}"]`);
-      // If exact id miss (e.g. build/reader id mismatch), fallback to deepest candidate
-      if (!match) {
-        fallbackToFile();
-        return;
-      }
+      if (!match) { fallbackToFile(); return; }
 
       match.classList.add('sidebar-link--active');
       this._expandTo(match, tree);
+    }
+
+    _updateTocRailTracking(id) {
+      const nav = document.getElementById('toc-desktop-nav');
+      if (!nav || !nav.innerHTML) return;
+      nav.querySelectorAll('.theme-doc-toc-desktop-link__a').forEach(a => {
+        a.classList.remove('theme-doc-toc-desktop-link__a--active');
+      });
+      if (!id) return;
+      const match = nav.querySelector(`a[href="#${id}"]`);
+      if (match) match.classList.add('theme-doc-toc-desktop-link__a--active');
     }
 
     _expandTo(el, container) {
@@ -642,17 +655,16 @@
       const tree = this.navTree?.querySelector('.sidebar-menu');
       if (!tree) return;
 
-      // Desktop: only match file-level node (no id), ignore hash
+      // Desktop: highlight the shallowest (first) heading for this file
       if (innerWidth >= 997) {
-        const fileLink = [...tree.querySelectorAll('.sidebar-link')].find(a => {
+        const fileLinks = [...tree.querySelectorAll('.sidebar-link')].filter(a => {
           const f = (a.dataset.file || '').replace(/\.html$/i, '');
-          const id = a.dataset.id || '';
-          return f === currentFile && !id;
+          return f === currentFile;
         });
-        if (fileLink) {
-          fileLink.classList.add('sidebar-link--active');
-          this._expandTo(fileLink, tree);
-          requestAnimationFrame(() => fileLink.scrollIntoView({ block: 'center', behavior: 'instant' }));
+        if (fileLinks.length) {
+          fileLinks[0].classList.add('sidebar-link--active');
+          this._expandTo(fileLinks[0], tree);
+          requestAnimationFrame(() => fileLinks[0].scrollIntoView({ block: 'center', behavior: 'instant' }));
         }
         return;
       }
@@ -759,52 +771,12 @@
     _scrollTocToActive() {
       // Delegates to the unified sync helper so the active heading
       // is always centred when the user opens the menu.
-      this._syncTocScroll();
+      this._syncNavScroll(this._activeHeadingId);
     }
 
     _scrollToReadingLegacy() {
-      if (!this.menuLoaded) return;
-      const container = this.navTree;
-      const currentFile = location.pathname.split('/').pop();
-      let target = null;
-
-      const content = $('#content');
-      let visibleH = null;
-      if (content) {
-        const headings = content.querySelectorAll('h1, h2, h3, h4, h5, h6');
-        for (let i = headings.length - 1; i >= 0; i--) {
-          if (headings[i].getBoundingClientRect().top <= 200) { visibleH = headings[i]; break; }
-        }
-        if (!visibleH && headings.length) visibleH = headings[0];
-      }
-      const hId = visibleH?.id;
-      if (hId) {
-        container.querySelectorAll('a').forEach(a => {
-          if (target) return;
-          const href = a.getAttribute('href') || '';
-          const [file, hash] = href.split('#');
-          if ((file.split('/').pop() === currentFile && hash === hId) || (!file && href === '#' + hId)) target = a;
-        });
-      }
-      if (!target) {
-        container.querySelectorAll('a').forEach(a => {
-          if (target) return;
-          const href = a.getAttribute('href') || '';
-          if (href.split('#')[0].split('/').pop() === currentFile && !href.includes('#')) target = a;
-        });
-      }
-      if (!target) target = container.querySelector('a.sidebar-link--active');
-      if (!target) return;
-      let parent = target.closest('.sidebar-item');
-      while (parent) {
-        if (parent.classList.contains('sidebar-item--collapsible')) {
-          parent.setAttribute('data-collapsed', 'false');
-          const caret = parent.querySelector(':scope > .sidebar-caret');
-          if (caret) caret.textContent = '\u25be';
-        }
-        parent = parent.parentElement?.closest('.sidebar-item');
-      }
-      requestAnimationFrame(() => target.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+      // Legacy fallback: uses the unified sync helper for libmap mode
+      this._syncNavScroll(this._activeHeadingId);
     }
 
     async _loadLibmapConfig() {

@@ -493,7 +493,7 @@ class VolumeIndexBuilder {
 
   async buildAll(libraryConfig, dist) {
     const pm = new PathMatcher(this.config.args.only || [], this.config.args.copyOnly || []);
-    const volumes = this._collectVolumes(libraryConfig).filter(v => !pm.isCopyOnly(v.dir));
+    const volumes = this._collectVolumes(libraryConfig).filter(v => (!pm.isCopyOnly(v.dir)||!pm.shouldBuild));
     let generated = 0;
     for (const vol of volumes) {
       if (await this._buildOne(vol, dist)) generated++;

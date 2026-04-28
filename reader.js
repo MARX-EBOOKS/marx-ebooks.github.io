@@ -21,13 +21,13 @@
                 if (table.parentElement?.classList.contains('table-wrapper')) return;
                 const wrapper = document.createElement('div');
                 wrapper.className = 'table-wrapper';
-                wrapper.style.cssText = 'overflow-x:auto;max-width:100%;display:block;';
-                table.style.minWidth = '600px';
                 table.parentNode.insertBefore(wrapper, table);
                 wrapper.appendChild(table);
             });
             content.querySelectorAll('img').forEach(img => {
-                img.style.cssText = 'max-width:100%;height:auto;display:block;';
+                img.style.maxWidth = '100%';
+                img.style.height = 'auto';
+                img.style.display = 'block';
             });
         } catch (e) { console.warn('[Reader] Responsive init failed:', e); }
     }
