@@ -79,10 +79,8 @@
 
             const updateThemeUI = () => {
                 const isDark = document.documentElement.dataset.theme === 'dark';
-                const sun = $('#icon-sun');
-                const moon = $('#icon-moon');
-                if (sun) sun.style.display = isDark ? 'none' : '';
-                if (moon) moon.style.display = isDark ? '' : 'none';
+                document.querySelectorAll('.icon-sun').forEach(el => el.style.display = isDark ? 'none' : '');
+                document.querySelectorAll('.icon-moon').forEach(el => el.style.display = isDark ? '' : 'none');
                 const ind = $('#mobile-theme-indicator');
                 if (ind) ind.textContent = isDark ? '\u25CF' : '\u25CB';
             };
@@ -96,6 +94,7 @@
                 updateThemeUI();
             };
             $('#theme-btn')?.addEventListener('click', toggleTheme);
+            $('#sidebar-theme-btn')?.addEventListener('click', toggleTheme);
             $('#mobile-theme')?.addEventListener('click', toggleTheme);
 
             const remBtn = $('#remember-btn');

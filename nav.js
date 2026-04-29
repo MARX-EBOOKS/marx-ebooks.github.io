@@ -125,7 +125,7 @@
           const fullyAbove = rect.bottom < root.top;
           bc.classList.toggle('breadcrumb--faded', fullyAbove);
         });
-      }, { root: this.sidebar, threshold: 0 });
+      }, { root: this.navTree, threshold: 0 });
 
       io.observe(tocTree);
     }
@@ -751,8 +751,10 @@
       if (innerWidth >= 997) return;   // Desktop: sidebar always visible, no overlay
       this.sidebar.classList.add('doc-sidebar--open');
       this.backdrop?.classList.add('sidebar-overlay--visible');
-      document.body.style.overflow = 'hidden';
-      $('#sidebar-toggle')?.classList.add('clean-btn--active');
+      // Body scroll lock removed (allow scrolling behind overlay)
+      // document.body.style.overflow = 'hidden';
+      // Active indicator removed (full-screen overlay mode)
+      // $('#sidebar-toggle')?.classList.add('clean-btn--active');
       if (this._mode === 'epub') {
         this._scrollTocToActive();
       } else {
@@ -764,8 +766,10 @@
       if (innerWidth >= 997) return;   // Desktop: no-op
       this.sidebar.classList.remove('doc-sidebar--open');
       this.backdrop?.classList.remove('sidebar-overlay--visible');
-      document.body.style.overflow = '';
-      $('#sidebar-toggle')?.classList.remove('clean-btn--active');
+      // Body scroll lock removed
+      // document.body.style.overflow = '';
+      // Active indicator removed (full-screen overlay mode)
+      // $('#sidebar-toggle')?.classList.remove('clean-btn--active');
     }
 
     _scrollTocToActive() {

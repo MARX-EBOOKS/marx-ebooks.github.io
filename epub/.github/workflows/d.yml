@@ -1,0 +1,33 @@
+name: Sync assets repo to Cloudflare R2
+on:
+  push:
+    branches: [ "main" ]
+  release:
+    types: [published]
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+      - name: Configure rclone for R2
+        run: |
+          mkdir -p ~/.config/rclone
+          cat <<EOF > ~/.config/rclone/rclone.conf
+          [r2]
+          type = s3
+          provider = Cloudflare
+          access_key_id = ${{ secrets.R2_ACCESS_KEY_ID }}
+          secret_access_key = ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          endpoint = https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          EOF
+      - name: Sync downloads to R2
+        run: |
+          rclone sync ./ r2:${{ secrets.R2_BUCKET }}/ \
+            --checksum \
+            --progress \
+            --verbose \
+            --exclude ".git/**" \
+            --exclude ".github/**"
