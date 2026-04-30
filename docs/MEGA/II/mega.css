@@ -1,0 +1,177 @@
+BODY {margin-right:4%; margin-left:4%;max-width:100%; -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;font-family:"Times New Roman","Baskerville Old Face",Arial,Helvetica,serif;color:#2D3A53;background-color:#EEF0F5;line-height:200%;font-size:1.25em;}
+.que {font-size:0.6em;}
+p {
+        margin: .05em 0;
+        text-indent: 1em;
+}
+
+.ni {
+        text-indent: 0;
+
+}
+
+blockquote {
+        margin: .4em 0 .4em 2em;
+        text-indent: 0
+    }
+
+h1 {
+  
+        font-size: 1.5em;
+        margin: 3em 0 .8em;
+        text-align: center
+    }
+
+h2{
+        font-size: 1.25em;
+        font-style: italic;
+        margin: 1.4em 0 .6em;
+        text-align: center
+    }
+
+
+h3 {
+       
+        font-size: 1.1em;
+        margin: 1.2em 0 .5em;
+        text-align: center
+    
+}
+
+h4 {
+        
+        font-size: 1em;
+        font-style: italic;
+        margin: 1.2em 0 .5em;
+        text-align: center
+    
+}
+
+h5,
+h6 {
+        
+        font-size: 1em;
+        margin: 1em 0 .4em;
+        text-align: center
+    
+}
+
+.h7,
+.h8 {
+        
+        font-size: 0.8em;
+        margin: 1em 0 .4em;
+        text-align: center;
+        font-style: normal
+    
+}
+
+.ed {
+        
+        border-top: 1px solid #000;
+        border-bottom: 1px solid #000;
+        padding: .35em 0;
+        margin: 1em 0;
+        font-size: 10pt
+    
+}
+
+aside {
+        
+        border-top: 1px solid #888;
+        margin-top: 2em;
+        padding-top: .7em;
+        font-size: 0.75em;
+         line-height:150%;
+    
+}
+.fn {font-size:0.75em;line-height:1.5em;}
+.fn table,blockquote table {font-size: 0.75em;margin:1em auto;line-height: 150%;}
+div.fnt {margin:1em 0;font-size:1.25rem;}
+aside.fn {margin:2em 0;}
+.fni {text-indent:0;}
+table {margin:1.5em auto;max-width:120vw !important;}
+.fnt {
+        
+        font-weight: bold;
+        margin-bottom: .4em
+    }
+
+
+.mpb {
+        
+        color: #777;
+        font-size: .82em
+    
+}
+
+.sp {
+        
+        letter-spacing: .15em
+    
+}
+
+.dot {
+        
+        text-decoration: underline dotted
+    
+}
+
+a {
+        
+        color: #2563EB;
+        text-decoration: none
+    
+}
+
+a:hover {
+        
+        text-decoration: underline
+    }
+
+
+sup {
+        
+        font-size: .7em;
+        line-height: 0;
+        vertical-align: super
+    
+}
+@media (prefers-color-scheme: dark) {
+  body {
+background-color: #020206;
+color:#ABABAB;
+}
+a {
+  color: #64ABD5;
+  text-decoration: none;
+}
+
+a:visited {
+  color:  #8597AE;
+}
+
+a:active  {
+  color: #a3d4ff;
+  text-decoration: underline;
+}
+h1,h2,h3,h4,h5,h6,b {
+ color:  #F0F0F0;
+}
+a b,b a {
+ color:   #64ABD5;
+  text-decoration: underline;
+}
+a:visited  b,b a:visited{
+  color:  #8597AE;
+}
+
+a:hover b, a:focus b ,b a:focus, b a:hover{
+  color: #a3d4ff;
+}
+
+a:active b,b a:active {
+  color:  #ff6b6b; 
+}
+}
+

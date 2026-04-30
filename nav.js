@@ -108,7 +108,6 @@
       this.navTree.innerHTML = html;
       this._initSidebarToggles(this.navTree);
       this._initLazySections();
-      this._initReadingTracker();
       this._initBreadcrumbFade();
     }
 
@@ -125,7 +124,7 @@
           const fullyAbove = rect.bottom < root.top;
           bc.classList.toggle('breadcrumb--faded', fullyAbove);
         });
-      }, { root: this.navTree, threshold: 0 });
+      }, { root: this.sidebar, threshold: 0 });
 
       io.observe(tocTree);
     }
@@ -344,12 +343,6 @@
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFn(); }
         });
       });
-    }
-
-    _initReadingTracker() {
-      if (this._mode !== 'epub') return;
-      if (innerWidth >= 997) return;
-      this._initScrollTracking();
     }
 
     // ── Unified scroll sync (mobile sidebar only; desktop TOC never auto-scrolls) ──
@@ -743,44 +736,22 @@
     _bindSidebarToggle() {
       $('#sidebar-toggle')?.addEventListener('click', () => this.toggle());
       this.backdrop?.addEventListener('click', () => this.close());
+      $('#sidebar-close-btn')?.addEventListener('click', () => this.close());
     }
 
     toggle() { this.sidebar.classList.contains('doc-sidebar--open') ? this.close() : this.open(); }
 
     open() {
-      if (innerWidth >= 997) return;   // Desktop: sidebar always visible, no overlay
+      if (innerWidth >= 997) return;
       this.sidebar.classList.add('doc-sidebar--open');
       this.backdrop?.classList.add('sidebar-overlay--visible');
-      // Body scroll lock removed (allow scrolling behind overlay)
-      // document.body.style.overflow = 'hidden';
-      // Active indicator removed (full-screen overlay mode)
-      // $('#sidebar-toggle')?.classList.add('clean-btn--active');
-      if (this._mode === 'epub') {
-        this._scrollTocToActive();
-      } else {
-        this._scrollToReadingLegacy();
-      }
+      this._syncNavScroll(this._activeHeadingId);
     }
 
     close() {
-      if (innerWidth >= 997) return;   // Desktop: no-op
+      if (innerWidth >= 997) return;
       this.sidebar.classList.remove('doc-sidebar--open');
       this.backdrop?.classList.remove('sidebar-overlay--visible');
-      // Body scroll lock removed
-      // document.body.style.overflow = '';
-      // Active indicator removed (full-screen overlay mode)
-      // $('#sidebar-toggle')?.classList.remove('clean-btn--active');
-    }
-
-    _scrollTocToActive() {
-      // Delegates to the unified sync helper so the active heading
-      // is always centred when the user opens the menu.
-      this._syncNavScroll(this._activeHeadingId);
-    }
-
-    _scrollToReadingLegacy() {
-      // Legacy fallback: uses the unified sync helper for libmap mode
-      this._syncNavScroll(this._activeHeadingId);
     }
 
     async _loadLibmapConfig() {
