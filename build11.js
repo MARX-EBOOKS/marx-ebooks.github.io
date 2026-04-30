@@ -493,7 +493,7 @@ class VolumeIndexBuilder {
 
   async buildAll(libraryConfig, dist) {
     const pm = new PathMatcher(this.config.args.only || [], this.config.args.copyOnly || []);
-    const volumes = this._collectVolumes(libraryConfig).filter(v => (!pm.isCopyOnly(v.dir)||!pm.shouldBuild));
+    const volumes = this._collectVolumes(libraryConfig).filter(v => (!pm.isCopyOnly(v.dir)&&pm.shouldBuild(v.dir)));
     let generated = 0;
     for (const vol of volumes) {
       if (await this._buildOne(vol, dist)) generated++;
@@ -803,15 +803,10 @@ class BuildEngine {
     const scanner = new FileScanner(ROOT, pathMatcher);
     const prevNextResolver = new PrevNextResolver(ROOT);
     const renderer = new PageRenderer(config, prevNextResolver, rawConfig);
-
-    await fs.writeFile(path.join(DIST, 'index.html'), renderer.generateCardIndex(rawConfig));
-
     const volBuilder = new VolumeIndexBuilder(config);
+    const volIndexPaths = volBuilder.collectVolumePaths(rawConfig);
     const { generated: volIndexCount } = await volBuilder.buildAll(rawConfig, DIST);
     console.log(`   Volume index.js: ${volIndexCount} generated`);
-
-    const volIndexPaths = volBuilder.collectVolumePaths(rawConfig);
-
     // Deploy assets
     console.log('\nDeploying reader shell assets');
     for (const asset of ['nav.js', 'reader.js', 'reader.css']) {
@@ -855,6 +850,7 @@ class BuildEngine {
     }
     await Promise.all(executing);
     process.stdout.write(`\rProgress: rendered ${rendered} | copied ${copied}   \n`);
+    await fs.writeFile(path.join(DIST, 'index.html'), renderer.generateCardIndex(rawConfig));
 
     console.log(`\nDone: ${rendered} pages rendered | ${copied} assets copied | vol indexes ${volIndexCount} | ${((Date.now() - start) / 1000).toFixed(1)}s`);
   }

@@ -942,7 +942,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 }
 
 .doc-header__pathbar .crumb {
-  text-decoration: underline !important;
+  text-decoration: underline;
   text-decoration-color: var(--border);
   text-underline-offset: 3px;
   color: var(--text-3);

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MLCLASSIC READER</title>
+<script>
+(function(){
+  var t=localStorage.getItem('theme')||'light';
+  document.documentElement.setAttribute('data-theme',t);
+  var f=parseFloat(localStorage.getItem('fontSize'));
+  if(f&&f!==1) document.documentElement.style.setProperty('--fs-user',Math.round(16*f)+'px');
+})();
+</script>
+<link rel="stylesheet" href="reader.css">
+<style>
+/* SPA-only skeleton, not present in SSG reader.css */
+#doc-skeleton{display:none;padding:2rem 0}
+#doc-skeleton.active{display:block}
+.skeleton{background:var(--bg-hover);border-radius:4px;margin:12px 0;animation:skeleton-pulse 1.5s ease-in-out infinite}
+.skeleton.h2{height:1.6em;width:60%}
+.skeleton.h3{height:1.3em;width:45%}
+.skeleton.p{height:1em;width:100%}
+.skeleton.p.short{width:75%}
+.skeleton.p.xshort{width:40%}
+@keyframes skeleton-pulse{0%,100%{opacity:1}50%{opacity:.5}}
+</style>
+</head>
+<body data-site="">
+
+<div class="scroll-indicator" id="progress-bar"></div>
+
+<nav class="navbar" id="navbar">
+  <div class="navbar__brand">
+    <button type="button" class="clean-btn" id="sidebar-toggle" title="目录 (Ctrl+S)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <a class="navbar__logo" href="reader.html">
+      <img src="favicon.ico" alt=""/>
+      <span>MLCLASSIC</span>
+    </a>
+  </div>
+  <div class="navbar__items" id="nav-actions">
+    <div class="navbar__item">
+      <div class="font-control">
+        <button type="button" class="font-btn" id="font-dec-btn" title="缩小字体">A−</button>
+        <input type="range" id="font-slider" min="0.75" max="1.5" step="0.05" value="1">
+        <button type="button" class="font-btn" id="font-inc-btn" title="放大字体">A+</button>
+      </div>
+      <button type="button" class="clean-btn" id="remember-btn" title="记忆阅读位置">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      </button>
+      <button type="button" class="clean-btn" id="theme-btn" title="切换主题">
+        <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+    <button type="button" class="clean-btn navbar__toggle" id="mobile-menu-toggle" title="设置">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="6" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="18" r="1"/></svg>
+    </button>
+  </div>
+</nav>
+
+<div class="dropdown" id="mobile-menu">
+  <div class="dropdown__label">字号调整</div>
+  <div class="dropdown__row">
+    <button type="button" class="stepper" id="mobile-font-dec">−</button>
+    <input type="range" id="mobile-font-slider" min="0.75" max="1.5" step="0.05" value="1">
+    <button type="button" class="stepper" id="mobile-font-inc">+</button>
+  </div>
+  <div class="dropdown__rule"></div>
+  <div class="dropdown__item" id="mobile-remember">
+    <span>记忆阅读位置</span>
+    <span class="toggle-indicator" id="mobile-remember-indicator">○</span>
+  </div>
+  <div class="dropdown__item" id="mobile-theme">
+    <span>深色模式</span>
+    <span class="toggle-indicator" id="mobile-theme-indicator">○</span>
+  </div>
+</div>
+
+<div class="sidebar-overlay" id="sidebar-backdrop"></div>
+
+<div class="doc-wrapper" id="shell">
+  <div class="doc-root">
+    <aside class="doc-sidebar" id="lsidebar">
+      <div class="doc-sidebar__header">
+        <a class="doc-sidebar__brand" href="reader.html">
+          <img src="favicon.ico" alt=""/>
+          <span>MLCLASSIC</span>
+        </a>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <button type="button" class="clean-btn" id="sidebar-theme-btn" title="切换主题">
+            <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </button>
+          <button type="button" class="clean-btn" id="sidebar-close-btn" title="关闭菜单">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+      <nav class="sidebar-nav" id="nav-tree"></nav>
+    </aside>
+
+    <main class="doc-main" id="main">
+      <div class="doc-main-inner">
+        <div id="doc-view">
+          <!-- 欢迎页 -->
+          <div class="doc-content" id="welcome-view">
+            <div class="hero">
+              <h1 class="hero__title">MLCLASSIC</h1>
+              <p>Proletarier aller Länder, vereinigt euch!<br>Пролетарии всех стран, соединяйтесь!<br>全世界无产者，联合起来！</p>
+              <p>从左侧目录选择文献。</p>
+            </div>
+            <div class="card-grid" id="library-cards"></div>
+          </div>
+
+          <!-- 骨架屏 -->
+          <div id="doc-skeleton">
+            <div class="skeleton h2"></div>
+            <div class="skeleton p"></div>
+            <div class="skeleton p short"></div>
+            <div class="skeleton p xshort"></div>
+            <div class="skeleton h3"></div>
+            <div class="skeleton p"></div>
+            <div class="skeleton p"></div>
+          </div>
+
+          <!-- 文章视图 -->
+          <div class="doc-content" id="article-view" style="display:none">
+            <header class="doc-header" id="doc-header">
+              <div class="doc-header__pathbar" id="doc-pathbar">
+                <span style="color:var(--text-3);">Library</span>
+              </div>
+            </header>
+            <div class="prose" id="content"></div>
+            <nav class="doc-footer" id="doc-footer">
+              <a href="#" class="pagination-link pagination-link--prev" id="prev-btn" style="display:none">
+                <span class="pagination-link__dir">← Previous</span>
+                <span class="pagination-link__label" id="prev-label"></span>
+              </a>
+              <a href="#" class="pagination-link pagination-link--next" id="next-btn" style="display:none">
+                <span class="pagination-link__dir">Next →</span>
+                <span class="pagination-link__label" id="next-label"></span>
+              </a>
+            </nav>
+          </div>
+        </div>
+
+        <div class="theme-doc-toc-desktop" id="toc-desktop">
+          <nav class="theme-doc-toc-desktop-nav" id="toc-desktop-nav"></nav>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="popover" id="fn-tooltip">
+  <div class="popover__body"></div>
+  <a class="popover__jump" href="#" style="display:none"></a>
+</div>
+
+<script src="libmap.js"></script>
+<script src="reader-nav.js"></script>
+<script src="reader-ui.js"></script>
+<script>
+(function(){
+  function syncFill(el){
+    var min=parseFloat(el.min)||0,max=parseFloat(el.max)||100,val=parseFloat(el.value)||0;
+    var pct=((val-min)/(max-min)*100).toFixed(2)+'%';
+    el.style.setProperty('--_fill',pct);
+  }
+  document.querySelectorAll('input[type="range"]').forEach(function(el){
+    syncFill(el);
+    el.addEventListener('input',function(){syncFill(this);});
+  });
+})();
+</script>
+</body>
+</html>
