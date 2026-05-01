@@ -16,7 +16,7 @@ class ConfigLoader {
   constructor() {
     const args = {
       input: '.', output: 'dist', baseUrl: '', logo: '/favicon.ico', logoText: 'MLCLASSIC',
-      concurrency: 4, config: './libmap.js', only: [],
+      concurrency: 4, config: './libmap.js', only: [], skip: [],
       copyOnly: ['en/archive/', 'en/history/', 'docs/VIL/', 'docs/MEW/', 'ru/VIL-UAIO/'],
       template: './template.js'
     };
@@ -28,7 +28,8 @@ class ConfigLoader {
       '--template': 'template', '-t': 'template',
       '--logo': 'logo', '--logotext': 'logoText',
       '--concurrency': 'concurrency',
-      '--only': 'only', '--copy-only': 'copyOnly'
+      '--only': 'only', '--skip': 'skip', '-s': 'skip',
+      '--copy-only': 'copyOnly'
     };
 
     for (let i = 2; i < process.argv.length; i++) {
@@ -38,24 +39,25 @@ class ConfigLoader {
       const val = process.argv[++i];
       if (val === undefined) continue;
       if (key === 'concurrency') args.concurrency = parseInt(val) || 4;
-      else if (key === 'only' || key === 'copyOnly') args[key].push(...val.split(',').map(s => s.trim()).filter(Boolean));
+      else if (key === 'only' || key === 'skip' || key === 'copyOnly') args[key].push(...val.split(',').map(s => s.trim()).filter(Boolean));
       else args[key] = val;
     }
 
     const envMap = [
-      ['BUILD_ONLY', 'only'], ['BUILD_COPY_ONLY', 'copyOnly'],
+      ['BUILD_ONLY', 'only'], ['BUILD_SKIP', 'skip'], ['BUILD_COPY_ONLY', 'copyOnly'],
       ['BUILD_TEMPLATE', 'template'], ['BUILD_INPUT', 'input'],
       ['BUILD_OUTPUT', 'output']
     ];
     for (const [envKey, argKey] of envMap) {
       const val = process.env[envKey];
       if (!val) continue;
-      if (argKey === 'only' || argKey === 'copyOnly') args[argKey].push(...val.split(',').map(s => s.trim()).filter(Boolean));
+      if (argKey === 'only' || argKey === 'skip' || argKey === 'copyOnly') args[argKey].push(...val.split(',').map(s => s.trim()).filter(Boolean));
       else args[argKey] = val;
     }
     if (process.env.CF_PAGES_URL) args.baseUrl = process.env.CF_PAGES_URL;
 
     args.only = [...new Set(args.only)];
+    args.skip = [...new Set(args.skip)];
     args.copyOnly = [...new Set(args.copyOnly)];
 
     this.args = args;
@@ -121,9 +123,10 @@ class ConfigLoader {
 
 // ── PathMatcher ─────────────────────────────────────────────────
 class PathMatcher {
-  constructor(only, copyOnly) {
+  constructor(only, copyOnly, skip) {
     this.only = only || [];
     this.copyOnly = copyOnly || [];
+    this.skip = skip || [];
   }
 
   matches(relPath, patterns) {
@@ -140,7 +143,10 @@ class PathMatcher {
     });
   }
 
-  shouldBuild(relPath) { return !this.only.length || this.matches(relPath, this.only); }
+  shouldBuild(relPath) {
+    if (this.matches(relPath, this.skip)) return false;
+    return !this.only.length || this.matches(relPath, this.only);
+  }
   isCopyOnly(relPath) { return this.matches(relPath, this.copyOnly); }
 }
 
@@ -419,7 +425,7 @@ class VolumeIndexBuilder {
   }
 
   collectVolumePaths(libraryConfig) {
-    const pm = new PathMatcher(this.config.args.only || [], this.config.args.copyOnly || []);
+    const pm = new PathMatcher(this.config.args.only || [], this.config.args.copyOnly || [], this.config.args.skip || []);
     const paths = new Set();
     this._eachItem(libraryConfig, (_col, _group, item) => {
       const p = item.path || '';
@@ -492,8 +498,8 @@ class VolumeIndexBuilder {
   }
 
   async buildAll(libraryConfig, dist) {
-    const pm = new PathMatcher(this.config.args.only || [], this.config.args.copyOnly || []);
-    const volumes = this._collectVolumes(libraryConfig).filter(v => (!pm.isCopyOnly(v.dir)&&pm.shouldBuild(v.dir)));
+    const pm = new PathMatcher(this.config.args.only || [], this.config.args.copyOnly || [], this.config.args.skip || []);
+    const volumes = this._collectVolumes(libraryConfig).filter(v => (!pm.isCopyOnly(v.dir) && pm.shouldBuild(v.dir)));
     let generated = 0;
     for (const vol of volumes) {
       if (await this._buildOne(vol, dist)) generated++;
@@ -787,6 +793,7 @@ class BuildEngine {
 
     console.log(`\nBuild started (lightweight mode)`);
     if (args.only.length) console.log(`   Build only: ${args.only.join(', ')}`);
+    if (args.skip.length) console.log(`   Skip: ${args.skip.join(', ')}`);
     if (args.copyOnly.length) console.log(`   Copy-only: ${args.copyOnly.join(', ')}`);
     console.log(`   Source: ${ROOT} -> Output: ${DIST}`);
 
@@ -799,7 +806,7 @@ class BuildEngine {
     const rawConfig = config.loadUserConfig();
     console.log(`   Loaded ${rawConfig.length} collection(s) from config`);
 
-    const pathMatcher = new PathMatcher(args.only, args.copyOnly);
+    const pathMatcher = new PathMatcher(args.only, args.copyOnly, args.skip);
     const scanner = new FileScanner(ROOT, pathMatcher);
     const prevNextResolver = new PrevNextResolver(ROOT);
     const renderer = new PageRenderer(config, prevNextResolver, rawConfig);
