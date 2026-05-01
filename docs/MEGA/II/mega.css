@@ -76,10 +76,10 @@ h6 {
     
 }
 
-aside {
+aside.fn {
         
         border-top: 1px solid #888;
-        margin-top: 2em;
+        margin:2em 0;
         padding-top: .7em;
         font-size: 0.75em;
          line-height:150%;
@@ -88,7 +88,6 @@ aside {
 .fn {font-size:0.75em;line-height:1.5em;}
 .fn table,blockquote table {font-size: 0.75em;margin:1em auto;line-height: 150%;}
 div.fnt {margin:1em 0;font-size:1.25rem;}
-aside.fn {margin:2em 0;}
 .fni {text-indent:0;}
 table {margin:1.5em auto;max-width:120vw !important;}
 .fnt {

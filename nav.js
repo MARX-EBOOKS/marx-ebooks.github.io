@@ -112,24 +112,20 @@
     }
 
     _initBreadcrumbFade() {
-      if (this._mode !== 'epub') return;
-      const bc = this.navTree.querySelector('.breadcrumb');
-      const tocTree = this.navTree.querySelector('.sidebar-menu');
-      if (!bc || !tocTree || !this.sidebar) return;
+      const bc = this.navTree?.querySelector('.breadcrumb');
+      const tocMenu = this.navTree?.querySelector('.sidebar-menu');
+      if (!bc || !tocMenu || !this.navTree) return;
 
+      // Fade the breadcrumb only when the entire first sidebar-menu
+      // (the epub TOC) has scrolled out of the nav viewport.
       const io = new IntersectionObserver((entries) => {
         entries.forEach(e => {
-          const rect = e.boundingClientRect;
-          const root = e.rootBounds;
-          const fullyAbove = rect.bottom < root.top;
-          bc.classList.toggle('breadcrumb--faded', fullyAbove);
+          bc.classList.toggle('breadcrumb--faded', !e.isIntersecting);
         });
-      }, { root: this.sidebar, threshold: 0 });
+      }, { root: this.navTree, threshold: 0 });
 
-      io.observe(tocTree);
+      io.observe(tocMenu);
     }
-
-    // ── Shared heading helpers ──────────────────────────────────
     _getDomHeadings() {
       const content = $('#content');
       if (!content) return [];

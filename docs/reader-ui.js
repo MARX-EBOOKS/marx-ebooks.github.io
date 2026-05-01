@@ -910,6 +910,23 @@ function bindEvents() {
             return;
         }
 
+        // 0) 品牌链接 → 欢迎页（兼容无 .html 的入口，阻止整页刷新）
+        if (a.classList.contains('navbar__logo') || a.classList.contains('doc-sidebar__brand')) {
+            e.preventDefault();
+            if ($('#welcome-view').style.display !== 'block') {
+                history.pushState({}, '', location.pathname);
+                $('#article-view').style.display = 'none';
+                $('#welcome-view').style.display = 'block';
+                $('#toc-desktop').style.display = 'none';
+                $('#toc-desktop-nav').innerHTML = '';
+                document.title = '文库阅读器 — MLCLASSIC';
+                state.doc = null;
+                window.__NAV__?.reinit(null);
+            }
+            closeSidebar();
+            return;
+        }
+
         // 1) 脚注弹窗（最高优先级）
         if (isFootnoteLink(a)) {
             e.preventDefault();
