@@ -106,6 +106,8 @@ function handleResize() {
 async function loadDoc(docPath) {
     $('#welcome-view').style.display = 'none';
     $('#article-view').style.display = 'block';
+    $('#toc-desktop').style.display = 'none';
+    $('#toc-desktop-nav').innerHTML = '';
     const skeleton = $('#doc-skeleton');
     skeleton.classList.add('active');
     skeleton.style.display = 'block';
@@ -224,7 +226,10 @@ function renderDoc(h, path) {
 
     updatePrevNext(path);
     window.__NAV__?.reinit(state.doc);
+    const tocDesktop = $('#toc-desktop');
+    if (tocDesktop) tocDesktop.style.display = '';
 }
+
 
 function updateBreadcrumb(path, title) {
     const bar = $('#doc-pathbar');
@@ -270,6 +275,8 @@ function fixOverflow(c) {
 }
 
 function showError(p, m) {
+    $('#toc-desktop').style.display = 'none';
+    $('#toc-desktop-nav').innerHTML = '';
     $('#content').innerHTML = `<p style="color:var(--text-2);padding:40px 0;">无法加载 <code>${esc(p)}</code><br><small>${esc(m)}</small></p>`;
     $('#content').style.display = 'block';
     $('#content').style.opacity = '1';
@@ -279,8 +286,9 @@ function showError(p, m) {
 const mf = {};
 
 async function fetchManifest(dir) {
-    if (mf[dir]) return mf[dir];
-    const data = await fetchVolData(dir.replace(/^\//, '').replace(/\/?$/, ''), mf);
+    const cleanDir = dir.replace(/^\//, '').replace(/\/$/, '');
+    if (mf[cleanDir]) return mf[cleanDir];
+    const data = await fetchVolData(cleanDir, mf);
     return data;
 }
 
@@ -292,12 +300,60 @@ function updatePrevNext(p) {
     if (s === -1) return;
     const dir = p.slice(0, s + 1), file = p.slice(s + 1);
 
-    fetchManifest(dir).then(m => {
+    fetchManifest(dir).then(raw => {
+        // 支持 {files: [...]} 或 [...] 两种结构
+        let m = raw;
+        if (!Array.isArray(m) && Array.isArray(m?.files)) m = m.files;
         if (!m || !Array.isArray(m)) return fallbackNav(dir, file, prev, next);
-        const i = m.findIndex(x => x.file === file || x.path?.includes(file));
-        if (i < 0) return fallbackNav(dir, file, prev, next);
-        if (i > 0) setupPaginationBtn(prev, dir + m[i - 1].file, m[i - 1].title, 'prev');
-        if (i < m.length - 1) setupPaginationBtn(next, dir + m[i + 1].file, m[i + 1].title, 'next');
+
+        // 有 index.json 时优先使用，不再 fallback 到编号加减一
+        const cleanFile = file.replace(/\.html$/i, '');
+        let i = m.findIndex(x => {
+            const f = x.file || x.path || x.url || x.filename || '';
+            const cleanF = f.replace(/\.html$/i, '');
+            return f === file || cleanF === cleanFile;
+        });
+
+        // 第二遍：宽松子串匹配
+        if (i < 0) {
+            i = m.findIndex(x => {
+                const f = x.file || x.path || x.url || x.filename || '';
+                return f.includes(file) || file.includes(f.replace(/\.html$/i, ''));
+            });
+        }
+
+        const makePath = item => {
+            const f = item.file || item.path || item.url || item.filename || '';
+            if (f.startsWith('http')) return f;
+            if (f.startsWith('/')) return f.slice(1);
+            // 如果 f 已经包含斜杠（相对路径或绝对路径），直接返回
+            if (f.includes('/')) return f;
+            return dir + f;
+        };
+
+        if (i >= 0) {
+            // 精确匹配成功，直接取前后相邻条目
+            if (i > 0) setupPaginationBtn(prev, makePath(m[i - 1]), m[i - 1].title, 'prev');
+            if (i < m.length - 1) setupPaginationBtn(next, makePath(m[i + 1]), m[i + 1].title, 'next');
+            return;
+        }
+
+        // index.json 存在但匹配不到当前文件：按文件名排序找邻居，不再 fallbackNav
+        console.warn('[PrevNext] index.json loaded but no exact match for', file, '; trying sorted neighbors');
+        const entries = m.map(x => ({
+            file: x.file || x.path || x.url || x.filename || '',
+            title: x.title,
+            clean: (x.file || x.path || x.url || x.filename || '').replace(/\.html$/i, '')
+        })).filter(x => x.file);
+
+        if (!entries.length) return;
+        entries.sort((a, b) => a.clean.localeCompare(b.clean, undefined, { numeric: true }));
+
+        const pos = entries.findIndex(e => e.clean === cleanFile || e.file.includes(file) || file.includes(e.clean));
+        if (pos < 0) return;
+
+        if (pos > 0) setupPaginationBtn(prev, makePath(entries[pos - 1]), entries[pos - 1].title, 'prev');
+        if (pos < entries.length - 1) setupPaginationBtn(next, makePath(entries[pos + 1]), entries[pos + 1].title, 'next');
     }).catch(() => fallbackNav(dir, file, prev, next));
 }
 
@@ -494,9 +550,9 @@ class FootnotePopup {
 // ── 事件绑定辅助 ──
 function bindStepperGroup({ stateKey, applyFn, step, decIds, incIds, sliderIds }) {
     const adjust = delta => applyFn(state[stateKey] + delta, true);
-    decIds.forEach(id => on($(id), 'click', () => adjust(-step)));
-    incIds.forEach(id => on($(id), 'click', () => adjust(step)));
-    sliderIds.forEach(id => on($(id), 'input', e => applyFn(parseFloat(e.target.value), true)));
+    decIds.forEach(id => on($('#' + id), 'click', () => adjust(-step)));
+    incIds.forEach(id => on($('#' + id), 'click', () => adjust(step)));
+    sliderIds.forEach(id => on($('#' + id), 'input', e => applyFn(parseFloat(e.target.value), true)));
 }
 
 function bindToggle({ btnIds, itemIds, getNext, apply }) {
@@ -504,8 +560,8 @@ function bindToggle({ btnIds, itemIds, getNext, apply }) {
         e?.stopPropagation();
         apply(getNext());
     };
-    btnIds.forEach(id => on($(id), 'click', toggle));
-    itemIds.forEach(id => on($(id), 'click', toggle));
+    btnIds.forEach(id => on($('#' + id), 'click', toggle));
+    itemIds.forEach(id => on($('#' + id), 'click', toggle));
 }
 
 // ── 事件绑定 ──
@@ -616,7 +672,7 @@ function bindEvents() {
         }
 
         const href = a.getAttribute('href') || '';
-        if (href.startsWith('#') && href.length > 1 && a.closest('#content')) {
+        if (href.startsWith('#') && href.length > 1) {
             e.preventDefault();
             const el = document.getElementById(href.slice(1)) || document.querySelector(`[name="${href.slice(1)}"]`);
             el && scrollToEl(el);

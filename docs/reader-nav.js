@@ -49,18 +49,17 @@ window.buildHeadingTree = function (headings) {
     return root.children;
 };
 window.fetchVolData = async function (dir, cacheMap) {
-    const base = '/' + dir.replace(/^\//, '').replace(/\/?$/, '/') + '/';
-    const vol = base.replace(/\/$/, '').split('/').pop();
-    for (const name of ['index.json', `index${vol}.json`, `${vol}/index.json`]) {
-        try {
-            const res = await fetch(base + name.replace(/^\//, ''));
-            if (res.ok) {
-                const data = await res.json();
-                if (cacheMap) cacheMap.set(dir, data);
-                return data;
-            }
-        } catch { }
-    }
+    const cleanDir = dir.replace(/^\//, '').replace(/\/$/, '');
+    if (cacheMap && cacheMap[cleanDir]) return cacheMap[cleanDir];
+    const url = '/' + cleanDir + '/index.json';
+    try {
+        const res = await fetch(url);
+        if (res.ok) {
+            const data = await res.json();
+            if (cacheMap) cacheMap[cleanDir] = data;
+            return data;
+        }
+    } catch (e) { console.warn('[fetchVolData]', url, e); }
     return null;
 };
 window.expandTo = function (el, container) {
@@ -186,6 +185,11 @@ class MenuManager {
         if (!data) { this._fallbackMenu(); return; }
         this._currentVol.data = data;
 
+        // 当前文件标题<=1时，左侧栏不渲染本页菜单，直接回退到全库菜单
+        const currentFile = (docPath || '').split('/').pop().replace(/\.html$/i, '');
+        const fileHeadings = (data.headings || []).filter(h => (h.file || '').replace(/\.html$/i, '') === currentFile);
+        if (fileHeadings.length <= 1) { this._forceLibmap(); return; }
+
         const volTitle = item.label || item.title || data.title || 'Contents';
         const volHref = item.path || (dir + '/index.html');
         const colHref = col.path && !col.path.startsWith('http') ? `?doc=${esc(col.path.replace(/^\//, ''))}` : null;
@@ -205,7 +209,7 @@ class MenuManager {
 
     _renderPageTocMenu() {
         const headings = getDomHeadings($('#content'));
-        if (!headings.length) { this._fallbackMenu(); return; }
+        if (headings.length <= 1) { this._forceLibmap(); return; }
 
         const pageTitle = headings[0]?.textContent?.trim() || document.title;
         const col = this._currentVol?.col || this._findCollectionByPath();
@@ -230,6 +234,14 @@ class MenuManager {
         this._postRenderMenu(state.doc);
     }
 
+    _forceLibmap() {
+        this._setMode('libmap');
+        this._renderLibmapMenu();
+        this._highlightLibmapCurrent();
+        this._initTocRail();
+        this._initScrollTracking();
+    }
+
     _fallbackMenu() {
         if (innerWidth < 997) {
             this._renderPageTocMenu();
@@ -243,9 +255,10 @@ class MenuManager {
     }
 
     async _fetchVolData(dir) {
-        const raw = await fetchVolData(dir, this._volCache);
+        const cleanDir = dir.replace(/^\//, '').replace(/\/$/, '');
+        const raw = await fetchVolData(cleanDir, this._volCache);
         if (!raw) return null;
-        return this._convertJsonToVolumeData(raw, dir);
+        return this._convertJsonToVolumeData(raw, cleanDir);
     }
 
     _convertJsonToVolumeData(json, dir) {
@@ -257,9 +270,10 @@ class MenuManager {
                 allHeadings.push({ level: h.level || 2, text: h.text || '', id: h.id || null, file: h.filename || f.file || '' });
             }
         }
+        const cleanDir = dir.replace(/^\//, '').replace(/\/$/, '');
         return {
-            version: 1, title: vol?.item?.label || vol?.item?.title || dir,
-            volumePath: '/' + dir.replace(/^\//, '').replace(/\/?$/, '/') + '/',
+            version: 1, title: vol?.item?.label || vol?.item?.title || cleanDir,
+            volumePath: '/' + cleanDir + '/',
             collectionId: vol?.col?.id, collectionLabel: vol?.col?.label, groupLabel: vol?.group?.label,
             navHtml: null, files: json, headings: allHeadings
         };
