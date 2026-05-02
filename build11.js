@@ -528,7 +528,7 @@ class VolumeIndexBuilder {
             file: e.file || '',
             title: e.title || '',
             headings: (e.headings || []).map(h => ({
-              tag: h.tag || 'h2', text: h.text || '', level: h.level || 2,
+              tag: h.tag || 'h2', text: h.text || '', level: h.level != null ? h.level : 2,
               id: h.id || null, filename: h.filename || e.file || ''
             }))
           }));
@@ -580,7 +580,7 @@ class VolumeIndexBuilder {
     for (const f of files) {
       for (const h of (f.headings || [])) {
         allHeadings.push({
-          level: h.level || 2,
+          level: h.level != null ? h.level : 2,
           text: h.text || '',
           id: h.id || null,
           file: h.filename || f.file || ''
