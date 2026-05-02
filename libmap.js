@@ -550,12 +550,10 @@ window.LIBRARY_CONFIG = [
             {
                 label: '中译本',
                 items: [
-                    { label: '精神现象学 （贺麟、王玖兴译）', path: 'docs/HEGEL/shorter-logic/part0000.html#ps' },
+                    { label: '贺麟（黑格尔译本）全集', path: 'docs/HEGEL/shorter-logic/part0000.html' },
                     { label: '大逻辑第一册 （杨一之译）', path: 'docs/HEGEL/SCIENCE-OF-LOGIC-I/part0003.html' },
                     { label: '大逻辑第二册 （杨一之译）', path: 'docs/HEGEL/SCIENCE-OF-LOGIC-II/index.html' },
-                    { label: '小逻辑 （贺麟译）', path: 'docs/HEGEL/shorter-logic/part0000.html#sl' },
                     { label: '法哲学原理 （范扬、张企泰译）', path: 'docs/HEGEL/philosophy-of-right/nav.html' },
-                    { label: '哲学史讲演录 （贺麟、王太庆等译）', path: 'docs/HEGEL/shorter-logic/part0000.html#hp' }
                 ],
             },
         ],

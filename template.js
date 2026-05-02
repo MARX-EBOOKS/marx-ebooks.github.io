@@ -26,7 +26,7 @@ function generateTemplate(opts) {
     prev, next, breadcrumb, hasVolIndex,
     volJsPath = '', volLabel = 'Contents',
     logo, logoText, site,
-    antiFlash = `<script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);var f=parseFloat(localStorage.getItem('fontSize'));if(f&&f!==1)document.documentElement.style.setProperty('--fs-user',Math.round(16*f)+'px');})();<\/script>`
+    antiFlash = `<script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);var f=parseFloat(localStorage.getItem('fontSize'));if(f&&f!==1)document.documentElement.style.setProperty('--fs-user',Math.round(16*f)+'px');var lh=parseFloat(localStorage.getItem('lineHeight'));if(lh)document.documentElement.style.setProperty('--lh-user',lh);})();<\/script>`
   } = opts;
 
   const prevBtn = prev
@@ -70,6 +70,11 @@ ${headExtras.join('\n')}
         <input type="range" id="font-slider" min="0.75" max="1.5" step="0.05" value="1">
         <button type="button" class="font-btn" id="font-inc-btn" title="Increase font">A+</button>
       </div>
+      <div class="lh-control">
+        <button type="button" class="font-btn" id="lh-dec-btn" title="Decrease line height">\u2195\u2212</button>
+        <input type="range" id="lh-slider" min="1.4" max="2.6" step="0.1" value="2.0">
+        <button type="button" class="font-btn" id="lh-inc-btn" title="Increase line height">\u2195+</button>
+      </div>
       <button type="button" class="clean-btn" id="remember-btn" title="Remember scroll position">
         ${SVG.bookmark}
       </button>
@@ -88,6 +93,13 @@ ${headExtras.join('\n')}
     <button type="button" class="stepper" id="mobile-font-dec">\u2212</button>
     <input type="range" id="mobile-font-slider" min="0.75" max="1.5" step="0.05" value="1">
     <button type="button" class="stepper" id="mobile-font-inc">+</button>
+  </div>
+  <div class="dropdown__rule"></div>
+  <div class="dropdown__label">Line Height</div>
+  <div class="dropdown__row">
+    <button type="button" class="stepper" id="mobile-lh-dec">\u2212</button>
+    <input type="range" id="mobile-lh-slider" min="1.4" max="2.6" step="0.1" value="2.0">
+    <button type="button" class="stepper" id="mobile-lh-inc">+</button>
   </div>
   <div class="dropdown__rule"></div>
   <div class="dropdown__item" id="mobile-remember">

@@ -29,7 +29,7 @@ class ConfigLoader {
       '--logo': 'logo', '--logotext': 'logoText',
       '--concurrency': 'concurrency',
       '--only': 'only', '--skip': 'skip', '-s': 'skip',
-      '--copy-only': 'copyOnly'
+      '--copy-only': 'copyOnly', '--base-url':'baseUrl'
     };
 
     for (let i = 2; i < process.argv.length; i++) {
@@ -54,7 +54,7 @@ class ConfigLoader {
       if (argKey === 'only' || argKey === 'skip' || argKey === 'copyOnly') args[argKey].push(...val.split(',').map(s => s.trim()).filter(Boolean));
       else args[argKey] = val;
     }
-    if (process.env.CF_PAGES_URL) args.baseUrl = process.env.CF_PAGES_URL;
+    //if (process.env.CF_PAGES_URL) args.baseUrl = process.env.CF_PAGES_URL;
 
     args.only = [...new Set(args.only)];
     args.skip = [...new Set(args.skip)];

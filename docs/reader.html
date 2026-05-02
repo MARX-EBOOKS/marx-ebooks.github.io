@@ -10,6 +10,8 @@
   document.documentElement.setAttribute('data-theme',t);
   var f=parseFloat(localStorage.getItem('fontSize'));
   if(f&&f!==1) document.documentElement.style.setProperty('--fs-user',Math.round(16*f)+'px');
+  var lh=parseFloat(localStorage.getItem('lineHeight'));
+  if(lh) document.documentElement.style.setProperty('--lh-user',lh);
 })();
 </script>
 <link rel="stylesheet" href="reader.css">
@@ -25,6 +27,7 @@
 .skeleton.p.xshort{width:40%}
 @keyframes skeleton-pulse{0%,100%{opacity:1}50%{opacity:.5}}
 </style>
+<base target="_blank">
 <base target="_blank">
 </head>
 <body data-site="">
@@ -48,6 +51,11 @@
         <input type="range" id="font-slider" min="0.75" max="1.5" step="0.05" value="1">
         <button type="button" class="font-btn" id="font-inc-btn" title="放大字体">A+</button>
       </div>
+      <div class="lh-control">
+        <button type="button" class="font-btn" id="lh-dec-btn" title="缩小行高">↕−</button>
+        <input type="range" id="lh-slider" min="1.4" max="2.6" step="0.1" value="2.0">
+        <button type="button" class="font-btn" id="lh-inc-btn" title="放大行高">↕+</button>
+      </div>
       <button type="button" class="clean-btn" id="remember-btn" title="记忆阅读位置">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
       </button>
@@ -68,6 +76,13 @@
     <button type="button" class="stepper" id="mobile-font-dec">−</button>
     <input type="range" id="mobile-font-slider" min="0.75" max="1.5" step="0.05" value="1">
     <button type="button" class="stepper" id="mobile-font-inc">+</button>
+  </div>
+  <div class="dropdown__rule"></div>
+  <div class="dropdown__label">行高调整</div>
+  <div class="dropdown__row">
+    <button type="button" class="stepper" id="mobile-lh-dec">−</button>
+    <input type="range" id="mobile-lh-slider" min="1.4" max="2.6" step="0.1" value="2.0">
+    <button type="button" class="stepper" id="mobile-lh-inc">+</button>
   </div>
   <div class="dropdown__rule"></div>
   <div class="dropdown__item" id="mobile-remember">

@@ -4,6 +4,7 @@
 
     const state = {
         fs: parseFloat(localStorage.fontSize) || 1,
+        lh: parseFloat(localStorage.lineHeight) || 2.0,
         rs: localStorage.rememberScroll !== 'false',
         mob: innerWidth < 768
     };
@@ -70,6 +71,24 @@
                 localStorage.setItem('fontSize', s);
             };
             setFont(state.fs);
+
+            // Line-height control
+            const lhSlider = $('#lh-slider');
+            const mobileLhSlider = $('#mobile-lh-slider');
+            const setLineHeight = v => {
+                v = Math.max(1.4, Math.min(2.6, Math.round(v * 10) / 10));
+                state.lh = v;
+                document.documentElement.style.setProperty('--lh-user', v);
+                [lhSlider, mobileLhSlider].forEach(el => { if (el) el.value = v; });
+                localStorage.setItem('lineHeight', v);
+            };
+            setLineHeight(state.lh);
+
+            [['#lh-dec-btn', '#mobile-lh-dec', -0.1], ['#lh-inc-btn', '#mobile-lh-inc', 0.1]].forEach(([d, m, delta]) => {
+                $(d)?.addEventListener('click', () => setLineHeight(state.lh + delta));
+                $(m)?.addEventListener('click', () => setLineHeight(state.lh + delta));
+            });
+            [lhSlider, mobileLhSlider].forEach(s => s?.addEventListener('input', e => setLineHeight(parseFloat(e.target.value))));
 
             [['#font-dec-btn', '#mobile-font-dec', -0.05], ['#font-inc-btn', '#mobile-font-inc', 0.05]].forEach(([d, m, delta]) => {
                 $(d)?.addEventListener('click', () => setFont(state.fs + delta));

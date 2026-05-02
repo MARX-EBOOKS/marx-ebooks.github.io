@@ -1,6 +1,6 @@
-// 极简 SPA 阅读器 —— 壳子对齐 SSG reader.css
 const state = {
     fs: parseFloat(localStorage.fontSize) || 1,
+    lh: parseFloat(localStorage.lineHeight) || 2.0,
     rs: localStorage.rememberScroll !== 'false',
     sb: false,
     th: localStorage.theme || 'light',
@@ -9,51 +9,7 @@ const state = {
     tocScrollHandler: null
 };
 
-const $ = s => document.querySelector(s);
-const $$ = s => [...document.querySelectorAll(s)];
-const on = (t, e, f) => t && t.addEventListener(e, f);
-const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-// ── Range slider fill sync ──
-function syncFill(el) {
-    const min = parseFloat(el.min) || 0;
-    const max = parseFloat(el.max) || 100;
-    const val = parseFloat(el.value) || 0;
-    const pct = ((val - min) / (max - min) * 100).toFixed(2) + '%';
-    el.style.setProperty('--_fill', pct);
-}
-
-const resolveUrl = href => { try { return new URL(href, location.href).href; } catch { return location.pathname.replace(/[^/]*$/, '') + href; } };
-
-// ── 文集匹配 ──
-function findCollection(path) {
-    const norm = path.replace(/^\//, '');
-    return window.LIBRARY_CONFIG?.find(c => norm.startsWith((c.basePath || `/${c.id}/`).replace(/^\//, '')));
-}
-
-// ── 初始化 ──
-on(document, 'DOMContentLoaded', () => {
-    // 确保侧边栏类名存在（兼容旧 HTML）
-    const sidebar = $('#lsidebar');
-    if (sidebar && !sidebar.classList.contains('doc-sidebar')) sidebar.classList.add('doc-sidebar');
-
-    applyTheme(state.th);
-    applyFont(state.fs, false);
-    window.__NAV__ = new MenuManager();
-    window.__NAV__.init();
-    buildWelcomeCards();
-
-    const d = new URLSearchParams(location.search).get('doc');
-    if (d) {
-        loadDoc(d);
-    } else {
-        $('#welcome-view').style.display = 'block';
-        $('#article-view').style.display = 'none';
-    }
-    bindEvents();
-    handleResize();
-});
-
-// ── 主题 / 字体 ──
+// ── 主题 / 字体 / 行高 ──
 function applyTheme(t) {
     document.documentElement.dataset.theme = t;
     localStorage.theme = t;
@@ -67,169 +23,20 @@ function applyFont(s, save) {
     state.fs = s;
     document.documentElement.style.setProperty('--fs-user', Math.round(16 * s) + 'px');
     if (save) localStorage.setItem('fontSize', s);
-    $$('#font-slider, #mobile-font-slider').forEach(el => {
-        if (el) {
-            el.value = s;
-            syncFill(el);
-        }
+    ['#font-slider', '#mobile-font-slider'].forEach(sel => {
+        const el = document.querySelector(sel);
+        if (el) { el.value = s; syncFill(el); }
     });
 }
 
-// ── 导航树（简单手风琴，类名对齐 reader.css） ──
-function buildNav() {
-    const tree = $('#nav-tree');
-    tree.innerHTML = '<ul class="sidebar-menu"></ul>';
-    const root = tree.querySelector('.sidebar-menu');
-
-    LIBRARY_CONFIG.forEach(col => {
-        const hasGroups = (col.groups || []).length > 0;
-        const colPath = (col.path || '').replace(/^\//, '');
-        const isExt = colPath.startsWith('http');
-
-        // 无 groups 但有 path → 直接渲染为链接
-        if (!hasGroups && colPath) {
-            const li = document.createElement('li');
-            li.className = 'sidebar-item';
-            const badge = col.badge ? ` <span class="sidebar-badge">${esc(col.badge)}</span>` : '';
-            const href = isExt ? col.path : `?doc=${esc(colPath)}`;
-            li.innerHTML = `<a href="${esc(href)}"${isExt ? ' target="_blank" rel="noopener"' : ''} data-path="${esc('/' + colPath)}" class="sidebar-link">${esc(col.label)}${badge}</a>`;
-            const a = li.querySelector('a');
-            if (!isExt) {
-                a.addEventListener('click', ev => {
-                    ev.preventDefault();
-                    history.pushState({}, '', a.href);
-                    loadDoc(colPath);
-                    updateNavActive(colPath);
-                    if (innerWidth < 997) closeSidebar();
-                });
-            }
-            root.appendChild(li);
-            return;
-        }
-
-        // 无 groups 也无 path → 纯文本 label
-        if (!hasGroups && !colPath) {
-            const li = document.createElement('li');
-            li.className = 'sidebar-item';
-            const badge = col.badge ? ` <span class="sidebar-badge">${esc(col.badge)}</span>` : '';
-            li.innerHTML = `<span class="sidebar-category-label">${esc(col.label)}${badge}</span>`;
-            root.appendChild(li);
-            return;
-        }
-
-        // 有 groups → 可折叠结构
-        const li = document.createElement('li');
-        li.className = 'sidebar-item sidebar-item--category sidebar-item--collapsible';
-        li.dataset.collapsed = 'true';
-        li.dataset.section = col.id;
-
-        const badge = col.badge ? ` <span class="sidebar-badge">${esc(col.badge)}</span>` : '';
-        li.innerHTML = `
-          <div class="sidebar-item-row">
-            <span class="sidebar-category-label">${esc(col.label)}${badge}</span>
-            <button class="sidebar-caret" type="button" aria-label="Expand" tabindex="0">\u25b8</button>
-          </div>`;
-
-        const row = li.querySelector('.sidebar-item-row');
-        const caret = li.querySelector('.sidebar-caret');
-
-        const toggle = (e) => {
-            e.stopPropagation();
-            const collapsed = li.getAttribute('data-collapsed') !== 'false';
-            li.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
-            caret.textContent = collapsed ? '\u25be' : '\u25b8';
-
-            if (collapsed && !li.dataset.loaded && hasGroups) {
-                const nested = document.createElement('ul');
-                nested.className = 'sidebar-menu sidebar-menu--nested';
-                col.groups.forEach(g => {
-                    const hasItems = (g.items || []).length > 0;
-                    const groupPath = (g.path || '').replace(/^\//, '');
-                    const isExt = groupPath.startsWith('http');
-
-                    // Case 1: no items but has path → render as direct link
-                    if (!hasItems && groupPath) {
-                        const gLi = document.createElement('li');
-                        gLi.className = 'sidebar-item';
-                        const href = isExt ? g.path : `?doc=${esc(groupPath)}`;
-                        gLi.innerHTML = `<a href="${esc(href)}"${isExt ? ' target="_blank" rel="noopener"' : ''} data-path="${esc('/' + groupPath)}" class="sidebar-link">${esc(g.label)}</a>`;
-                        const a = gLi.querySelector('a');
-                        if (!isExt) {
-                            a.addEventListener('click', ev => {
-                                ev.preventDefault();
-                                history.pushState({}, '', a.href);
-                                loadDoc(groupPath);
-                                updateNavActive(groupPath);
-                                if (innerWidth < 997) closeSidebar();
-                            });
-                        }
-                        nested.appendChild(gLi);
-                        return;
-                    }
-
-                    // Case 2: no items and no path → render as plain text label
-                    if (!hasItems && !groupPath) {
-                        const gLi = document.createElement('li');
-                        gLi.className = 'sidebar-item';
-                        gLi.innerHTML = `<span class="sidebar-category-label">${esc(g.label)}</span>`;
-                        nested.appendChild(gLi);
-                        return;
-                    }
-
-                    // Case 3: has items → collapsible structure
-                    const gLi = document.createElement('li');
-                    gLi.className = 'sidebar-item sidebar-item--category sidebar-item--collapsible';
-                    gLi.dataset.collapsed = 'true';
-                    gLi.innerHTML = `
-                      <div class="sidebar-item-row">
-                        <span class="sidebar-category-label">${esc(g.label)}</span>
-                        <button class="sidebar-caret" type="button" aria-label="Expand" tabindex="0">\u25b8</button>
-                      </div>`;
-                    const items = document.createElement('ul');
-                    items.className = 'sidebar-menu sidebar-menu--nested';
-                    (g.items || []).forEach(x => {
-                        const path = (x.path || '').replace(/^\//, '');
-                        const iLi = document.createElement('li');
-                        iLi.className = 'sidebar-item';
-                        iLi.innerHTML = `<a href="?doc=${esc(path)}" data-path="${esc(path)}" class="sidebar-link">${esc(x.label || x.title || '')}</a>`;
-                        const a = iLi.querySelector('a');
-                        a.addEventListener('click', ev => {
-                            ev.preventDefault();
-                            history.pushState({}, '', a.href);
-                            loadDoc(path);
-                            updateNavActive(path);
-                            if (innerWidth < 997) closeSidebar();
-                        });
-                        items.appendChild(iLi);
-                    });
-                    gLi.appendChild(items);
-
-                    const gRow = gLi.querySelector('.sidebar-item-row');
-                    const gCaret = gLi.querySelector('.sidebar-caret');
-                    const gToggle = (ev) => {
-                        ev.stopPropagation();
-                        const gCol = gLi.getAttribute('data-collapsed') !== 'false';
-                        gLi.setAttribute('data-collapsed', gCol ? 'false' : 'true');
-                        gCaret.textContent = gCol ? '\u25be' : '\u25b8';
-                    };
-                    gRow.addEventListener('click', gToggle);
-                    gCaret.addEventListener('click', gToggle);
-                    gCaret.addEventListener('keydown', ev => {
-                        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); gToggle(ev); }
-                    });
-                    nested.appendChild(gLi);
-                });
-                li.appendChild(nested);
-                li.dataset.loaded = 'true';
-            }
-        };
-
-        row.addEventListener('click', toggle);
-        caret.addEventListener('click', toggle);
-        caret.addEventListener('keydown', ev => {
-            if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(ev); }
-        });
-        root.appendChild(li);
+function applyLineHeight(v, save) {
+    v = Math.max(1.4, Math.min(2.6, Math.round(v * 10) / 10));
+    state.lh = v;
+    document.documentElement.style.setProperty('--lh-user', v);
+    if (save) localStorage.setItem('lineHeight', v);
+    ['#lh-slider', '#mobile-lh-slider'].forEach(sel => {
+        const el = document.querySelector(sel);
+        if (el) { el.value = v; syncFill(el); }
     });
 }
 
@@ -272,52 +79,27 @@ function applySidebar() {
     const sidebar = $('#lsidebar');
     const backdrop = $('#sidebar-backdrop');
     if (!sidebar) return;
-    // 强制确保基础 CSS 类存在（HTML 可能未写）
     if (!sidebar.classList.contains('doc-sidebar')) sidebar.classList.add('doc-sidebar');
 
     const isMobile = innerWidth < 997;
     if (isMobile) {
-        // 同时兼容旧版 .open 和 SSG 版 .doc-sidebar--open
         sidebar.classList.toggle('open', state.sb);
         sidebar.classList.toggle('doc-sidebar--open', state.sb);
-        // 防御性修复：关闭 sidebar 时禁用 pointer-events，防止其不可见区域
-        //（transform 移出屏幕后）拦截 navbar 的汉堡按钮点击
         sidebar.style.pointerEvents = state.sb ? 'auto' : 'none';
         backdrop && backdrop.classList.toggle('visible', state.sb);
         backdrop && backdrop.classList.toggle('sidebar-overlay--visible', state.sb);
-        // 注意：不设置 body.style.overflow，避免 iOS Safari 等浏览器中
-        // overflow:hidden 导致 position:fixed 元素定位异常（需滚回顶部才可见）
     } else {
-        sidebar.classList.remove('open');
-        sidebar.classList.remove('doc-sidebar--open');
+        sidebar.classList.remove('open', 'doc-sidebar--open');
         sidebar.style.pointerEvents = '';
-        backdrop && backdrop.classList.remove('visible');
-        backdrop && backdrop.classList.remove('sidebar-overlay--visible');
+        backdrop && backdrop.classList.remove('visible', 'sidebar-overlay--visible');
     }
 }
 
 function handleResize() {
     const was = state.mob;
     state.mob = innerWidth < 768;
-    if (was !== state.mob) {
-        $('#mobile-menu')?.classList.remove('dropdown--open');
-    }
+    if (was !== state.mob) $('#mobile-menu')?.classList.remove('dropdown--open');
     applySidebar();
-}
-
-// ── CSS 路径解析 ──
-function resolveCssHref(href, base) {
-    if (/^https?:\/\//.test(href) || href.startsWith('//')) return href;
-    if (href.startsWith('/')) return href.slice(1);
-    try {
-        const dir = base.endsWith('/') ? base : base + '/';
-        const resolved = new URL(href, location.origin + '/' + dir);
-        return resolved.pathname.replace(/^\//, '');
-    } catch (e) {
-        const cleanBase = base.replace(/^\//, '').replace(/\/$/, '');
-        const cleanHref = href.replace(/^\.+\//, '');
-        return cleanBase ? cleanBase + '/' + cleanHref : cleanHref;
-    }
 }
 
 // ── 文档加载 ──
@@ -411,8 +193,7 @@ function renderDoc(h, path) {
     c.innerHTML = d.body.innerHTML;
 
     c.querySelectorAll('a[name]').forEach(a => {
-        if (a.parentElement && !a.parentElement.id)
-            a.parentElement.id = a.getAttribute('name');
+        if (a.parentElement && !a.parentElement.id) a.parentElement.id = a.getAttribute('name');
     });
 
     const skip = new Set(['Karl Marx', 'Friedrich Engels', 'Karl Marx/Friedrich Engels']);
@@ -432,8 +213,7 @@ function renderDoc(h, path) {
     fixOverflow(c);
 
     if (location.hash) {
-        const el = document.getElementById(location.hash.slice(1)) ||
-            document.querySelector(`[name="${location.hash.slice(1)}"]`);
+        const el = document.getElementById(location.hash.slice(1)) || document.querySelector(`[name="${location.hash.slice(1)}"]`);
         el && scrollToEl(el);
     } else if (state.rs) {
         const s = localStorage.getItem('scroll_' + path);
@@ -466,58 +246,6 @@ function updateBreadcrumb(path, title) {
     bar.innerHTML = parts.join('');
 }
 
-// ── 桌面端 TOC（右侧栏） ──
-function buildTocDesktop(container) {
-    const nav = $('#toc-desktop-nav');
-    const wrap = $('#toc-desktop');
-    nav.innerHTML = '';
-
-    const hs = Array.from(container.querySelectorAll('h1[id],h2[id],h3[id],h4[id],h5[id],h6[id]'));
-    if (!hs.length) { wrap.style.display = 'none'; return; }
-
-    wrap.style.display = '';
-    let html = '<div class="theme-doc-toc-desktop-header">On this page</div>';
-    html += '<ul class="theme-doc-toc-desktop-list">';
-    hs.forEach(h => {
-        const lvl = parseInt(h.tagName[1]);
-        const cls = 'theme-doc-toc-desktop-link theme-doc-toc-desktop-link--lvl' + (lvl - 1);
-        html += `<li class="${esc(cls)}"><a href="#${esc(h.id)}" class="theme-doc-toc-desktop-link__a">${esc(h.textContent.replace(/#/, '').trim())}</a></li>`;
-    });
-    html += '</ul>';
-    nav.innerHTML = html;
-
-    if (state.tocScrollHandler) window.removeEventListener('scroll', state.tocScrollHandler, { passive: true });
-    let lastId = null;
-    const onScroll = () => {
-        let activeId = null;
-        for (let i = hs.length - 1; i >= 0; i--) {
-            if (hs[i].getBoundingClientRect().top <= 200) { activeId = hs[i].id; break; }
-        }
-        if (!activeId && hs.length) activeId = hs[0].id;
-        if (activeId && activeId !== lastId) {
-            lastId = activeId;
-            nav.querySelectorAll('.theme-doc-toc-desktop-link__a').forEach(a => a.classList.remove('theme-doc-toc-desktop-link__a--active'));
-            const match = nav.querySelector(`a[href="#${CSS.escape(activeId)}"]`);
-            if (match) match.classList.add('theme-doc-toc-desktop-link__a--active');
-        }
-    };
-    state.tocScrollHandler = onScroll;
-    window.addEventListener('scroll', onScroll, { passive: true });
-    requestAnimationFrame(onScroll);
-
-    nav.querySelectorAll('a').forEach(a => {
-        a.addEventListener('click', e => {
-            e.preventDefault();
-            const id = a.getAttribute('href').slice(1);
-            const el = document.getElementById(id);
-            if (el) {
-                el.scrollIntoView({ behavior: 'smooth' });
-                history.replaceState(null, '', location.pathname + location.search + '#' + id);
-            }
-        });
-    });
-}
-
 function fixOverflow(c) {
     requestAnimationFrame(() => {
         c.querySelectorAll('table').forEach(t => {
@@ -541,14 +269,6 @@ function fixOverflow(c) {
     });
 }
 
-function scrollToEl(el) {
-    window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + scrollY - 80), behavior: 'smooth' });
-}
-
-function updateNavActive(p) {
-    $$('.sidebar-link').forEach(a => a.classList.toggle('sidebar-link--active', a.dataset.path === p));
-}
-
 function showError(p, m) {
     $('#content').innerHTML = `<p style="color:var(--text-2);padding:40px 0;">无法加载 <code>${esc(p)}</code><br><small>${esc(m)}</small></p>`;
     $('#content').style.display = 'block';
@@ -558,17 +278,10 @@ function showError(p, m) {
 // ── 前后篇导航 ──
 const mf = {};
 
-async function getM(dir) {
+async function fetchManifest(dir) {
     if (mf[dir]) return mf[dir];
-    const base = (dir.startsWith('/') ? dir : '/' + dir).replace(/\/?$/, '/');
-    const vol = base.replace(/\/$/, '').split('/').pop();
-    for (const name of ['index.json', `index${vol}.json`, `/${vol}/index.json`]) {
-        try {
-            const r = await fetch(base + name.replace(/^\//, ''));
-            if (r.ok) return (mf[dir] = await r.json());
-        } catch { }
-    }
-    return null;
+    const data = await fetchVolData(dir.replace(/^\//, '').replace(/\/?$/, ''), mf);
+    return data;
 }
 
 function updatePrevNext(p) {
@@ -579,7 +292,7 @@ function updatePrevNext(p) {
     if (s === -1) return;
     const dir = p.slice(0, s + 1), file = p.slice(s + 1);
 
-    getM(dir).then(m => {
+    fetchManifest(dir).then(m => {
         if (!m || !Array.isArray(m)) return fallbackNav(dir, file, prev, next);
         const i = m.findIndex(x => x.file === file || x.path?.includes(file));
         if (i < 0) return fallbackNav(dir, file, prev, next);
@@ -628,7 +341,7 @@ function setupPaginationBtn(btn, path, title, dir) {
     };
 }
 
-// ── 脚注判定（纯 <sup> 包裹） ──
+// ── 脚注判定 ──
 function isFootnoteLink(a) {
     if (a.hasAttribute('data-fn-ref') || a.hasAttribute('data-fn-cross')) return true;
     const href = a.getAttribute('href') || '';
@@ -637,7 +350,7 @@ function isFootnoteLink(a) {
     return !!inSup;
 }
 
-// ── 脚注弹窗（先显示 loading，再异步加载；跨页 3s timeout） ──
+// ── 脚注弹窗 ──
 class FootnotePopup {
     constructor() {
         this.tip = $('#fn-tooltip');
@@ -659,21 +372,12 @@ class FootnotePopup {
         } else if (href.includes('#')) {
             targetId = href.slice(href.indexOf('#') + 1);
             const beforeHash = href.slice(0, href.indexOf('#'));
-            // SPA 路由格式 ?doc=path → 提取实际文件路径，避免 fetch 壳子 reader.html
-            if (beforeHash.startsWith('?doc=')) {
-                pageUrl = beforeHash.slice(5);
-            } else {
-                pageUrl = resolveUrl(beforeHash);
-            }
+            pageUrl = beforeHash.startsWith('?doc=') ? beforeHash.slice(5) : resolveUrl(beforeHash);
             isCross = true;
-        } else {
-            return;
-        }
+        } else return;
 
         this._trigger = a;
-
-        // 立即显示弹窗（loading），避免跨页 fetch 时"好几秒没反应"
-        this._renderLoading(isCross);
+        this._renderState('loading', isCross);
         this._position(e);
         this.tip.classList.add('popover--visible');
         this._active = true;
@@ -682,12 +386,8 @@ class FootnotePopup {
         window.addEventListener('scroll', this._reposition, { passive: true });
 
         const result = await this._resolveTarget(targetId, pageUrl, isCross);
-        if (!result) {
-            this._renderError(isCross);
-            return;
-        }
+        if (!result) { this._renderState('error', isCross); return; }
         this._render(result.block, href, isCross);
-        // 内容高度变化后重新定位，防止溢出视口
         requestAnimationFrame(() => this._position(e));
     }
 
@@ -709,36 +409,25 @@ class FootnotePopup {
             if (!target) return null;
             return { target, block: this._toBlock(target) };
         }
-
         const target = document.getElementById(targetId) || document.querySelector(`a[name="${CSS.escape(targetId)}"]`);
         if (!target) return null;
         return { target, block: this._toBlock(target) };
     }
 
-    // 优先返回包含 target 的最近块级元素，且位于 notes 容器内
     _toBlock(target) {
         const notes = '.fni, .footnote, .endnote, .fn, .note';
         const tag = target.tagName;
-
-        // 1. 自身就是合适的块级容器
         if (tag === 'LI' || tag === 'DD') return target;
         if ((tag === 'DIV' || tag === 'P') && target.closest(notes)) return target;
-
-        // 2. 向上找第一个 div/p/li/dd；
-        //    如果该元素自身就是 notes 容器，返回它（包含全部子内容）
-        //    如果它是 notes 的后代，返回它（比 notes 容器更精确）
         let el = target.parentElement;
         while (el && el !== document.body) {
             const t = el.tagName;
             if (t === 'DIV' || t === 'P' || t === 'LI' || t === 'DD') {
-                if (el.matches(notes)) return el;          // 例如 <div class="footnote">
-                if (el.closest(notes)) return el;            // 例如 <div> 嵌套在 <aside class="footnote"> 内
-                break;                                       // 找到块级元素但不在 notes 内，停止
+                if (el.matches(notes) || el.closest(notes)) return el;
+                break;
             }
             el = el.parentElement;
         }
-
-        // 3. 兜底：返回 notes 容器或 target 自身
         return target.closest(notes) || target.closest('li, dd') || target.closest('p, div') || target;
     }
 
@@ -760,16 +449,15 @@ class FootnotePopup {
         }
     }
 
-    _renderLoading(isCross) {
+    _renderState(type, isCross) {
         const viewer = this.tip.querySelector('.popover__body');
         if (!viewer) return;
-        viewer.innerHTML = `<div style="color:var(--text-3);font-size:13px;padding:4px 0;">${isCross ? '\u52a0\u8f7d\u8de8\u9875\u6ce8\u91ca\u4e2d\u2026' : '\u52a0\u8f7d\u4e2d\u2026'}</div>`;
-    }
-
-    _renderError(isCross) {
-        const viewer = this.tip.querySelector('.popover__body');
-        if (!viewer) return;
-        viewer.innerHTML = `<div style="color:var(--accent);font-size:13px;padding:4px 0;">${isCross ? '\u8de8\u9875\u6ce8\u91ca\u52a0\u8f7d\u5931\u8d25\uff08\u8d85\u65f6\u6216\u65e0\u6cd5\u8bbf\u95ee\uff09' : '\u672a\u627e\u5230\u5bf9\u5e94\u6ce8\u91ca'}</div>`;
+        const msgs = {
+            loading: { text: isCross ? '\u52a0\u8f7d\u8de8\u9875\u6ce8\u91ca\u4e2d\u2026' : '\u52a0\u8f7d\u4e2d\u2026', color: 'var(--text-3)' },
+            error: { text: isCross ? '\u8de8\u9875\u6ce8\u91ca\u52a0\u8f7d\u5931\u8d25\uff08\u8d85\u65f6\u6216\u65e0\u6cd5\u8bbf\u95ee\uff09' : '\u672a\u627e\u5230\u5bf9\u5e94\u6ce8\u91ca', color: 'var(--accent)' }
+        };
+        const m = msgs[type];
+        viewer.innerHTML = `<div style="color:${m.color};font-size:13px;padding:4px 0;">${m.text}</div>`;
     }
 
     _position(e) {
@@ -803,6 +491,22 @@ class FootnotePopup {
     forceClose() { if (this._active) this._doDismiss(); }
 }
 
+// ── 事件绑定辅助 ──
+function bindStepperGroup({ stateKey, applyFn, step, decIds, incIds, sliderIds }) {
+    const adjust = delta => applyFn(state[stateKey] + delta, true);
+    decIds.forEach(id => on($(id), 'click', () => adjust(-step)));
+    incIds.forEach(id => on($(id), 'click', () => adjust(step)));
+    sliderIds.forEach(id => on($(id), 'input', e => applyFn(parseFloat(e.target.value), true)));
+}
+
+function bindToggle({ btnIds, itemIds, getNext, apply }) {
+    const toggle = e => {
+        e?.stopPropagation();
+        apply(getNext());
+    };
+    btnIds.forEach(id => on($(id), 'click', toggle));
+    itemIds.forEach(id => on($(id), 'click', toggle));
+}
 
 // ── 事件绑定 ──
 function bindEvents() {
@@ -816,7 +520,6 @@ function bindEvents() {
         e.preventDefault();
         e.stopPropagation();
         const menu = $('#mobile-menu');
-        // 强制 fixed 定位：避免滚动后 absolute 定位被正文层叠上下文干扰
         menu.style.position = 'fixed';
         menu.style.top = 'calc(var(--nav-h) + 6px)';
         menu.classList.toggle('dropdown--open');
@@ -825,51 +528,32 @@ function bindEvents() {
     const toggleBtn = $('#mobile-menu-toggle');
     if (toggleBtn) {
         toggleBtn.addEventListener('click', toggleMobileMenu);
-        // touchend 兜底：部分移动端浏览器滚动后 click 事件丢失
-        toggleBtn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            toggleMobileMenu(e);
-        }, { passive: false });
+        toggleBtn.addEventListener('touchend', (e) => { e.preventDefault(); toggleMobileMenu(e); }, { passive: false });
     }
 
-    // 字号
-    const adj = d => applyFont(state.fs + d, true);
-    [['font-dec-btn', 'mobile-font-dec', -.05], ['font-inc-btn', 'mobile-font-inc', .05]].forEach(([a, b, d]) => {
-        const elA = document.getElementById(a);
-        const elB = document.getElementById(b);
-        if (elA) on(elA, 'click', () => adj(d));
-        if (elB) on(elB, 'click', () => adj(d));
+    bindStepperGroup({ stateKey: 'fs', applyFn: applyFont, step: 0.05, decIds: ['font-dec-btn', 'mobile-font-dec'], incIds: ['font-inc-btn', 'mobile-font-inc'], sliderIds: ['font-slider', 'mobile-font-slider'] });
+    bindStepperGroup({ stateKey: 'lh', applyFn: applyLineHeight, step: 0.1, decIds: ['lh-dec-btn', 'mobile-lh-dec'], incIds: ['lh-inc-btn', 'mobile-lh-inc'], sliderIds: ['lh-slider', 'mobile-lh-slider'] });
+
+    bindToggle({
+        btnIds: ['remember-btn'], itemIds: ['mobile-remember'],
+        getNext: () => !state.rs,
+        apply: (next) => {
+            state.rs = next;
+            localStorage.rememberScroll = next;
+            $('#remember-btn')?.classList.toggle('clean-btn--active', next);
+            setIndicator('#mobile-remember-indicator', next);
+            if (!next && state.doc) localStorage.removeItem('scroll_' + state.doc);
+        }
     });
-    ['font-slider', 'mobile-font-slider'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) on(el, 'input', e => applyFont(parseFloat(e.target.value), true));
+    bindToggle({
+        btnIds: ['theme-btn', 'sidebar-theme-btn'], itemIds: ['mobile-theme'],
+        getNext: () => document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark',
+        apply: (next) => {
+            applyTheme(next);
+            setIndicator('#mobile-theme-indicator', next === 'dark');
+        }
     });
 
-    // 记忆滚动
-    const toggleRemember = e => {
-        e?.stopPropagation();
-        state.rs = !state.rs;
-        localStorage.rememberScroll = state.rs;
-        $('#remember-btn')?.classList.toggle('clean-btn--active', state.rs);
-        setIndicator('#mobile-remember-indicator', state.rs);
-        if (!state.rs && state.doc) localStorage.removeItem('scroll_' + state.doc);
-    };
-
-    // 主题
-    const toggleTheme = e => {
-        e?.stopPropagation();
-        const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-        applyTheme(next);
-        setIndicator('#mobile-theme-indicator', next === 'dark');
-    };
-
-    on($('#remember-btn'), 'click', toggleRemember);
-    on($('#mobile-remember'), 'click', toggleRemember);
-    on($('#theme-btn'), 'click', toggleTheme);
-    on($('#sidebar-theme-btn'), 'click', toggleTheme);
-    on($('#mobile-theme'), 'click', toggleTheme);
-
-    // 窗口 / 历史 / 滚动
     on(window, 'resize', () => { clearTimeout(window.rt); window.rt = setTimeout(handleResize, 100); });
 
     on(window, 'popstate', () => {
@@ -884,8 +568,7 @@ function bindEvents() {
         } else if (d !== state.doc) {
             loadDoc(d);
         } else if (location.hash) {
-            const el = document.getElementById(location.hash.slice(1)) ||
-                document.querySelector(`[name="${location.hash.slice(1)}"]`);
+            const el = document.getElementById(location.hash.slice(1)) || document.querySelector(`[name="${location.hash.slice(1)}"]`);
             el && scrollToEl(el);
         }
     });
@@ -895,12 +578,9 @@ function bindEvents() {
         const bar = $('#progress-bar');
         if (bar) bar.style.width = (h > 0 ? (scrollY / h) * 100 : 0) + '%';
         clearTimeout(window.st);
-        window.st = setTimeout(() => {
-            if (state.rs && state.doc) localStorage.setItem('scroll_' + state.doc, scrollY);
-        }, 300);
+        window.st = setTimeout(() => { if (state.rs && state.doc) localStorage.setItem('scroll_' + state.doc, scrollY); }, 300);
     }, { passive: true });
 
-    // 全局点击：脚注 + 锚点 + 路由 + 关闭菜单
     on(document, 'click', e => {
         const a = e.target.closest('a');
         if (!a) {
@@ -910,7 +590,8 @@ function bindEvents() {
             return;
         }
 
-        // 0) 品牌链接 → 欢迎页（兼容无 .html 的入口，阻止整页刷新）
+        if (a.closest('#nav-tree') && innerWidth < 997) closeSidebar();
+
         if (a.classList.contains('navbar__logo') || a.classList.contains('doc-sidebar__brand')) {
             e.preventDefault();
             if ($('#welcome-view').style.display !== 'block') {
@@ -927,7 +608,6 @@ function bindEvents() {
             return;
         }
 
-        // 1) 脚注弹窗（最高优先级）
         if (isFootnoteLink(a)) {
             e.preventDefault();
             e.stopImmediatePropagation();
@@ -935,7 +615,6 @@ function bindEvents() {
             return;
         }
 
-        // 2) 文档内部锚点
         const href = a.getAttribute('href') || '';
         if (href.startsWith('#') && href.length > 1 && a.closest('#content')) {
             e.preventDefault();
@@ -944,7 +623,6 @@ function bindEvents() {
             return;
         }
 
-        // 3) SPA 路由拦截
         if (href.startsWith('?doc=')) {
             e.preventDefault();
             const docPath = href.slice(5).split('#')[0];
@@ -980,6 +658,34 @@ function setIndicator(sel, active) {
 function updateMobileMenuIndicators() {
     setIndicator('#mobile-remember-indicator', state.rs);
     setIndicator('#mobile-theme-indicator', document.documentElement.dataset.theme === 'dark');
-    const fs = $('#mobile-font-slider');
-    if (fs) fs.value = state.fs;
+    ['#mobile-font-slider'].forEach(sel => {
+        const el = document.querySelector(sel);
+        if (el) { el.value = state.fs; syncFill(el); }
+    });
+    ['#mobile-lh-slider'].forEach(sel => {
+        const el = document.querySelector(sel);
+        if (el) { el.value = state.lh; syncFill(el); }
+    });
 }
+
+// ── 初始化 ──
+on(document, 'DOMContentLoaded', () => {
+    const sidebar = $('#lsidebar');
+    if (sidebar && !sidebar.classList.contains('doc-sidebar')) sidebar.classList.add('doc-sidebar');
+
+    applyTheme(state.th);
+    applyFont(state.fs, false);
+    applyLineHeight(state.lh, false);
+    window.__NAV__ = new MenuManager();
+    window.__NAV__.init();
+    buildWelcomeCards();
+
+    const d = new URLSearchParams(location.search).get('doc');
+    if (d) loadDoc(d);
+    else {
+        $('#welcome-view').style.display = 'block';
+        $('#article-view').style.display = 'none';
+    }
+    bindEvents();
+    handleResize();
+});
