@@ -488,7 +488,7 @@ class VolumeIndexBuilder {
     for (const f of files) {
       for (const h of (f.headings || [])) {
         all.push({
-          text: h.text || '', level: h.level || 2,
+          text: h.text || '', level: h.level != null ? h.level : 2,
           file: h.filename || f.file || '', id: h.id || null
         });
       }
