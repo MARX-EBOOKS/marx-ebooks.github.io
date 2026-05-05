@@ -319,18 +319,21 @@
         return;
       }
 
-      // 移动端的原有逻辑
       const fallback = () => {
         const f = [...tree.querySelectorAll('.sidebar-link')].find(a => (a.dataset.file || '').replace(/\.html$/i, '') === curFile && !a.dataset.id);
         if (f) { f.classList.add('sidebar-link--active'); this._expandTo(f, tree); return; }
         const cand = [...tree.querySelectorAll('.sidebar-link')].filter(a => (a.dataset.file || '').replace(/\.html$/i, '') === curFile && a.dataset.id);
         if (cand.length) { cand[cand.length - 1].classList.add('sidebar-link--active'); this._expandTo(cand[cand.length - 1], tree); }
       };
-
+      const curFile = location.pathname.split('/').pop().replace(/\.html$/i, '');
       if (!id) { fallback(); return; }
-      const match = tree.querySelector(`.sidebar-link[data-id="${id}"]`);
-      if (match) { match.classList.add('sidebar-link--active'); this._expandTo(match, tree); }
-      else fallback();
+      const match = tree.querySelector(`.sidebar-link[data-file="${curFile}"][data-id="${id}"]`);
+      if (match) {
+        match.classList.add('sidebar-link--active');
+        this._expandTo(match, tree);
+      } else {
+        fallback();
+      }
     }
 
     _updateTocRailTracking(id) {
