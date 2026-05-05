@@ -243,7 +243,9 @@ function updateBreadcrumb(path, title) {
         parts.push(`<span class="crumb">${esc(pts[0])}</span>`);
     }
     for (let i = 1; i < pts.length - 1; i++) {
-        parts.push(`<span class="crumb-sep">/</span><span class="crumb">${esc(pts[i])}</span>`);
+        const subPath = pts.slice(0, i + 1).join('/').replace(/^\//, '');
+        parts.push(`<span class="crumb-sep">/</span>`);
+        parts.push(`<a class="crumb" href="?doc=${esc(subPath)}">${esc(pts[i])}</a>`);
     }
     const file = pts[pts.length - 1];
     if (file) parts.push(`<span class="crumb-sep">/</span><span class="crumb crumb--active">${esc(file)}</span>`);

@@ -188,7 +188,6 @@ class MenuManager {
         // 当前文件标题<=1时，左侧栏不渲染本页菜单，直接回退到全库菜单
         const currentFile = (docPath || '').split('/').pop().replace(/\.html$/i, '');
         const fileHeadings = (data.headings || []).filter(h => (h.file || '').replace(/\.html$/i, '') === currentFile);
-        if (fileHeadings.length <= 1) { this._forceLibmap(); return; }
 
         const volTitle = item.label || item.title || data.title || 'Contents';
         const volHref = item.path || (dir + '/index.html');
@@ -556,8 +555,16 @@ class MenuManager {
 
         let match = tree.querySelector(`.sidebar-link[data-id="${CSS.escape(id)}"]`);
         if (!match) {
-            const candidates = links.filter(a => (a.dataset.file || '').replace(/\.html$/i, '') === currentFile && a.dataset.id);
-            if (candidates.length) match = candidates[candidates.length - 1];
+            const fileLink = links.find(a =>
+                (a.dataset.file || '').replace(/\.html$/i, '') === currentFile && !a.dataset.id
+            );
+            match = fileLink;
+            if (!match) {
+                const candidates = links.filter(a =>
+                    (a.dataset.file || '').replace(/\.html$/i, '') === currentFile && a.dataset.id
+                );
+                if (candidates.length) match = candidates[candidates.length - 1];
+            }
         }
         if (match) { match.classList.add('sidebar-link--active'); expandTo(match, tree); }
     }
