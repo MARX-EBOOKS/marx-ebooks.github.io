@@ -652,11 +652,11 @@ input[type="range"]:focus::-webkit-slider-thumb {
 .breadcrumb a:link,
 .breadcrumb a:visited {
   font-weight: 500;
-  color: var(--text-3) !important;
+  color: var(--accent) !important;
 }
 .breadcrumb a:hover {
   border-bottom-color: var(--link-hover) !important;
-  color: var(--accent) !important;
+  color: var(--accent-2) !important;
 }
 
 .breadcrumb__sep {
@@ -1287,7 +1287,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   transition: max-height 250ms ease;
   width: 100%;
   padding-left: 27px;      /* 原 16px + 原 margin-left 11px */
-  border-left: 2px solid var(--accent-border);
+  border-left: 1px solid var(--border);
   margin-left: 0;
   box-sizing: border-box;
 }
