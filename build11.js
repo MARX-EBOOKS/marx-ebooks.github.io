@@ -160,7 +160,7 @@ class FileScanner {
 
       if (ent.isDirectory()) {
         yield* this.scan(relPath, copyMode || this.pm.isCopyOnly(relPath));
-      } else if (ent.isFile() && !this.SKIP_FILES.has(ent.name)) {
+      } else if (ent.isFile() && (copyMode || !this.SKIP_FILES.has(ent.name))) {
         yield {
           type: copyMode || this.pm.isCopyOnly(relPath) || !/\.html?$/i.test(ent.name) ? 'copy' : 'render',
           path: relPath, fullPath
