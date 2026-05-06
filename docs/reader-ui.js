@@ -298,61 +298,114 @@ function updatePrevNext(p) {
     const prev = $('#prev-btn'), next = $('#next-btn');
     prev.style.display = next.style.display = 'none';
 
+    // ── 1. 解析路径 ──
+    let dir = '', file = p;
     const s = p.lastIndexOf('/');
-    if (s === -1) return;
-    const dir = p.slice(0, s + 1), file = p.slice(s + 1);
+    if (s !== -1) {
+        dir = p.slice(0, s + 1);
+        file = p.slice(s + 1);
+    } else {
+        // 无目录前缀时，尝试从集合配置推断
+        const col = findCollection(p);
+        if (col) {
+            const colPath = (col.path || col.basePath || '').replace(/^\//, '').replace(/\/$/, '');
+            if (colPath) dir = colPath + '/';
+        }
+    }
 
-    fetchManifest(dir).then(raw => {
-        // 支持 {files: [...]} 或 [...] 两种结构
-        let m = raw;
-        if (!Array.isArray(m) && Array.isArray(m?.files)) m = m.files;
-        if (!m || !Array.isArray(m)) return fallbackNav(dir, file, prev, next);
+    const cleanFile = file.replace(/\.html(?:#.*)?$/i, '');
+    const col = findCollection(p);
+    const colDir = col ? (col.path || col.basePath || '').replace(/^\//, '').replace(/\/$/, '') : '';
+    const currentDir = dir.replace(/^\//, '').replace(/\/$/, '');
+    const pageDir = location.pathname.split('/').slice(1, -1).join('/');
 
-        // 有 index.json 时优先使用，不再 fallback 到编号加减一
-        const cleanFile = file.replace(/\.html$/i, '');
+    // ── 2. 候选 manifest 目录（去重） ──
+    const candidates = [];
+    const addCandidate = d => { if (d && !candidates.includes(d)) candidates.push(d); };
+    addCandidate(currentDir);   // 当前文件所在目录
+    addCandidate(colDir);       // 集合配置目录
+    addCandidate(pageDir);      // 当前页面所在目录
+
+    // ── 3. 顺序尝试加载 manifest，成功即停 ──
+    let chain = Promise.resolve(null);
+    for (const d of candidates) {
+        chain = chain.then(async result => {
+            if (result) return result;
+            try {
+                const raw = await fetchManifest(d);
+                if (raw && (Array.isArray(raw) || Array.isArray(raw?.files))) {
+                    return {
+                        data: Array.isArray(raw) ? raw : raw.files,
+                        manifestDir: d
+                    };
+                }
+            } catch (e) { }
+            return null;
+        });
+    }
+
+    // ── 4. 处理 manifest ──
+    chain.then(result => {
+        if (!result || !result.data?.length) return fallbackNav(dir, file, prev, next);
+
+        const m = result.data;
+        const manifestDir = result.manifestDir;
+
+        // 在 manifest 中查找当前文件（支持 basename 匹配，忽略 .html 和 #hash）
         let i = m.findIndex(x => {
             const f = x.file || x.path || x.url || x.filename || '';
-            const cleanF = f.replace(/\.html$/i, '');
-            return f === file || cleanF === cleanFile;
+            const src = x.source_file || x.filename || '';
+            const cleanF = f.replace(/\.html(?:#.*)?$/i, '');
+            const cleanSrc = src.replace(/\.html(?:#.*)?$/i, '');
+            const fBase = f.split('/').pop().replace(/\.html(?:#.*)?$/i, '');
+            const srcBase = src.split('/').pop().replace(/\.html(?:#.*)?$/i, '');
+
+            return f === p || f === file || cleanF === cleanFile ||
+                fBase === cleanFile || srcBase === cleanFile ||
+                cleanSrc === cleanFile;
         });
 
         // 第二遍：宽松子串匹配
         if (i < 0) {
             i = m.findIndex(x => {
                 const f = x.file || x.path || x.url || x.filename || '';
-                return f.includes(file) || file.includes(f.replace(/\.html$/i, ''));
+                const src = x.source_file || x.filename || '';
+                return f.includes(file) || file.includes(f.replace(/\.html(?:#.*)?$/i, '')) ||
+                    src.includes(file) || file.includes(src.replace(/\.html(?:#.*)?$/i, ''));
             });
         }
 
+        // 生成路径：相对路径保留；纯文件名用 manifest 所在目录拼接
         const makePath = item => {
             const f = item.file || item.path || item.url || item.filename || '';
             if (f.startsWith('http')) return f;
             if (f.startsWith('/')) return f.slice(1);
-            // 如果 f 已经包含斜杠（相对路径或绝对路径），直接返回
             if (f.includes('/')) return f;
-            return dir + f;
+            if (manifestDir) return manifestDir + '/' + f;
+            return f;
         };
 
         if (i >= 0) {
-            // 精确匹配成功，直接取前后相邻条目
+            // 有 index.json 时优先使用，不再 fallback 到编号加减一
             if (i > 0) setupPaginationBtn(prev, makePath(m[i - 1]), m[i - 1].title, 'prev');
             if (i < m.length - 1) setupPaginationBtn(next, makePath(m[i + 1]), m[i + 1].title, 'next');
             return;
         }
 
-        // index.json 存在但匹配不到当前文件：按文件名排序找邻居，不再 fallbackNav
+        // index.json 存在但匹配不到当前文件：按文件名排序找邻居
         console.warn('[PrevNext] index.json loaded but no exact match for', file, '; trying sorted neighbors');
         const entries = m.map(x => ({
             file: x.file || x.path || x.url || x.filename || '',
             title: x.title,
-            clean: (x.file || x.path || x.url || x.filename || '').replace(/\.html$/i, '')
+            clean: (x.file || x.path || x.url || x.filename || '').replace(/\.html(?:#.*)?$/i, '')
         })).filter(x => x.file);
 
-        if (!entries.length) return;
+        if (!entries.length) return fallbackNav(dir, file, prev, next);
+
         entries.sort((a, b) => a.clean.localeCompare(b.clean, undefined, { numeric: true }));
 
         const pos = entries.findIndex(e => e.clean === cleanFile || e.file.includes(file) || file.includes(e.clean));
-        if (pos < 0) return;
+        if (pos < 0) return fallbackNav(dir, file, prev, next);
 
         if (pos > 0) setupPaginationBtn(prev, makePath(entries[pos - 1]), entries[pos - 1].title, 'prev');
         if (pos < entries.length - 1) setupPaginationBtn(next, makePath(entries[pos + 1]), entries[pos + 1].title, 'next');
@@ -360,7 +413,8 @@ function updatePrevNext(p) {
 }
 
 function fallbackNav(dir, file, prev, next) {
-    const m = file.match(/^(.*?)(\d+)(\.[^.]+)$/);
+    const baseFile = file.split('#')[0];
+    const m = baseFile.match(/^(.*?)(\d+)(\.[^.]+)$/);
     if (!m) return;
     const [, prefix, num, ext] = m, pad = num.length;
     const make = n => dir + prefix + String(n).padStart(pad, '0') + ext;
@@ -370,8 +424,9 @@ function fallbackNav(dir, file, prev, next) {
             if (r.ok) setupPaginationBtn(btn, path, null, btn === prev ? 'prev' : 'next');
         } catch { }
     };
-    if (parseInt(num) > 1) tryBtn(prev, make(parseInt(num) - 1));
-    tryBtn(next, make(parseInt(num) + 1));
+    const n = parseInt(num);
+    if (n > 1) tryBtn(prev, make(n - 1));
+    tryBtn(next, make(n + 1));
 }
 
 function setupPaginationBtn(btn, path, title, dir) {
@@ -386,7 +441,8 @@ function setupPaginationBtn(btn, path, title, dir) {
     labelEl.title = title || '';
 
     if (!title) {
-        fetch(path).then(r => r.text()).then(h => {
+        const fetchPath = path.split('#')[0];
+        fetch(fetchPath).then(r => r.text()).then(h => {
             const t = new DOMParser().parseFromString(h, 'text/html').querySelector('title')?.textContent?.trim();
             if (t) { labelEl.textContent = truncate(t); labelEl.title = t; }
         }).catch(() => { });
@@ -398,7 +454,6 @@ function setupPaginationBtn(btn, path, title, dir) {
         loadDoc(path);
     };
 }
-
 // ── 脚注判定 ──
 function isFootnoteLink(a) {
     if (a.hasAttribute('data-fn-ref') || a.hasAttribute('data-fn-cross')) return true;
