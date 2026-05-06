@@ -40,7 +40,7 @@ function generateTemplate(opts) {
   const volPreload = hasVolIndex && volJsPath ? `<link rel="preload" href="${esc(volJsPath)}" as="fetch" crossorigin>` : '';
 
   return `<!DOCTYPE html>
-<html lang="zh" data-theme="light">
+<html lang="${esc(meta?.lang || 'zh')}" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
