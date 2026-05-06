@@ -287,52 +287,33 @@
       }
 
       const curFile = location.pathname.split('/').pop().replace(/\.html$/i, '') || 'index';
+      const allLinks = [...tree.querySelectorAll('.sidebar-link')];
+      let match = null;
 
-      if (innerWidth >= 997) {
-        // 桌面端智能高亮：判断当前文件在卷中是否为独立顶级章节
-        const fileHeadings = this._getPageHeadings();
-        const volHeadings = this._currentVol?.data?.headings || [];
-        const fileMinLevel = Math.min(...volHeadings.filter(h => (h.file || '').replace(/\.html$/i, '') === curFile).map(h => h.level));
-        const firstLevel = fileHeadings[0]?.level;
-        const isTopChapter = firstLevel === fileMinLevel;   // 当前文件的第一标题层级等于该文件在卷中的最浅层级
-
-        if (isTopChapter) {
-          // 只高亮文件入口链接（不展开子目录）
-          const fileLink = [...tree.querySelectorAll('.sidebar-link')].find(a => (a.dataset.file || '').replace(/\.html$/i, '') === curFile);
-          if (fileLink) {
-            fileLink.classList.add('sidebar-link--active');
-            this._expandTo(fileLink, tree);
-          }
-        } else {
-          // 高亮具体标题链接
-          const targetId = fileHeadings[0]?.id || id;
-          const match = tree.querySelector(`.sidebar-link[data-id="${targetId}"]`);
-          if (match) {
-            match.classList.add('sidebar-link--active');
-            this._expandTo(match, tree);
-          } else {
-            // 回退到文件链接
-            const fileLink = [...tree.querySelectorAll('.sidebar-link')].find(a => (a.dataset.file || '').replace(/\.html$/i, '') === curFile);
-            if (fileLink) { fileLink.classList.add('sidebar-link--active'); this._expandTo(fileLink, tree); }
-          }
-        }
-        return;
+      // 1) 精确匹配：当前文件 + 当前 id（统一去掉 .html 比对，避免 data-file="MEW24-018.html" 与 curFile="MEW24-018" 不匹配）
+      if (id) {
+        match = allLinks.find(a =>
+          (a.dataset.file || '').replace(/\.html$/i, '') === curFile && a.dataset.id === id
+        );
       }
 
-      const fallback = () => {
-        const f = [...tree.querySelectorAll('.sidebar-link')].find(a => (a.dataset.file || '').replace(/\.html$/i, '') === curFile && !a.dataset.id);
-        if (f) { f.classList.add('sidebar-link--active'); this._expandTo(f, tree); return; }
-        const cand = [...tree.querySelectorAll('.sidebar-link')].filter(a => (a.dataset.file || '').replace(/\.html$/i, '') === curFile && a.dataset.id);
-        if (cand.length) { cand[cand.length - 1].classList.add('sidebar-link--active'); this._expandTo(cand[cand.length - 1], tree); }
-      };
-      const curFile = location.pathname.split('/').pop().replace(/\.html$/i, '');
-      if (!id) { fallback(); return; }
-      const match = tree.querySelector(`.sidebar-link[data-file="${curFile}"][data-id="${id}"]`);
+      // 2) fallback：当前文件的无 id 入口链接（对应 title heading 等）
+      if (!match) {
+        match = allLinks.find(a =>
+          (a.dataset.file || '').replace(/\.html$/i, '') === curFile && !a.dataset.id
+        );
+      }
+
+      // 3) 最终兜底：当前文件下任一链接
+      if (!match) {
+        match = allLinks.find(a =>
+          (a.dataset.file || '').replace(/\.html$/i, '') === curFile
+        );
+      }
+
       if (match) {
         match.classList.add('sidebar-link--active');
         this._expandTo(match, tree);
-      } else {
-        fallback();
       }
     }
 
@@ -492,43 +473,32 @@
 
     _highlightEpubCurrent() {
       const curFile = location.pathname.split('/').pop().replace(/\.html$/i, ''), hash = location.hash.slice(1);
-      const tree = this.navTree?.querySelector('.sidebar-menu'); if (!tree) return;
+      const tree = this.navTree?.querySelector('.sidebar-menu');
+      if (!tree) return;
 
-      if (innerWidth >= 997) {
-        // 桌面端智能高亮并聚焦
-        const fileHeadings = this._getPageHeadings();
-        const volHds = this._currentVol?.data?.headings || [];
-        const fileMinLevel = Math.min(...volHds.filter(h => (h.file || '').replace(/\.html$/i, '') === curFile).map(h => h.level));
-        const firstLevel = fileHeadings[0]?.level;
-        const isTop = firstLevel === fileMinLevel;
-
-        let el = null;
-        if (isTop) {
-          el = [...tree.querySelectorAll('.sidebar-link')].find(a => (a.dataset.file || '').replace(/\.html$/i, '') === curFile);
-        } else {
-          const id = fileHeadings[0]?.id || hash;
-          el = tree.querySelector(`.sidebar-link[data-id="${id}"]`);
-          if (!el) el = [...tree.querySelectorAll('.sidebar-link')].find(a => (a.dataset.file || '').replace(/\.html$/i, '') === curFile);
-        }
-
-        if (el) {
-          el.classList.add('sidebar-link--active');
-          this._expandTo(el, tree);
-          requestAnimationFrame(() => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
-        }
-        return;
-      }
-
-      // 移动端
       let best = null, bestScore = 0;
       tree.querySelectorAll('.sidebar-link').forEach(a => {
         const f = (a.dataset.file || '').replace(/\.html$/i, ''), id = a.dataset.id || '', href = a.getAttribute('href') || '';
         let score = 0;
-        if (f === curFile) { score = 1; if (id && id === hash) score = 3; else if (!id && !hash) score = 2; }
-        if (!f && href.startsWith('#') && hash && href.slice(1) === hash) score = 3;
+        // 优先匹配当前文件，再按精确度打分
+        if (f === curFile) {
+          if (id && id === hash) score = 5;   // 当前文件 + 精确 hash
+          else if (!id && !hash) score = 4;   // 当前文件入口
+          else if (id && !hash) score = 3;   // 当前文件子标题（无 hash 时）
+          else score = 2;   // 当前文件其他
+        } else if (!f && href.startsWith('#') && hash && href.slice(1) === hash) {
+          score = 1;                                   // 跨文件锚点（最低优先级）
+        }
         if (score > bestScore) { bestScore = score; best = a; }
       });
-      if (best) { best.classList.add('sidebar-link--active'); this._expandTo(best, tree); }
+
+      if (best) {
+        best.classList.add('sidebar-link--active');
+        this._expandTo(best, tree);
+        if (innerWidth >= 997) {
+          requestAnimationFrame(() => best.scrollIntoView({ block: 'center', behavior: 'instant' }));
+        }
+      }
     }
 
     _highlightPageTocCurrent() {
