@@ -534,38 +534,29 @@ class MenuManager {
         tree.querySelectorAll('.sidebar-link').forEach(a => a.classList.remove('sidebar-link--active'));
         const currentFile = (state.doc || '').split('/').pop().replace(/\.html$/i, '') || 'index';
         const links = [...tree.querySelectorAll('.sidebar-link')];
+        let match = null;
 
-        if (innerWidth >= 997) {
-            const first = links.find(a => (a.dataset.file || '').replace(/\.html$/i, '') === currentFile);
-            if (first) { first.classList.add('sidebar-link--active'); expandTo(first, tree); }
-            return;
+        // 1) 精确匹配：当前文件 + 当前 id（统一去掉 .html 比对，避免跨文件同名 id 误高亮）
+        if (id) {
+            match = links.find(a =>
+                (a.dataset.file || '').replace(/\.html$/i, '') === currentFile && a.dataset.id === id
+            );
         }
 
-        if (!id) {
-            const fileLink = links.find(a => (a.dataset.file || '').replace(/\.html$/i, '') === currentFile && !a.dataset.id);
-            if (fileLink) { fileLink.classList.add('sidebar-link--active'); expandTo(fileLink, tree); return; }
-            const candidates = links.filter(a => (a.dataset.file || '').replace(/\.html$/i, '') === currentFile && a.dataset.id);
-            if (candidates.length) {
-                const deepest = candidates[candidates.length - 1];
-                deepest.classList.add('sidebar-link--active');
-                expandTo(deepest, tree);
-            }
-            return;
-        }
-
-        let match = tree.querySelector(`.sidebar-link[data-id="${CSS.escape(id)}"]`);
+        // 2) fallback：当前文件的无 id 入口链接（对应 title heading 等）
         if (!match) {
-            const fileLink = links.find(a =>
+            match = links.find(a =>
                 (a.dataset.file || '').replace(/\.html$/i, '') === currentFile && !a.dataset.id
             );
-            match = fileLink;
-            if (!match) {
-                const candidates = links.filter(a =>
-                    (a.dataset.file || '').replace(/\.html$/i, '') === currentFile && a.dataset.id
-                );
-                if (candidates.length) match = candidates[candidates.length - 1];
-            }
         }
+
+        // 3) 最终兜底：当前文件下任一链接
+        if (!match) {
+            match = links.find(a =>
+                (a.dataset.file || '').replace(/\.html$/i, '') === currentFile
+            );
+        }
+
         if (match) { match.classList.add('sidebar-link--active'); expandTo(match, tree); }
     }
 
@@ -589,21 +580,14 @@ class MenuManager {
         const tree = this.navTree?.querySelector('.sidebar-menu');
         if (!tree) return;
 
-        if (innerWidth >= 997) {
-            const first = [...tree.querySelectorAll('.sidebar-link')].find(a => (a.dataset.file || '').replace(/\.html$/i, '') === currentFile);
-            if (first) {
-                first.classList.add('sidebar-link--active');
-                expandTo(first, tree);
-                requestAnimationFrame(() => first.scrollIntoView({ block: 'center', behavior: 'instant' }));
-            }
-            return;
-        }
-
         const links = [...tree.querySelectorAll('.sidebar-link')];
         const best = this._pickBestLink(links, currentFile, currentHash);
         if (best) {
             best.classList.add('sidebar-link--active');
             expandTo(best, tree);
+            if (innerWidth >= 997) {
+                requestAnimationFrame(() => best.scrollIntoView({ block: 'center', behavior: 'instant' }));
+            }
         }
     }
 
