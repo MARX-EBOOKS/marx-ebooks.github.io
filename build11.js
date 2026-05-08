@@ -21,9 +21,9 @@ class ConfigLoader {
       input: '.', output: 'dist', baseUrl: '', logo: '', logoText: 'MLREAD',
       concurrency: 4, config: './libmap.js', only: [], skip: [],
       copyOnly: ['en/archive/', 'en/history/', 'docs/VIL/', 'docs/MEW/', 'ru/VIL-UAIO/'],
-      template: './template.js', mitt: '', mps: ''
+      template: './template.js', mitt: '', mps: '',notgenIndex: false 
     };
-
+    const boolFlags = new Set(['--noindex']);
     const flagMap = {
       '--input': 'input', '-i': 'input', '--output': 'output', '-o': 'output',
       '--config': 'config', '-c': 'config', '--template': 'template', '-t': 'template',
@@ -33,15 +33,21 @@ class ConfigLoader {
     };
 
     for (let i = 2; i < process.argv.length; i++) {
-      const key = flagMap[process.argv[i]];
+      const arg = process.argv[i];
+      const key = flagMap[arg];
       if (!key) continue;
-      const val = process.argv[++i];
-      if (val === undefined) continue;
-      if (key === 'concurrency') args.concurrency = parseInt(val) || 4;
-      else if (['only', 'skip', 'copyOnly'].includes(key)) args[key].push(...val.split(',').map(s => s.trim()).filter(Boolean));
-      else args[key] = val;
-    }
 
+      // ← 2. 在这里实际使用 boolFlags
+      if (boolFlags.has(arg)) {
+        args[key] = true;
+      } else {
+        const val = process.argv[++i];
+        if (val === undefined) continue;
+        if (key === 'concurrency') args.concurrency = parseInt(val) || 4;
+        else if (['only', 'skip', 'copyOnly'].includes(key)) args[key].push(...val.split(',').map(s => s.trim()).filter(Boolean));
+        else args[key] = val;
+      }
+    }
     const envMap = [
       ['BUILD_ONLY', 'only'], ['BUILD_SKIP', 'skip'], ['BUILD_COPY_ONLY', 'copyOnly'],
       ['BUILD_TEMPLATE', 'template'], ['BUILD_INPUT', 'input'], ['BUILD_OUTPUT', 'output']
@@ -702,7 +708,7 @@ class BuildEngine {
     }
     await Promise.all(executing);
     process.stdout.write(`\rProgress: rendered ${rendered} | copied ${copied}   \n`);
-    if (!this.config.args.includes('--noindex')) await fs.writeFile(path.join(DIST, 'index.html'), renderer.generateCardIndex(rawConfig));
+    if (!args.notgenIndex) await fs.writeFile(path.join(DIST, 'index.html'), renderer.generateCardIndex(rawConfig));
 
     console.log(`\nDone: ${rendered} pages rendered | ${copied} assets copied | vol indexes ${volIndexCount} | ${((Date.now() - start) / 1000).toFixed(1)}s`);
   }
