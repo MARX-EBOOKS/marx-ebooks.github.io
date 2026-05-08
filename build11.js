@@ -29,7 +29,7 @@ class ConfigLoader {
       '--config': 'config', '-c': 'config', '--template': 'template', '-t': 'template',
       '--logo': 'logo', '--logotext': 'logoText', '--concurrency': 'concurrency',
       '--only': 'only', '--skip': 'skip', '-s': 'skip', '--copy-only': 'copyOnly',
-      '--base-url': 'baseUrl', '--mitt': 'mitt', '--mps': 'mps'
+      '--base-url': 'baseUrl', '--mitt': 'mitt', '--mps': 'mps','--noindex':'notgenIndex'
     };
 
     for (let i = 2; i < process.argv.length; i++) {
@@ -702,7 +702,7 @@ class BuildEngine {
     }
     await Promise.all(executing);
     process.stdout.write(`\rProgress: rendered ${rendered} | copied ${copied}   \n`);
-    await fs.writeFile(path.join(DIST, 'index.html'), renderer.generateCardIndex(rawConfig));
+    if (!this.config.args.includes('--noindex')) await fs.writeFile(path.join(DIST, 'index.html'), renderer.generateCardIndex(rawConfig));
 
     console.log(`\nDone: ${rendered} pages rendered | ${copied} assets copied | vol indexes ${volIndexCount} | ${((Date.now() - start) / 1000).toFixed(1)}s`);
   }
