@@ -471,6 +471,7 @@ def brief(recontent,filename):
     recontent=re.sub(r"""<p align="right"><div class="fnt">Textvarianten</div>([\S\s\r\n]+?)</p>[\s\r\n]+<p align="right">([\S ]+?)</p>""",r"""<p class="rgt">\1<br>\2</p>""",recontent,flags=re.DOTALL|re.IGNORECASE)
     recontent=re.sub(r"""<p align="center">""",r"""<p class="ctr">""",recontent,flags=re.DOTALL|re.IGNORECASE)
     recontent=re.sub(r"""<p align="right">""",r"""<p class="rgt">""",recontent,flags=re.DOTALL|re.IGNORECASE)
+    recontent=re.sub(r"<br/>",r"<br>",recontent,flags=re.DOTALL|re.IGNORECASE)
     recontent=re.sub(r"""<aside>[\S\r\n\s]+?</aside>""",asidepatch,recontent,flags=re.DOTALL|re.IGNORECASE)
     return recontent
 def open_files(html_files,input_dir,output_dir):

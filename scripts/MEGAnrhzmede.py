@@ -293,6 +293,48 @@ class BookVolume:
                     # 建立映射关系
                     self.image_map[img_src] = img_filename
                     print(f"    收集图片: {img_src} -> {img_filename}")
+    def recont(self,recontent):
+        recontent=re.sub(r'[\./]*?/web/[\d]+?/[\S]+?/me/me[0]*([\d]+?)/me([\d]*?)_([\d]+?\.htm)([#]*)',r'../\1/ME\2-\3l\4',recontent ,flags=re.DOTALL | re.IGNORECASE)
+        recontent=re.sub(r'/web/[\d]+?/[\S]+?/\.\./me_([\S]+?\.htm)([#]*)',r'../../ME-\1l\2',recontent,flags=re.DOTALL | re.IGNORECASE)
+        recontent=re.sub(r'[\./]*(?:/me/)*me[0]*([\d]+?)/me([\d]+?)_([\d]+?\.htm)([#]*)',r'../\1/ME\2-\3l\4',recontent,flags=re.DOTALL | re.IGNORECASE)
+        #recontent=re.sub(r'<A HREF="me03_anm\.htm(#[\S]+?)">\(([\d]+?)</A><A NAME=("[\S]+?")></A>\)',r'<sup><a id=\3 href="ME03-anm.html\1">(\2)</a></sup>',recontent ,flags=re.DOTALL | re.IGNORECASE)
+        #recontent=re.sub(r'<A HREF="me03_anm\.htm(#[\S]+?)">\(([\d]+?)</A><A NAME=("[\S]+?")></A>\)',r'<sup><a id=\3 href="ME03-anm.html\1">(\2)</a></sup>',recontent ,flags=re.DOTALL | re.IGNORECASE)
+        #recontent=re.sub(r'href=["\']*me03_anm\.htm',r'href=ME03-anm.html',recontent ,flags=re.DOTALL | re.IGNORECASE)
+        recontent=re.sub(r'href=([\S]*?)me([\d]*?)_([\S]+?\.htm)([#]*)',r'href=\1ME\2-\3l\4',recontent,flags=re.DOTALL | re.IGNORECASE)
+        recontent=re.sub(r'href="[\S]*?(default\.htm)([#]*)',r'href="../\1l\2',recontent ,flags=re.DOTALL | re.IGNORECASE)
+        if self.volume_number<=22:
+            recontent=re.sub(r'''<p class="ctr">\s*([IVXL]+?\s*\.\s*(?:(?!<p|<small)[\s\r\n\S])+?)\s*</p>''',r'<h2>\1</h2>'
+                         ,recontent ,flags=re.DOTALL | re.IGNORECASE)
+            recontent=re.sub(r'''<p style="ctr">\s*(Vorwor[dt][\S ]+?)\s*</p>''',r'<h2>\1</h2>'
+                         ,recontent ,flags=re.DOTALL | re.IGNORECASE)
+            recontent=re.sub(r'''<p style="text-align:center;">\s*([IVXL]+?\s*\.\s*(?:(?!<p|<small)[\s\r\n\S])+?)\s*</p>''',r'<h2>\1</h2>'
+                         ,recontent ,flags=re.DOTALL | re.IGNORECASE)
+            recontent=re.sub(r'''<p style="text-align:center;">\s*(Vorwor[dt][\S ]+?)\s*</p>''',r'<h2>\1</h2>'
+                         ,recontent ,flags=re.DOTALL | re.IGNORECASE)
+        return recontent
+    def contentre(self,recontent):
+        content=re.sub(r'<body[\S ]+?>',r'<body>',recontent ,flags=re.DOTALL | re.IGNORECASE)
+        content=re.sub(r'<a\s+name=([\S]+?)>\s*</a>\s*<a\s+href=([\S]+?)>\s*([\d]+?)\s*</a>',r'<sup><a id=\1 href=\2>\3</a></sup>',content,flags=re.DOTALL|re.IGNORECASE)
+        content=re.sub(r'[\[]*<a\s+name=([\S]+?)>\s*</a>\s*<a\s+href=([\S]+?)>[\s\[]*([\d]+?)[\s\]]*</a>[\]]*',r'<sup><a id=\1 href=\2>\3</a></sup>'
+                                   ,content,flags=re.DOTALL|re.IGNORECASE)
+        content=re.sub(r'/web/[\d]+?/[\S]+?/me/me[0]*([\d]+?)/me([\d]+?)_([\d]+?.htm)([#]*)',r'../\1/ME\2-\3l\4',content
+                         ,flags=re.DOTALL | re.IGNORECASE)
+        content=re.sub(r'[\./]*(?:/me/)*me[0]*([\d]+?)/me([\d]+?)_([\d]+?.htm)([#]*)',r'../\1/ME\2-\3l\4',content
+                         ,flags=re.DOTALL | re.IGNORECASE)
+        content=re.sub(r'href="me([\d]+?)_([\S]+?.htm)([#]*)',r'href="ME\1-\2l\3',content ,flags=re.DOTALL | re.IGNORECASE)
+        content=re.sub(r'<a name=',r'<a id=',content ,flags=re.DOTALL | re.IGNORECASE)
+        content=re.sub(r'[-]*[ ]{0,2}<a id=("S[\d]+?")></a>',r'<a id=\1></a>',content ,flags=re.DOTALL | re.IGNORECASE)
+        content = re.sub(r"<([/]*)em>",r"<\1i>",content ,flags=re.DOTALL | re.IGNORECASE)
+        content = content.replace(r"&szlig;", r"ß")
+        content = content.replace(r"&ouml;", r"ö")
+        content = content.replace(r"&auml;", r"ä")
+        content = content.replace(r"&uuml;", r"ü")
+        content = content.replace(r"&Szlig;", r"ẞ")
+        content = content.replace(r"&Ouml;", r"Ö")
+        content = content.replace(r"&Auml;", r"Ä")
+        content = content.replace(r"&Uuml;", r"Ü")
+
+        return content
     
     def scan_chapters(self):
         """通过解析目录页链接来扫描章节文件"""
@@ -336,7 +378,6 @@ class BookVolume:
                 content=content.replace("<br>&emsp;&emsp;<br>&emsp;&emsp;","<br>&emsp;&emsp;")
                 content=re.sub(r"<br>&emsp;&emsp;[\s]*</h1>",r"</h1>",content,flags=re.DOTALL|re.IGNORECASE)
                 content=content.replace('</p><p class="quote">','')
-                content=content.replace('<br/>','<br>')
                 content=re.sub(r'<html lang="de"></html>','',content,flags=re.DOTALL|re.IGNORECASE)
                 content=re.sub(r'','',content,flags=re.DOTALL|re.IGNORECASE)
                 #content=re.sub(r'</p>\s*</body>','</p>\n<HR>\n</body>', content, flags=re.DOTALL | re.IGNORECASE)
@@ -747,10 +788,10 @@ def main():
     # 配置参数
     book_title = "KARL MARX FRIEDRICH ENGELS GESAMTAUSGABE"  # 修改为你的书名
     book_author = "Karl Marx & Friedrich Engels"      # 修改为作者名
-    book_dir = r"D:\马恩列总装\MEGA_II_pre"  # 修改为你的书籍根目录
+    book_dir = r"D:\马恩列总装\nrhz_raw"  # 修改为你的书籍根目录
     #output_dir = "./MEW10"  # 输出目录名
-    output_dirs = [r"./mlread/docs/MEGA/II",r"./MARX-ZH-CN-node/MEGA/II"] 
-    #output_dirs = [r"./de/MEW"] 
+    #output_dirs = [r"./mlread/MEGA/II",r"./MARX-ZH-CN.github.io1/MEGA/II"] 
+    output_dirs = [r"./de/MEGA/I"] 
     excel_file=Path(r"LENIN-toc.xlsx")
     # 创建构建器
     wb = openpyxl.load_workbook(excel_file)            
