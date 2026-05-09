@@ -1,0 +1,855 @@
+{
+  "repo_notes": [
+    {
+      "content": ""
+    }
+  ],
+  "pages": [
+    {
+      "title": "Project Overview",
+      "purpose": "High-level introduction to the MARX-ZH-CN digital library project: its mission, scope, multilingual collections, hosting infrastructure, and how the major sections relate to each other. Links to all child pages for deeper detail.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Mission and Scope",
+      "purpose": "Explains the project's purpose as a free, web-accessible digital archive of Marxist-Leninist and Hegelian classics in German, Chinese, English, and Russian. Covers the site's domain names (19491007.xyz, marx-zh-cn.github.io), the AGPLv3 license, usage restrictions, and the disclaimer about text accuracy versus original printed editions.",
+      "parent": "Project Overview",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Deployment and Infrastructure",
+      "purpose": "Documents the CI/CD pipeline: the GitHub Actions workflow (.github/workflows/d.yml) that deploys to Cloudflare Workers on every push to main, required secrets (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID), and the wrangler CLI. Also covers the epub sub-repository's own workflow and the _redirects file in docs/MEW/.",
+      "parent": "Project Overview",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Site Architecture and Shared Frontend",
+      "purpose": "Overview of the static-site architecture: how HTML files, CSS stylesheets, and the shared mlr.js script work together to deliver a consistent reading experience across all collections. Links to child pages covering the JavaScript runtime and the CSS design system.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "mlr.js — Shared JavaScript Runtime",
+      "purpose": "Deep dive into docs/mlr.js (and the identical copy at en/mlr.js and ru/mlr.js): the ?rd reading-progress feature (localStorage scroll persistence), automatic propagation of the ?rd query parameter to all internal links, responsive table wrapping, and image width clamping. Explains the ALLOWED_PATHS regex list that gates which pages participate in progress tracking.",
+      "parent": "Site Architecture and Shared Frontend",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "CSS Design System",
+      "purpose": "Covers the family of stylesheets used across the site: mewde.css (MEW German reader), styles.css (Chinese collections), hegel.css (Hegel works), vil.css (Russian Lenin), works.css and MECW.css (English MECW), firstpages.css (landing pages), artikel.css, inhalt.css, leitseit.css, format.css, mew42.css. Documents shared conventions: dark-mode support, seitenzahlen class, blockquote/zitat sizing, TOC/volc layout classes, and the color palette (#DC3545 red headings, #2D3A53 body text, #EEF0F5 background).",
+      "parent": "Site Architecture and Shared Frontend",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Navigation and Pagination System",
+      "purpose": "Explains the cross-document navigation conventions used in every HTML article: the seitenzahlen div for bibliographic provenance, inline page-break anchors (id='S[N]'), sequential article links (ME01-028.html → ME01-033.html → …), volume index pages (index.html per volume), and the chronological index (MEW/default.html). Covers the ?rd parameter propagation that preserves reading progress across page transitions.",
+      "parent": "Site Architecture and Shared Frontend",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Marx-Engels Works (MEW) — German Edition",
+      "purpose": "Overview of the German-language Marx-Engels Werke collection hosted under MEW/ (mlwerke.de source, Bände 1–26, 40, 42) and docs/MEW-ZENO/ (Zeno.org source, long works). Introduces the two sub-sources, the volume structure, and links to child pages covering content and HTML document format.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "MEW Volume Structure and Content",
+      "purpose": "Documents the 42 volumes of MEW available in the repository (Bände 1–26, 40, 42), their date ranges, and notable works. Covers the two German sub-collections: MEW/ (mlwerke.de, includes letters) and docs/MEW-ZENO/ (Zeno.org, preferred for long works). Describes the chronological index (MEW/default.html) and the economics index (ME-zuoek.html). Notes the supplementary files: ME-ak*.html (Appendix volumes 42–95), ME-iaa*.html (IAA documents), ME-nrz*.html (Neue Rheinische Zeitung), ME-fb.html.",
+      "parent": "Marx-Engels Works (MEW) — German Edition",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "MEW HTML Document Format",
+      "purpose": "Technical reference for the HTML format used in every MEW article file. Covers: UTF-8 encoding and viewport meta tags; the seitenzahlen div with bibliographic citation; heading hierarchy (h2=author, h1=title, h3/h4/h5/h6=article identifier); inline page-break anchors (id='S[N]'); blockquote for quoted sources; the i tag for emphasis and foreign phrases; pipe-delimited inline translations (e.g. 'voix toujours tonnante |stets donnernde Stimme|'); the fn/fnt footnote classes; and the mewde.css + mlr.js dependencies.",
+      "parent": "Marx-Engels Works (MEW) — German Edition",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "MEW Band 10 and Higher Volumes",
+      "purpose": "Covers the structure and content of MEW volumes 10 and above (Bände 10–26, 40, 42) as represented in the MEW/10/ through MEW/42/ directories. Notes the same HTML conventions as Band 1 but applied to later works including Das Kapital (Bände 23–25), Theorien über den Mehrwert (Band 26), and the supplementary volumes.",
+      "parent": "Marx-Engels Works (MEW) — German Edition",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Chinese-Language Collections",
+      "purpose": "Overview of the three Chinese-language collections hosted under docs/: MEW-ZH (Marx-Engels Collected Works 1st Chinese ed., 50 vols), MEA (Marx-Engels Anthology, new translations, 10 vols), and LENIN (Lenin Collected Works 2nd Chinese ed., 60 vols). Links to child pages for each collection.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "MEW-ZH — Marx-Engels Collected Works (Chinese, 1st Edition)",
+      "purpose": "Documents docs/MEW-ZH/: the 50-volume Chinese first edition of the Marx-Engels Collected Works (马克思恩格斯全集第一版), translated by the CPC Central Compilation and Translation Bureau. Covers volume numbering (vols 1–50, with vols 46–49 partially formatted), the parallel structure to MEW German volumes, the MEAW Selected Works index files (MEAW-1.html–4.html), and the HTML format (styles.css, mlr.js, ?rd reading progress).",
+      "parent": "Chinese-Language Collections",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "MEA — Marx-Engels Anthology (New Chinese Translations)",
+      "purpose": "Documents docs/MEA/: the 10-volume Marx-Engels Anthology (马克思恩格斯文集) with newer translations. Covers the volume structure (vols 1–10, with vols 6–8 partially formatted), the relationship to MEW-ZH, and the EPUB download (MEA.epub in the epub/ directory).",
+      "parent": "Chinese-Language Collections",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "LENIN — Lenin Collected Works (Chinese, 2nd Edition)",
+      "purpose": "Documents docs/LENIN/: the 60-volume Chinese second edition of Lenin's Collected Works (列宁全集第二版). Covers the volume mapping to the Russian 5th edition (vols 1–27 parallel; vols 28–43 → Russian 30–45; vols 44–53 → Russian 46–55; vols 54–55 → Russian 28–29; vols 56–60 unique to Chinese edition), formatting status (vols 8, 13–28 bold/emphasis not yet marked; vols 44–60 incomplete), the Lenin Selected Works index (ls-1.html–4.html), and the EPUB download (LENIN.epub).",
+      "parent": "Chinese-Language Collections",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "English Collection — Marx & Engels Collected Works (MECW)",
+      "purpose": "Overview and technical reference for the English-language collection under en/MECW/: the 50-volume Marx & Engels Collected Works published by Progress Publishers, Lawrence & Wishart, and International Publishers (1975–2004). Covers the volume structure (vols 1–27 political/philosophical/historical writings; vols 28–37 political economy drafts; vols 38–50 correspondence), the MECW.css stylesheet, the en/index.html landing page, the en/archive/ (Eleanor Marx and other archive material), and en/history/international/.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "MECW Volume Index and HTML Format",
+      "purpose": "Details the file naming convention (MECW[VV]-[NNN].html), the MECW.css stylesheet, the MECW1-index.html volume index, and the works.css used on the en/ landing page. Explains how the English files differ from the German MEW files: no seitenzahlen div, different heading conventions, image files (MECW[VV]-img[NNN].png/gif/jpg) embedded in volumes.",
+      "parent": "English Collection — Marx & Engels Collected Works (MECW)",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Archive and History Sections",
+      "purpose": "Documents en/archive/ (3,378 files: marx/ subdirectory with additional Marx writings, eleanor-marx/ with one file) and en/history/international/ (74 files covering international labour history). Explains how these sections complement the main MECW volumes.",
+      "parent": "English Collection — Marx & Engels Collected Works (MECW)",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Russian Collection — Lenin Complete Works (5th Edition)",
+      "purpose": "Overview of the Russian-language Lenin collection under ru/: the 5th Russian edition of Lenin's Complete Works (Полное собрание сочинений, 55 vols). Covers the two sub-collections (VIL-FB2 from LitRes FB2 files, vols 1–42; VIL-UAIO from uaio.ru HTML, all 55 vols), the vil.css stylesheet, the ru/index.html landing page, and the ?rd reading progress feature.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "VIL-FB2 — FB2-Derived HTML Volumes",
+      "purpose": "Documents ru/VIL-FB2/: 42 volumes derived from LitRes FB2 files (prepared by Светлана Тимакова), covering Lenin's works from 1893 to approximately 1921. Explains the FB2-to-HTML conversion process, the volume directory structure (1/–42/), and the index.html per volume. Notes that this sub-collection is preferred for major works due to better formatting.",
+      "parent": "Russian Collection — Lenin Complete Works (5th Edition)",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "VIL-UAIO — uaio.ru HTML Volumes",
+      "purpose": "Documents ru/VIL-UAIO/: all 55 volumes derived from uaio.ru HTML (prepared by Василию Грозину), including late works, letters, notebooks, and annotations not available in VIL-FB2. Covers the volume directory structure (1/–55/ plus pic/), the caution against using book_file to read volume content files, and the pic/ subdirectory with 89 portrait images.",
+      "parent": "Russian Collection — Lenin Complete Works (5th Edition)",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Hegel Works Collection",
+      "purpose": "Overview of the Hegel collection under docs/HEGEL/: German Suhrkamp Werke (vols 3, 5–10, 18–20) and English translations (Phenomenology by Pinkard, Science of Logic by Miller, Shorter Logic by Brinkmann & Dahlstrom). Links to child pages for German and English sub-collections.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Hegel German Werke (Suhrkamp Edition)",
+      "purpose": "Documents docs/HEGEL/1/–20/: the German Suhrkamp Werke in zwanzig Bänden digitized by Talpa-Verlag and sourced from Zeno.org. Covers the volume-to-directory mapping (vol 3 = Phänomenologie; vols 5–6 = Wissenschaft der Logik; vol 7 = Rechtsphilosophie; vols 8–10 = Enzyklopädie; vols 18–20 = Geschichte der Philosophie), the hegel.css stylesheet, and the HGPS/HGSL/HEPL English translation sub-directories.",
+      "parent": "Hegel Works Collection",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Hegel Chinese and English Translations",
+      "purpose": "Documents the Chinese translations under docs/HEGEL/: shorter-logic/ (He Lin's Shorter Logic and Phenomenology), SCIENCE-OF-LOGIC-I/ and II/ (Yang Yizhi's Science of Logic), philosophy-of-right/ (Fan Yang/Zhang Qitai's Philosophy of Right), and the Lectures on the History of Philosophy (He Lin/Wang Taiqing). Also covers the English translations: HGPS/ (Pinkard Phenomenology), HGSL/ (Miller Science of Logic), HEPL/ (Brinkmann & Dahlstrom Shorter Logic), and the Images/ directory.",
+      "parent": "Hegel Works Collection",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Drawer Agent — AI-Assisted Research Tool",
+      "purpose": "Overview of the drawer/ directory: a Python command-line AI agent for searching and translating texts in the local library. Introduces the two agent variants (drawer_agent.py with translation, drawer_agent_simple.py without) and links to child pages for configuration and skills.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Agent Architecture and Configuration",
+      "purpose": "Documents drawer/agent_config.py (Config class): API_KEY, API_URL, MODEL selection from MODELS list, MAX_TOKENS, TEMPERATURE, TOP_P, MAX_CONCURRENT, TIMEOUT, MAX_HITS, TRANS_CHUNK_CHARS, MAX_TOOL_RESULT_CHARS, HTML_FOLDER path, HISTORY_OUTPUT_PATH, ZH_DIRS/DE_DIRS/EN_DIRS/RU_DIRS language-to-directory mappings, SPECIAL_DIRS for per-collection skill files. Covers the ChatClient class (httpx-based LLM wrapper with retry, semaphore concurrency, thinking-mode support) and the command-line argument overrides (--model, --api-url, --api-key, --max-context-token, etc.).",
+      "parent": "Drawer Agent — AI-Assisted Research Tool",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Agent Skills and Prompts",
+      "purpose": "Documents the drawer/skills/ directory: SYSTEM.md (master system prompt defining the three-step search/read/answer workflow), LIB_MAP.md and LIB_MAPB.md (library path-to-language mapping injected into the system prompt), READ.md (deep reading mode instructions), TRANS.md and TRANS_TEXT.md (HTML translation prompts), THINK.md (thinking mode guidance), MEW.md/MEW_ZENO.md/MEW_ZH.md/MECW.md/MEA.md/VIL_FB2.md/VIL_UAIO.md (per-collection volume indexes), IMPORTANT_WORK_ME.md/IMPORTANT_WORK_VL.md (notable works lists), SYS_SIMP.md (simplified system prompt for drawer_agent_simple.py). Covers the tool functions: grep_files, read_file_html, book_index, add_quote.",
+      "parent": "Drawer Agent — AI-Assisted Research Tool",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Translation Workflow",
+      "purpose": "Documents the AI-assisted translation pipeline in drawer_agent.py: the useapitrans.py and useapitranslongtext.py scripts for translating individual HTML files and long texts respectively. Covers the TRANS.md prompt rules (preserve HTML tags, translate only visible text, handle footnotes, use CPC standard proper-noun translations), the TRANS_CHUNK_CHARS chunking strategy for long documents, and the output format.",
+      "parent": "Drawer Agent — AI-Assisted Research Tool",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "EPUB Packages",
+      "purpose": "Documents the epub/ directory: MEW.epub (German MEW collection), Lenin.epub (Chinese Lenin collection), MEA.epub (Chinese Marx-Engels Anthology), and the epub/.github/workflows/ CI pipeline for building/publishing EPUBs. Explains that EPUBs are compressed archives of the site's HTML pages, recommended for bulk download of the collection.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "EPUB Contents and Download",
+      "purpose": "Details the three EPUB files: MEW.epub (German MEW HTML pages), LENIN.epub (Chinese Lenin Collected Works HTML pages), MEA.epub (Chinese Marx-Engels Anthology HTML pages). Explains the relationship between EPUB content and the live website pages, the recommendation to download EPUBs for bulk access, and the caveat that EPUB content is for reference only and should be verified against original printed editions.",
+      "parent": "EPUB Packags",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "经典著作全集卷目对照表",
+      "description": "马克思恩格斯全集（中文版/德文版/英文版）、列宁全集（中文版/俄文版）、黑格尔全集（二十卷本）、MEGA²第二部分卷目逐卷对照",
+      "columns": [
+        "马恩全集中文第一版",
+        "MEW",
+        "MECW",
+        "列宁全集中文第二版",
+        "列宁全集俄文第五版",
+        "黑格尔全集（二十卷本）",
+        "MEGA²第二部分"
+      ],
+      "rows": [
+        {
+          "马恩全集中文第一版": "（第二版，1833年—1843年3月）",
+          "MEW": "1839 bis 1844",
+          "MECW": "1835-1843 Early writings of Marx, including doctoral dissertation The Difference Between the Democritean and Epicurean Philosophy of Nature",
+          "列宁全集中文第二版": "（1893年—1894年）",
+          "列宁全集俄文第五版": "1893-1894",
+          "黑格尔全集（二十卷本）": "Frühe Schriften",
+          "MEGA²第二部分": "Ökonomische Manuskripte 1857/58 (Grundrisse der Kritik der politischen Ökonomie)"
+        },
+        {
+          "马恩全集中文第一版": "（1844年9月—1846年2月）",
+          "MEW": "1844 bis 1846",
+          "MECW": "1838-1842 Early writings of Engel",
+          "列宁全集中文第二版": "（1895年—1897年）",
+          "列宁全集俄文第五版": "1895-1897",
+          "黑格尔全集（二十卷本）": "Jenaer Schriften",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（1845年—1847年1月）",
+          "MEW": "1845 bis 1846",
+          "MECW": "1843-1844 Early writings of both, including the Economic and Philosophic Manuscripts of 1844",
+          "列宁全集中文第二版": "（俄国资本主义的发展）",
+          "列宁全集俄文第五版": "РАЗВИТИЕ КАПИТАЛИЗМА В РОССИИ",
+          "黑格尔全集（二十卷本）": "Phänomenologie des Geistes",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（1846年5月—1848年3月）",
+          "MEW": "Mai 1846 bis März 1848",
+          "MECW": "1844-1845 The Holy Family, The Condition of the Working Class in England",
+          "列宁全集中文第二版": "（1898年—1901年）",
+          "列宁全集俄文第五版": "1898 - апрель 1901",
+          "黑格尔全集（二十卷本）": "Nürnberger und Heidelberger Schriften",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（1848年3月—11月）",
+          "MEW": "März bis November 1848",
+          "MECW": "1845-1847 The German Ideology, Theses on Feuerbach",
+          "列宁全集中文第二版": "（1901年5月—12月）",
+          "列宁全集俄文第五版": "Май - декабрь 1901",
+          "黑格尔全集（二十卷本）": "Wissenschaft der Logik",
+          "MEGA²第二部分": "Das Kapital Kritik der Politischen Ökonomie, Erster Band Hamburg 1867"
+        },
+        {
+          "马恩全集中文第一版": "（1848年11月—1849年7月）",
+          "MEW": "November 1848 bis Juli 1849",
+          "MECW": "1845-1848 The Communist Manifesto, The Poverty of Philosophy, Principles of Communism",
+          "列宁全集中文第二版": "（1902年1月—8月）",
+          "列宁全集俄文第五版": "Январь - август 1902",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（1849年8月—1851年6月）",
+          "MEW": "August 1849 bis Juni 1851",
+          "MECW": "1848 Articles for Neue Rheinische Zeitung",
+          "列宁全集中文第二版": "（1902年9月—1903年9月）",
+          "列宁全集俄文第五版": "Сентябрь 1902 - сентябрь 1903",
+          "黑格尔全集（二十卷本）": "Grundlinien der Philosophie des Rechts",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（1851年8月—1853年3月）",
+          "MEW": "August 1851 bis März 1853",
+          "MECW": "1848-1849",
+          "列宁全集中文第二版": "（1903年9月—1904年7月）",
+          "列宁全集俄文第五版": "Сентябрь 1903 - сентябрь 1904",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（1853年3月—12月）",
+          "MEW": "März bis Dezember 1853",
+          "MECW": "1849",
+          "列宁全集中文第二版": "（1904年7月—1905年3月）",
+          "列宁全集俄文第五版": "Июль 1904 - март 1905",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（1854年1月—1855年1月）",
+          "MEW": "Januar 1854 bis Januar 1855",
+          "MECW": "1849-1851 The Class Struggles in France 1848–1850, The Peasant War in Germany",
+          "列宁全集中文第二版": "（1905年3月—1905年6月）",
+          "列宁全集俄文第五版": "Март - июнь 1905",
+          "黑格尔全集（二十卷本）": "Enzyklopädie der philosophischen Wissenschaften im Grundrisse",
+          "MEGA²第二部分": "Das Kapital Kritik der Politischen Ökonomie, Erster Band Hamburg 1890"
+        },
+        {
+          "马恩全集中文第一版": "（1855年1月底—1856年4月）",
+          "MEW": "Januar 1855 bis April 1856",
+          "MECW": "1851-1853 The Eighteenth Brumaire of Louis Napoleon, Revolution and Counter-Revolution in Germany",
+          "列宁全集中文第二版": "（1905年7月—10月）",
+          "列宁全集俄文第五版": "Июль - октябрь 1905",
+          "黑格尔全集（二十卷本）": "Berliner Schriften",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（1856年4月—1859年1月）",
+          "MEW": "April 1856 bis Januar 1859",
+          "MECW": "1853-1854 Newspaper articles concerning global politics and other writings, including The Civil War in the United States",
+          "列宁全集中文第二版": "（1905年10月—1906年4月）",
+          "列宁全集俄文第五版": "Октябрь 1905 - апрель 1906",
+          "黑格尔全集（二十卷本）": "Vorlesungen über die Philosophie der Geschichte",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（1859年1月—1860年2月）",
+          "MEW": "Januar 1859 bis Februar 1860",
+          "MECW": "1854-1855",
+          "列宁全集中文第二版": "（1906年5月—9月）",
+          "列宁全集俄文第五版": "Май - сентябрь 1906",
+          "黑格尔全集（二十卷本）": "Vorlesungen über die Ästhetik",
+          "MEGA²第二部分": "Das Kapital. Kritik der politischen Ökonomie, Zweiter Band"
+        },
+        {
+          "马恩全集中文第一版": "（1857年7月－1860年11月）",
+          "MEW": "Juli 1857 bis November 1860",
+          "MECW": "1855-1856",
+          "列宁全集中文第二版": "（1906年9月—1907年2月）",
+          "列宁全集俄文第五版": "Сентябрь 1906 - февраль 1907",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（1860年1月－1864年9月）",
+          "MEW": "Januar 1860 bis September 1864",
+          "MECW": "1856-1858",
+          "列宁全集中文第二版": "（1907年2月—6月）",
+          "列宁全集俄文第五版": "Февраль - июнь 1907",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": "Das Kapital Kritik der politischen Ökonomie, Dritter Band"
+        },
+        {
+          "马恩全集中文第一版": "（1864年9月—1870年7月）",
+          "MEW": "September 1864 bis Juli 1870",
+          "MECW": "1858-1860",
+          "列宁全集中文第二版": "（1907年6月—1908年3月）",
+          "列宁全集俄文第五版": "Июнь 1907- март 1908",
+          "黑格尔全集（二十卷本）": "Vorlesungen über die Philosophie der Religion",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（1870年7月—1872年2月）",
+          "MEW": "Juli 1870 bis Februar 1872",
+          "MECW": "1859-1860",
+          "列宁全集中文第二版": "（1908年3月—1909年2月）",
+          "列宁全集俄文第五版": "Март 1908 - июнь 1909",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（1872年3月—1875年3月）",
+          "MEW": "März 1872 bis Mai 1875",
+          "MECW": "1857-1862",
+          "列宁全集中文第二版": "（唯物主义和经验批判主义）",
+          "列宁全集俄文第五版": "МАТЕРИАЛИЗМ И ЭМПИРИОКРИТИЦИЗМ",
+          "黑格尔全集（二十卷本）": "Vorlesungen über die Geschichte der Philosophie",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（1875年3月—1883年5月）",
+          "MEW": "März 1875 bis Mai 1883",
+          "MECW": "1861-1864",
+          "列宁全集中文第二版": "（1909年6月—1910年10月）",
+          "列宁全集俄文第五版": "Июнь 1909 - октябрь 1910",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（反杜林论、自然辩证法）",
+          "MEW": "Anti-Dühring, Dialektik der Natur",
+          "MECW": "1864-1868 Articles and writings concerning the First International, Value, Price and Profit (V. 20)",
+          "列宁全集中文第二版": "（1910年11月—1911年11月）",
+          "列宁全集俄文第五版": "Ноябрь 1910 - ноябрь 1911",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（1883年5月—1889年12月）",
+          "MEW": "Mai 1883 bis Dezember 1889",
+          "MECW": "1867-1870",
+          "列宁全集中文第二版": "（1911年12月—1912年7月）",
+          "列宁全集俄文第五版": "Декабрь 1911 - июль 1912",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（1890年1月—1895年8月）",
+          "MEW": "Januar 1890 bis August 1895",
+          "MECW": "1870-1871",
+          "列宁全集中文第二版": "（1912年7月—1913年2月）",
+          "列宁全集俄文第五版": "Июль 1912 - февраль 1913",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（《资本论》第一卷）",
+          "MEW": "Das Kapital, Erster Band",
+          "MECW": "1871-1874",
+          "列宁全集中文第二版": "（1913年3月—1913年9月）",
+          "列宁全集俄文第五版": "Март - сентябрь 1913",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（《资本论》第二卷）",
+          "MEW": "Das Kapital, Zweiter Band",
+          "MECW": "1874-1883 Critique of the Gotha Program, Socialism: Utopian and Scientific",
+          "列宁全集中文第二版": "（1913年9月—1914年3月）",
+          "列宁全集俄文第五版": "Сентябрь 1913 - март 1914",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（《资本论》第三卷）",
+          "MEW": "Das Kapital, Dritter Band",
+          "MECW": "Anti-Dühring, Dialectics of Nature",
+          "列宁全集中文第二版": "（1914年3月—1914年7月）",
+          "列宁全集俄文第五版": "Март - июль 1914",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（剩余价值理论）",
+          "MEW": "Theorien über den Mehrwert, Teil 1 bis 3",
+          "MECW": "1882-1889 Origin of the Family, Ludwig Feuerbach and the End of Classical German Philosophy",
+          "列宁全集中文第二版": "（1914年7月—1915年8月）",
+          "列宁全集俄文第五版": "Июль 1914 - август 1915",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（书信。1842年—1851年12月）",
+          "MEW": "Briefe Februar 1842 bis Dezember 1851",
+          "MECW": "1890-1895 Late political writings of Engels",
+          "列宁全集中文第二版": "（1915年8月—1916年6月）",
+          "列宁全集俄文第五版": "Август 1915 - июнь 1916",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（书信。1852年—1855年）",
+          "MEW": "Briefe Januar 1852 bis Dezember 1855",
+          "MECW": "1857-1861 Grundrisse, A Contribution to the Critique of Political Economy",
+          "列宁全集中文第二版": "（1916年7月—1917年2月）",
+          "列宁全集俄文第五版": "ТЕТРАДИ ПО ИМПЕРИАЛИЗМУ",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（书信。1856年—1859年）",
+          "MEW": "Briefe Januar 1856 bis Dezember 1859",
+          "MECW": "1857-1861 Grundrisse, A Contribution to the Critique of Political Economy",
+          "列宁全集中文第二版": "（1917年3月—4月）",
+          "列宁全集俄文第五版": "ФИЛОСОФСКИЕ ТЕТРАДИ",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（书信。1860年—1864年9月）",
+          "MEW": "Briefe Januar 1860 bis September 1864",
+          "MECW": "1861-1863 Theories of Surplus Value, Volume I",
+          "列宁全集中文第二版": "（1917年5月—7月）",
+          "列宁全集俄文第五版": "Июль 1916 - февраль 1917",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（书信。1864年10月-1867年）",
+          "MEW": "Briefe Oktober 1864 bis Dezember 1867",
+          "MECW": "1861-1863 Theories of Surplus Value, Volume II",
+          "列宁全集中文第二版": "（国家与革命）",
+          "列宁全集俄文第五版": "Март - апрель 1917",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（书信。1868年—1870年7月）",
+          "MEW": "Briefe Januar 1868 bis Mitte Juli 1870",
+          "MECW": "1861-1863 Theories of Surplus Value, Volume III",
+          "列宁全集中文第二版": "（1917年7月—10月）",
+          "列宁全集俄文第五版": "Май - июль 1917",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（书信。1870年7月-1874年）",
+          "MEW": "Briefe Juli 1870 bis Dezember 1874",
+          "MECW": "1861-1863 Economic Manuscripts of 1861–1863, remaining parts",
+          "列宁全集中文第二版": "（1917年10月—1918年3月）",
+          "列宁全集俄文第五版": "ГОСУДАРСТВО И РЕВОЛЮЦИЯ",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（书信。1875年—1880年）",
+          "MEW": "Briefe Januar 1875 bis Dezember 1880",
+          "MECW": "1861-1864 Economic Manuscripts of 1861–1863, remaining parts",
+          "列宁全集中文第二版": "（1918年3月—7月）",
+          "列宁全集俄文第五版": "Июль - октябрь 1917",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（书信。1881年—1883年3月）",
+          "MEW": "Briefe Januar 1881 bis März 1883",
+          "MECW": "Capital, Volume I",
+          "列宁全集中文第二版": "（1918年7月—1919年3月）",
+          "列宁全集俄文第五版": "Октябрь 1917~ март 1918",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（书信。1883年4月—1887年）",
+          "MEW": "Briefe April 1883 bis Dezember 1887",
+          "MECW": "Capital, Volume II",
+          "列宁全集中文第二版": "（1919年3月—6月）",
+          "列宁全集俄文第五版": "Март - июль 1918",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（书信。1888年—1890年）",
+          "MEW": "Briefe Januar 1888 bis Dezember 1890",
+          "MECW": "Capital, Volume III",
+          "列宁全集中文第二版": "（1919年6月—12月）",
+          "列宁全集俄文第五版": "Июль 1918-март 1919",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（书信。1891年—1892年）",
+          "MEW": "Briefe Januar 1891 bis Dezember 1892",
+          "MECW": "1844-1851 Letters",
+          "列宁全集中文第二版": "（1919年12月—1920年4月）",
+          "列宁全集俄文第五版": "Март - июнь 1919",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（书信。1893年—1895年7月）",
+          "MEW": "Briefe Januar 1893 bis Juli 1895",
+          "MECW": "1852-1855 Letters",
+          "列宁全集中文第二版": "（1920年5月—11月）",
+          "列宁全集俄文第五版": "Июнь - декабрь 1919",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（著作。1844年—1848年2月）",
+          "MEW": "Karl Marx: Schriften und Briefe, November 1837 bis August 1844",
+          "MECW": "1856-1859 Letters",
+          "列宁全集中文第二版": "（1920年11月—1921年3月）",
+          "列宁全集俄文第五版": "Декабрь 1919 - апрель 1920",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（恩格斯早年著作书信）",
+          "MEW": "Friedrich Engels: Schriften, 1839 bis 1844",
+          "MECW": "1860-1864 Letters",
+          "列宁全集中文第二版": "（1921年3月—6月）",
+          "列宁全集俄文第五版": "Май - ноябрь 1920",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（著作。1844年—1848年2月）",
+          "MEW": "Karl Marx: Ökonomische Manuskripte 1857/1858",
+          "MECW": "1864-1868 Letters",
+          "列宁全集中文第二版": "（1921年6月—1922年3月）",
+          "列宁全集俄文第五版": "Ноябрь 1920 - март 1921",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（著作。1848年6月-1849年8月）",
+          "MEW": "Karl Marx: Ökonomisches Manuskript 1861 bis 1863 / Teil I",
+          "MECW": "1868-1870 Letters",
+          "列宁全集中文第二版": "（1922年3月—1923年1月）",
+          "列宁全集俄文第五版": "Март - июнь 1921",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（著作。1849年秋—1873年5月）",
+          "MEW": "Karl Marx: Ökonomisches Manuskript 1861 bis 1863 / Teil II",
+          "MECW": "1870-1873 Letters",
+          "列宁全集中文第二版": "（书信，1893年—1904年）",
+          "列宁全集俄文第五版": "Июнь 1921 - март 1922",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（笔记和文章。1867—1893年）",
+          "MEW": "",
+          "MECW": "1874-1879 Letters",
+          "列宁全集中文第二版": "（书信，1905年1月—1910年11月）",
+          "列宁全集俄文第五版": "Март 1922 - март 1923",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（马克思1857-1858政治经济学手稿）",
+          "MEW": "",
+          "MECW": "1880-1883 Letters",
+          "列宁全集中文第二版": "（书信，1910年11月—1914年7月）",
+          "列宁全集俄文第五版": "Письма 1893 - 1904",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（马克思1861-1863年《政治经济学批判》手稿I-V、XIX、XX本）",
+          "MEW": "",
+          "MECW": "1883-1886 Letters",
+          "列宁全集中文第二版": "（书信及电报，1914年8月—1917年10月）",
+          "列宁全集俄文第五版": "Письма 1905 - ноябрь 1910",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（马克思1861-1863年《政治经济学批判》手稿XVI、XVII、XXI-XXIII本）",
+          "MEW": "",
+          "MECW": "1887-1890 Letters",
+          "列宁全集中文第二版": "（书信及电报，1917年10月—1919年6月）",
+          "列宁全集俄文第五版": "Письма ноябрь 1910 - июль 1914",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（马克思1861-1875年资本论手稿）",
+          "MEW": "",
+          "MECW": "1890-1892 Letters",
+          "列宁全集中文第二版": "（书信及电报，1919年7月—1920年11月）",
+          "列宁全集俄文第五版": "Письма август 1914 - октябрь 1917",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "（著作书信补遗。1840—1895）",
+          "MEW": "",
+          "MECW": "1892-1895 Letters",
+          "列宁全集中文第二版": "（书信及电报，1920年11月—1921年6月）",
+          "列宁全集俄文第五版": "Письма Октябрь 1917 - июнь 1919",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "",
+          "MEW": "",
+          "MECW": "",
+          "列宁全集中文第二版": "（书信及电报，1921年6月—1921年11月）",
+          "列宁全集俄文第五版": "Письма Июль 1919 - ноябрь 1920",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "",
+          "MEW": "",
+          "MECW": "",
+          "列宁全集中文第二版": "（书信及电报，1921年11月—1923年3月）",
+          "列宁全集俄文第五版": "Письма Ноябрь 1920 - июнь 1921",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "",
+          "MEW": "",
+          "MECW": "",
+          "列宁全集中文第二版": "（家书，1893年—1922年）",
+          "列宁全集俄文第五版": "Письма Июнь - ноябрь 1921",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "",
+          "MEW": "",
+          "MECW": "",
+          "列宁全集中文第二版": "（1912年—1916年，帝国主义笔记）",
+          "列宁全集俄文第五版": "Письма Ноябрь 1921 - март 1923",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "",
+          "MEW": "",
+          "MECW": "",
+          "列宁全集中文第二版": "（1895年—1916年，哲学笔记）",
+          "列宁全集俄文第五版": "Письма к родным 1893 - 1922",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "",
+          "MEW": "",
+          "MECW": "",
+          "列宁全集中文第二版": "（1901年—1915年，土地问题笔记）",
+          "列宁全集俄文第五版": "",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "",
+          "MEW": "",
+          "MECW": "",
+          "列宁全集中文第二版": "（1888年—1913年，《俄国资本主义的发展》一书准备材料）",
+          "列宁全集俄文第五版": "",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "",
+          "MEW": "",
+          "MECW": "",
+          "列宁全集中文第二版": "（1913年10月—1913年12月，马克思恩格斯通讯集批注）",
+          "列宁全集俄文第五版": "",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "",
+          "MEW": "",
+          "MECW": "",
+          "列宁全集中文第二版": "（1888年—1914年，批注类文献专卷）",
+          "列宁全集俄文第五版": "",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        },
+        {
+          "马恩全集中文第一版": "",
+          "MEW": "",
+          "MECW": "",
+          "列宁全集中文第二版": "（1915年—1922年，批注类文献专卷）",
+          "列宁全集俄文第五版": "",
+          "黑格尔全集（二十卷本）": "",
+          "MEGA²第二部分": ""
+        }
+      ]
+    }
+  ]
+}
