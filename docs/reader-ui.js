@@ -40,6 +40,46 @@ function applyLineHeight(v, save) {
     });
 }
 
+// ── 统一链接解析 ──
+function resolveDocLink(href, basePath) {
+    if (!href) return null;
+    if (href.startsWith('#')) return { type: 'anchor', href, hash: href.slice(1) };
+    if (/^(https?:|mailto:|javascript:|\/\/)/i.test(href)) return { type: 'external', href };
+
+    let hash = '';
+    let urlPart = href;
+    const hashIdx = href.indexOf('#');
+    if (hashIdx >= 0) {
+        hash = href.slice(hashIdx);
+        urlPart = href.slice(0, hashIdx);
+    }
+
+    let parts;
+    if (urlPart.startsWith('?doc=')) {
+        parts = urlPart.slice(5).split('/').filter(Boolean);
+    } else if (urlPart.startsWith('/')) {
+        parts = urlPart.slice(1).split('/').filter(Boolean);
+    } else {
+        const baseParts = basePath ? basePath.split('/').filter(Boolean) : [];
+        const relParts = urlPart.split('/').filter(p => p && p !== '.');
+        parts = [...baseParts, ...relParts];
+    }
+
+    const stack = [];
+    for (const p of parts) {
+        if (p === '..' && stack.length) { stack.pop(); }
+        else if (p !== '..') { stack.push(p); }
+    }
+    const docPath = stack.join('/');
+
+    return {
+        type: 'doc',
+        href: '?doc=' + docPath + hash,
+        docPath,
+        hash: hash ? hash.slice(1) : ''
+    };
+}
+
 // ── 欢迎页卡片 ──
 function buildWelcomeCards() {
     const grid = $('#library-cards');
@@ -150,8 +190,18 @@ async function loadDoc(docPath) {
             requestAnimationFrame(() => {
                 content.style.opacity = '1';
                 $('#doc-footer').style.display = 'flex';
-                // DOM 已可见且布局完成，统一处理锚点滚动
-                handleDocAnchor(docPath);
+
+                // 统一滚动：必须在 content 可见后执行，否则 getBoundingClientRect 为 0
+                const hash = location.hash.slice(1);
+                if (hash) {
+                    const el = document.getElementById(hash) || document.querySelector(`[name="${hash}"]`);
+                    if (el) scrollToEl(el);
+                } else if (state.rs) {
+                    const s = localStorage.getItem('scroll_' + state.doc);
+                    s && window.scrollTo(0, parseInt(s));
+                } else {
+                    window.scrollTo(0, 0);
+                }
             });
         });
     } catch (e) {
@@ -183,9 +233,8 @@ function renderDoc(h, path) {
 
     d.querySelectorAll('a[href]').forEach(a => {
         const x = a.getAttribute('href');
-        if (!x || x.startsWith('#') || x.match(/^https?:/)) return;
-        const [f, fg] = x.split('#');
-        a.href = '?doc=' + (f.startsWith('/') ? f.slice(1) : base + f) + (fg ? '#' + fg : '');
+        const r = resolveDocLink(x, base);
+        if (r && r.type === 'doc') a.href = r.href;
     });
 
     d.querySelectorAll('[src]').forEach(e => {
@@ -216,43 +265,12 @@ function renderDoc(h, path) {
 
     fixOverflow(c);
 
-    // 滚动逻辑延后到 loadDoc 内容显示后统一处理
-
     updatePrevNext(path);
     window.__NAV__?.reinit(state.doc);
     const tocDesktop = $('#toc-desktop');
     if (tocDesktop) tocDesktop.style.display = '';
 }
 
-
-// ── 跨页锚点统一处理 ──
-function handleDocAnchor(docPath) {
-    // 1. 优先处理 location.hash（用户直接访问或 history 带来的锚点）
-    if (location.hash) {
-        const id = location.hash.slice(1);
-        const el = document.getElementById(id) || document.querySelector(`[name="${id}"]`);
-        if (el) { scrollToEl(el); return; }
-    }
-    // 2. 处理 reader-nav 遗留的跨页 pending anchor
-    const pendingHash = sessionStorage.getItem('__reader_pending_anchor');
-    const pendingDoc = sessionStorage.getItem('__reader_pending_doc');
-    if (pendingHash) {
-        sessionStorage.removeItem('__reader_pending_anchor');
-        sessionStorage.removeItem('__reader_pending_doc');
-        const normalize = p => (p || '').replace(/^\//, '').replace(/\.html$/i, '').replace(/\/$/, '');
-        if (!pendingDoc || normalize(pendingDoc) === normalize(docPath)) {
-            const el = document.getElementById(pendingHash);
-            if (el) { scrollToEl(el); return; }
-        }
-    }
-    // 3. 恢复阅读进度
-    if (state.rs) {
-        const s = localStorage.getItem('scroll_' + docPath);
-        if (s) { window.scrollTo(0, parseInt(s)); return; }
-    }
-    // 4. 默认回到顶部
-    window.scrollTo(0, 0);
-}
 
 function updateBreadcrumb(path, title) {
     const bar = $('#doc-pathbar');
@@ -277,7 +295,6 @@ function updateBreadcrumb(path, title) {
 }
 
 function fixOverflow(c) {
-    // 无条件包裹所有表格，防止任何情况下撑宽页面
     c.querySelectorAll('table').forEach(table => {
         if (table.parentElement?.classList.contains('table-wrapper')) return;
         const wrapper = document.createElement('div');
@@ -285,7 +302,6 @@ function fixOverflow(c) {
         table.parentNode.insertBefore(wrapper, table);
         wrapper.appendChild(table);
     });
-    // 无条件限制图片，防止任何情况下撑宽页面
     c.querySelectorAll('img').forEach(img => {
         img.style.maxWidth = '100%';
         img.style.height = 'auto';
@@ -395,10 +411,8 @@ function updatePrevNext(p) {
         // 生成路径：相对路径保留；纯文件名用 manifest 所在目录拼接
         const makePath = item => {
             const f = item.file || item.path || item.url || item.filename || '';
-            if (f.startsWith('http')) return f;
-            if (f.startsWith('/')) return f.slice(1);
-            if (f.includes('/')) return f;
-            if (manifestDir) return manifestDir + '/' + f;
+            const r = resolveDocLink(f, manifestDir ? manifestDir + '/' : '');
+            if (r && r.type === 'doc') return r.docPath;
             return f;
         };
 
@@ -748,8 +762,14 @@ function bindEvents() {
         const href = a.getAttribute('href') || '';
         if (href.startsWith('#') && href.length > 1) {
             e.preventDefault();
-            const el = document.getElementById(href.slice(1)) || document.querySelector(`[name="${href.slice(1)}"]`);
-            el && scrollToEl(el);
+            const id = href.slice(1);
+            const el = document.getElementById(id) || document.querySelector(`[name="${id}"]`);
+            if (el) {
+                scrollToEl(el);
+                const url = new URL(location.href);
+                url.hash = id;
+                history.replaceState({}, '', url.toString());
+            }
             return;
         }
 
@@ -760,7 +780,7 @@ function bindEvents() {
 
             const normalize = p => (p || '').replace(/\.html$/i, '').replace(/^\//, '').replace(/\/$/, '');
 
-            // 同页跳转（含锚点）：直接滚动，不重新加载
+            // 同页带锚点：直接滚动，不重新加载
             if (normalize(r.docPath) === normalize(state.doc)) {
                 if (r.hash) {
                     const el = document.getElementById(r.hash);
@@ -772,15 +792,7 @@ function bindEvents() {
                 return;
             }
 
-            // 跨页跳转：设置 pending anchor，由 loadDoc 显示后统一处理
-            if (r.hash) {
-                sessionStorage.setItem('__reader_pending_anchor', r.hash);
-                sessionStorage.setItem('__reader_pending_doc', r.docPath);
-            } else {
-                sessionStorage.removeItem('__reader_pending_anchor');
-                sessionStorage.removeItem('__reader_pending_doc');
-            }
-
+            // 跨页跳转：pushState 后 loadDoc，loadDoc 会在 content 显示后自动处理 hash 滚动
             history.pushState({}, '', r.href);
             loadDoc(r.docPath);
             return;
