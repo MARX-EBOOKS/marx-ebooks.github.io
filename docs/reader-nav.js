@@ -325,7 +325,7 @@ class MenuManager {
 
     _initSidebarToggles(container) {
         if (!container) return;
-        container.querySelectorAll('.sidebar-item--collapsible').forEach(li => {
+        container.querySelectorAll('.sidebar-item--collapsible:not([data-section])').forEach(li => {
             const caret = li.querySelector('.sidebar-caret');
             const header = li.querySelector('.sidebar-category-label');
             this._bindCollapsible(li, caret, header);

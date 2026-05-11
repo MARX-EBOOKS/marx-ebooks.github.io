@@ -213,6 +213,7 @@ window.LIBRARY_CONFIG = [
         badge: 'DE',
         path: '/MEGA/index.html',
         groups: [
+            {label: 'Digitalisierung „Neue Rheinische Zeitung“', path: '/MEGA/nrhz/index.html' },
             {
                 label: 'II. Abteilung: "DAS KAPITAL" UND VORARBEITEN',
                 stylesheets: ['/MEGA/II/MEGA.css'],
