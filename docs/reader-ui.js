@@ -254,25 +254,19 @@ function updateBreadcrumb(path, title) {
 }
 
 function fixOverflow(c) {
-    requestAnimationFrame(() => {
-        c.querySelectorAll('table').forEach(t => {
-            if (t.parentElement?.classList.contains('table-wrapper')) return;
-            if (t.offsetWidth > c.offsetWidth) {
-                const w = document.createElement('div');
-                w.className = 'table-wrapper';
-                t.parentNode.insertBefore(w, t);
-                w.appendChild(t);
-            }
-        });
+    // 无条件包裹所有表格，防止任何情况下撑宽页面
+    c.querySelectorAll('table').forEach(table => {
+        if (table.parentElement?.classList.contains('table-wrapper')) return;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'table-wrapper';
+        table.parentNode.insertBefore(wrapper, table);
+        wrapper.appendChild(table);
     });
+    // 无条件限制图片，防止任何情况下撑宽页面
     c.querySelectorAll('img').forEach(img => {
-        const clamp = () => {
-            if (img.naturalWidth > img.parentElement.offsetWidth) {
-                img.style.maxWidth = '100%';
-                img.style.height = 'auto';
-            }
-        };
-        img.complete ? clamp() : (img.onload = clamp);
+        img.style.maxWidth = '100%';
+        img.style.height = 'auto';
+        img.style.display = 'block';
     });
 }
 
