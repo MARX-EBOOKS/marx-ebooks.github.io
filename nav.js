@@ -196,8 +196,10 @@
 
     _renderSidebarNodes(nodes, cf) {
       return nodes.map(n => {
-        const href = n.id ? `${esc(n.file || '')}#${esc(n.id)}` : esc(n.file || '');
-        const isFile = n.file === cf, hasKids = n.children.length > 0;
+        const nFile = (n.file || '').replace(/\.html$/i, '');
+        const isSameFile = nFile && nFile === cf;
+        const href = n.id ? (isSameFile ? `#${esc(n.id)}` : `${esc(n.file || '')}#${esc(n.id)}`) : esc(n.file || '');
+        const isFile = nFile === cf, hasKids = n.children.length > 0;
         const kidsHtml = hasKids ? `<ul class="sidebar-menu sidebar-menu--nested">${this._renderSidebarNodes(n.children, cf)}</ul>` : '';
         const active = (this._mode === 'page-toc' ? (n.id && n.id === this._activeHeadingId) : (isFile && ((this._activeHeadingId && n.id === this._activeHeadingId) || (!this._activeHeadingId && !n.id)))) ? ' sidebar-link--active' : '';
         const caret = hasKids ? `<button class="sidebar-caret" tabindex="0" aria-label="Expand">\u25b8</button>` : '';

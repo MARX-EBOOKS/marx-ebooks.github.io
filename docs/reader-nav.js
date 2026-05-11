@@ -86,6 +86,7 @@ class MenuManager {
         this._scrollTrackingReady = false;
         this._tocScrollHandler = null;
         this._io = null;
+        this._sidebarClickHandler = null;
     }
 
     init() {
@@ -129,6 +130,10 @@ class MenuManager {
         if (this._io) { this._io.disconnect(); this._io = null; }
         this._scrollTrackingReady = false;
         this._activeHeadingId = null;
+        if (this._sidebarClickHandler && this.navTree) {
+            this.navTree.removeEventListener('click', this._sidebarClickHandler);
+            this._sidebarClickHandler = null;
+        }
     }
 
     _setMode(m) { this._mode = m; }
@@ -177,6 +182,8 @@ class MenuManager {
         this._highlightCurrent(docPath);
         this._initTocRail();
         this._initScrollTracking();
+        this._bindSidebarLinkClicks(docPath);
+        this._scrollToPendingAnchor();
     }
 
     async _renderEpubMenu(docPath) {
@@ -304,7 +311,11 @@ class MenuManager {
         const isPageToc = this._mode === 'page-toc';
         return nodes.map(n => {
             const fullFile = n.file ? (volDir.replace(/\/?$/, '/') + n.file).replace(/\/+/g, '/') : '';
-            let href = isPageToc ? (n.id ? `#${esc(n.id)}` : '#') : (n.id ? `?doc=${esc(fullFile)}#${esc(n.id)}` : `?doc=${esc(fullFile)}`);
+            const targetFile = fullFile.replace(/\.html$/i, '');
+            const isSameFile = !isPageToc && targetFile && targetFile === currentFile;
+            let href = isPageToc ? (n.id ? `#${esc(n.id)}` : '#')
+                : isSameFile ? (n.id ? `#${esc(n.id)}` : '#')
+                    : (n.id ? `?doc=${esc(fullFile)}#${esc(n.id)}` : `?doc=${esc(fullFile)}`);
             const hasChildren = n.children.length > 0;
             const childHtml = hasChildren ? `<ul class="sidebar-menu sidebar-menu--nested">${this._renderSidebarNodes(n.children, currentFile)}</ul>` : '';
             const active = this._isLinkActive(n, currentFile) ? ' sidebar-link--active' : '';
@@ -535,22 +546,16 @@ class MenuManager {
         const currentFile = (state.doc || '').split('/').pop().replace(/\.html$/i, '') || 'index';
         const links = [...tree.querySelectorAll('.sidebar-link')];
         let match = null;
-
-        // 1) 精确匹配：当前文件 + 当前 id（统一去掉 .html 比对，避免跨文件同名 id 误高亮）
         if (id) {
             match = links.find(a =>
                 (a.dataset.file || '').replace(/\.html$/i, '') === currentFile && a.dataset.id === id
             );
         }
-
-        // 2) fallback：当前文件的无 id 入口链接（对应 title heading 等）
         if (!match) {
             match = links.find(a =>
                 (a.dataset.file || '').replace(/\.html$/i, '') === currentFile && !a.dataset.id
             );
         }
-
-        // 3) 最终兜底：当前文件下任一链接
         if (!match) {
             match = links.find(a =>
                 (a.dataset.file || '').replace(/\.html$/i, '') === currentFile
@@ -625,6 +630,80 @@ class MenuManager {
             link.classList.add('sidebar-link--active');
             expandTo(link, this.navTree);
             requestAnimationFrame(() => link.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+        });
+    }
+
+    _bindSidebarLinkClicks(docPath) {
+        if (!this.navTree) return;
+        // 先移除旧监听器，避免重复绑定
+        if (this._sidebarClickHandler) {
+            this.navTree.removeEventListener('click', this._sidebarClickHandler);
+        }
+        this._sidebarClickHandler = (e) => {
+            const link = e.target.closest('.sidebar-link');
+            if (!link) return;
+            const href = link.getAttribute('href') || '';
+
+            // 同页纯锚点 #id —— 直接滚动，防止 SPA 路由重复加载
+            if (href.startsWith('#')) {
+                const id = href.slice(1);
+                if (id) {
+                    e.preventDefault();
+                    const el = document.getElementById(id);
+                    if (el) {
+                        scrollToEl(el);
+                        history.replaceState(null, '', href);
+                    }
+                }
+                return;
+            }
+
+            // SPA 路由链接 ?doc=...#id
+            if (href.startsWith('?doc=')) {
+                const url = new URL(href, location.href);
+                const doc = url.searchParams.get('doc');
+                const hash = url.hash.slice(1);
+                const currentDoc = (state.doc || '').replace(/\.html$/i, '');
+                const targetDoc = (doc || '').replace(/\.html$/i, '');
+
+                // 同页带锚点 —— 直接滚动，不重新请求
+                if (doc && targetDoc === currentDoc && hash) {
+                    e.preventDefault();
+                    const el = document.getElementById(hash);
+                    if (el) {
+                        scrollToEl(el);
+                        history.replaceState(null, '', href);
+                    }
+                    return;
+                }
+
+                // 跨页带锚点 —— 设置标记，等内容加载后滚动
+                if (hash) {
+                    sessionStorage.setItem('__reader_pending_anchor', hash);
+                    sessionStorage.setItem('__reader_pending_doc', doc);
+                }
+            }
+        };
+        this.navTree.addEventListener('click', this._sidebarClickHandler);
+    }
+
+    _scrollToPendingAnchor() {
+        const hash = sessionStorage.getItem('__reader_pending_anchor');
+        const doc = sessionStorage.getItem('__reader_pending_doc');
+        if (!hash) return;
+        sessionStorage.removeItem('__reader_pending_anchor');
+        sessionStorage.removeItem('__reader_pending_doc');
+
+        // 确保当前文档就是目标文档，避免 fallback 菜单等误滚动
+        if (doc) {
+            const currentDoc = (state.doc || '').replace(/\.html$/i, '');
+            const targetDoc = doc.replace(/\.html$/i, '');
+            if (targetDoc !== currentDoc) return;
+        }
+
+        requestAnimationFrame(() => {
+            const el = document.getElementById(hash);
+            if (el) scrollToEl(el);
         });
     }
 }
