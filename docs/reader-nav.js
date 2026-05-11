@@ -251,14 +251,9 @@ class MenuManager {
         if (innerWidth < 997) {
             this._renderPageTocMenu();
         } else {
-            this._setMode('libmap');
-            this._renderLibmapMenu();
-            this._highlightLibmapCurrent();
-            this._initTocRail();
-            this._initScrollTracking();
+            this._forceLibmap();
         }
     }
-
     async _fetchVolData(dir) {
         const cleanDir = dir.replace(/^\//, '').replace(/\/$/, '');
         const raw = await fetchVolData(cleanDir, this._volCache);

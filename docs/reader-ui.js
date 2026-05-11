@@ -150,6 +150,8 @@ async function loadDoc(docPath) {
             requestAnimationFrame(() => {
                 content.style.opacity = '1';
                 $('#doc-footer').style.display = 'flex';
+                // DOM 已可见且布局完成，统一处理锚点滚动
+                handleDocAnchor(docPath);
             });
         });
     } catch (e) {
@@ -214,15 +216,7 @@ function renderDoc(h, path) {
 
     fixOverflow(c);
 
-    if (location.hash) {
-        const el = document.getElementById(location.hash.slice(1)) || document.querySelector(`[name="${location.hash.slice(1)}"]`);
-        el && scrollToEl(el);
-    } else if (state.rs) {
-        const s = localStorage.getItem('scroll_' + path);
-        s && window.scrollTo(0, parseInt(s));
-    } else {
-        window.scrollTo(0, 0);
-    }
+    // 滚动逻辑延后到 loadDoc 内容显示后统一处理
 
     updatePrevNext(path);
     window.__NAV__?.reinit(state.doc);
@@ -230,6 +224,35 @@ function renderDoc(h, path) {
     if (tocDesktop) tocDesktop.style.display = '';
 }
 
+
+// ── 跨页锚点统一处理 ──
+function handleDocAnchor(docPath) {
+    // 1. 优先处理 location.hash（用户直接访问或 history 带来的锚点）
+    if (location.hash) {
+        const id = location.hash.slice(1);
+        const el = document.getElementById(id) || document.querySelector(`[name="${id}"]`);
+        if (el) { scrollToEl(el); return; }
+    }
+    // 2. 处理 reader-nav 遗留的跨页 pending anchor
+    const pendingHash = sessionStorage.getItem('__reader_pending_anchor');
+    const pendingDoc = sessionStorage.getItem('__reader_pending_doc');
+    if (pendingHash) {
+        sessionStorage.removeItem('__reader_pending_anchor');
+        sessionStorage.removeItem('__reader_pending_doc');
+        const normalize = p => (p || '').replace(/^\//, '').replace(/\.html$/i, '').replace(/\/$/, '');
+        if (!pendingDoc || normalize(pendingDoc) === normalize(docPath)) {
+            const el = document.getElementById(pendingHash);
+            if (el) { scrollToEl(el); return; }
+        }
+    }
+    // 3. 恢复阅读进度
+    if (state.rs) {
+        const s = localStorage.getItem('scroll_' + docPath);
+        if (s) { window.scrollTo(0, parseInt(s)); return; }
+    }
+    // 4. 默认回到顶部
+    window.scrollTo(0, 0);
+}
 
 function updateBreadcrumb(path, title) {
     const bar = $('#doc-pathbar');
@@ -732,14 +755,34 @@ function bindEvents() {
 
         if (href.startsWith('?doc=')) {
             e.preventDefault();
-            const docPath = href.slice(5).split('#')[0];
-            const hash = href.includes('#') ? href.slice(href.indexOf('#')) : '';
-            history.pushState({}, '', href);
-            loadDoc(docPath);
-            if (hash) setTimeout(() => {
-                const el = document.getElementById(hash.slice(1));
-                el && scrollToEl(el);
-            }, 100);
+            const r = resolveDocLink(href, '');
+            if (!r || r.type !== 'doc') return;
+
+            const normalize = p => (p || '').replace(/\.html$/i, '').replace(/^\//, '').replace(/\/$/, '');
+
+            // 同页跳转（含锚点）：直接滚动，不重新加载
+            if (normalize(r.docPath) === normalize(state.doc)) {
+                if (r.hash) {
+                    const el = document.getElementById(r.hash);
+                    if (el) {
+                        scrollToEl(el);
+                        history.pushState({}, '', r.href);
+                    }
+                }
+                return;
+            }
+
+            // 跨页跳转：设置 pending anchor，由 loadDoc 显示后统一处理
+            if (r.hash) {
+                sessionStorage.setItem('__reader_pending_anchor', r.hash);
+                sessionStorage.setItem('__reader_pending_doc', r.docPath);
+            } else {
+                sessionStorage.removeItem('__reader_pending_anchor');
+                sessionStorage.removeItem('__reader_pending_doc');
+            }
+
+            history.pushState({}, '', r.href);
+            loadDoc(r.docPath);
             return;
         }
     });
