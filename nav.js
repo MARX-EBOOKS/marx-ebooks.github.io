@@ -1,7 +1,6 @@
 (function () {
   'use strict';
   const $ = s => document.querySelector(s);
-  const lc = s => (s || '').toLowerCase();
   const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const resolveUrl = href => { try { return new URL(href, location.href).href; } catch { return location.pathname.replace(/[^/]*$/, '') + href; } };
 
@@ -71,25 +70,21 @@
 
     _detectVolume() {
       const path = location.pathname;
-      const tryMatch = (useLc) => {
-        const cmp = useLc ? lc : (x => x);
-        for (const col of (window.LIBRARY_CONFIG || [])) {
-          for (const g of (col.groups || [])) {
-            for (const item of (g.items || [])) {
-              const p = cmp(item.path || '');
-              if (!p.endsWith('/index.html')) continue;
-              const dir = p.replace(/^\//, '').replace(/\/index\.html$/, '');
-              if (!dir) continue;
-              const curDir = cmp(path.replace(/\/[^\/]+$/, ''));
-              if (curDir === dir || cmp(path).startsWith('/' + dir + '/')) {
-                return { col, group: g, item, dir: path.replace(/^\//, '').replace(/\/[^\/]+$/, '') };
-              }
-            }
+      for (const col of (window.LIBRARY_CONFIG || [])) {
+        for (const g of (col.groups || [])) {
+          for (const item of (g.items || [])) {
+            const p = item.path || '';
+            if (!p.endsWith('/index.html')) continue;
+            const dir = p.replace(/^\//, '').replace(/\/index\.html$/, '');
+            if (!dir) continue;
+            const curDir = path.replace(/\/[^\/]+$/, '');
+            if (curDir === dir || path.startsWith('/' + dir + '/')) return { col, group: g, item, dir };
+            const dirL = dir.toLowerCase();
+            if (curDir.toLowerCase() === dirL || path.toLowerCase().startsWith('/' + dirL + '/')) return { col, group: g, item, dir: path.replace(/^\//, '').replace(/\/[^\/]+$/, '') };
           }
         }
-        return null;
-      };
-      return tryMatch(false) || tryMatch(true);
+      }
+      return null;
     }
 
     async _renderEpubMenu() {
@@ -174,9 +169,10 @@
     _getPageHeadings() {
       if (this._mode !== 'epub') return this._getDomHeadings().map(h => ({ level: +h.tagName[1], text: h.textContent.trim(), id: h.id }));
       const curFile = location.pathname.split('/').pop().replace(/\.html$/i, '');
+      const curFileL = curFile.toLowerCase();
       const jsonH = (this._currentVol?.data?.headings || []).filter(h => {
         const f = (h.file || '').replace(/\.html$/i, '');
-        return f === curFile || lc(f) === lc(curFile);
+        return f === curFile || f.toLowerCase() === curFileL;
       });
       const domAll = [...($('#content')?.querySelectorAll('h1,h2,h3,h4,h5,h6') || [])];
       let di = 0;
@@ -207,9 +203,9 @@
     _renderSidebarNodes(nodes, cf) {
       return nodes.map(n => {
         const nFile = (n.file || '').replace(/\.html$/i, '');
-        const isSameFile = nFile && (nFile === cf || lc(nFile) === lc(cf));
+        const isSameFile = nFile && (nFile === cf || nFile.toLowerCase() === cf.toLowerCase());
         const href = n.id ? (isSameFile ? `#${esc(n.id)}` : `${esc(n.file || '')}#${esc(n.id)}`) : esc(n.file || '');
-        const isFile = nFile === cf || lc(nFile) === lc(cf), hasKids = n.children.length > 0;
+        const isFile = isSameFile, hasKids = n.children.length > 0;
         const kidsHtml = hasKids ? `<ul class="sidebar-menu sidebar-menu--nested">${this._renderSidebarNodes(n.children, cf)}</ul>` : '';
         const active = (this._mode === 'page-toc' ? (n.id && n.id === this._activeHeadingId) : (isFile && ((this._activeHeadingId && n.id === this._activeHeadingId) || (!this._activeHeadingId && !n.id)))) ? ' sidebar-link--active' : '';
         const caret = hasKids ? `<button class="sidebar-caret" tabindex="0" aria-label="Expand">\u25b8</button>` : '';
@@ -299,20 +295,16 @@
       }
 
       const curFile = location.pathname.split('/').pop().replace(/\.html$/i, '') || 'index';
+      const curFileL = curFile.toLowerCase();
       const allLinks = [...tree.querySelectorAll('.sidebar-link')];
-      const tryMatch = (useLc) => {
-        const cmp = useLc ? lc : (x => x);
-        const cf = cmp(curFile);
-        if (id) {
-          const m = allLinks.find(a => cmp((a.dataset.file || '').replace(/\.html$/i, '')) === cf && a.dataset.id === id);
-          if (m) return m;
-        }
-        const m = allLinks.find(a => cmp((a.dataset.file || '').replace(/\.html$/i, '')) === cf && !a.dataset.id);
-        if (m) return m;
-        return allLinks.find(a => cmp((a.dataset.file || '').replace(/\.html$/i, '')) === cf);
+      const sameFile = a => {
+        const f = (a.dataset.file || '').replace(/\.html$/i, '');
+        return f === curFile || f.toLowerCase() === curFileL;
       };
+      let match = id ? allLinks.find(a => sameFile(a) && a.dataset.id === id) : null;
+      if (!match) match = allLinks.find(a => sameFile(a) && !a.dataset.id);
+      if (!match) match = allLinks.find(sameFile);
 
-      const match = tryMatch(false) || tryMatch(true);
       if (match) {
         match.classList.add('sidebar-link--active');
         this._expandTo(match, tree);
@@ -341,25 +333,23 @@
 
     _findCollectionByPath() {
       const path = location.pathname;
-      const tryMatch = (useLc) => {
-        const cmp = useLc ? lc : (x => x);
-        for (const col of (window.LIBRARY_CONFIG || [])) {
-          if (col.basePath) {
-            const bp = cmp(('/' + col.basePath.replace(/^\/|\/$/g, '') + '/').replace(/\/+/g, '/'));
-            if (cmp(path).startsWith(bp)) return col;
+      for (const col of (window.LIBRARY_CONFIG || [])) {
+        if (col.basePath) {
+          const bp = ('/' + col.basePath.replace(/^\/|\/$/g, '') + '/').replace(/\/+/g, '/');
+          if (path.startsWith(bp)) return col;
+          if (path.toLowerCase().startsWith(bp.toLowerCase())) return col;
+        }
+      }
+      for (const col of (window.LIBRARY_CONFIG || [])) {
+        for (const g of (col.groups || [])) {
+          for (const item of (g.items || [])) {
+            const dir = (item.path || '').replace(/\/[^\/]*$/, '');
+            if (dir && path.startsWith('/' + dir.replace(/^\//, '') + '/')) return col;
+            if (dir && path.toLowerCase().startsWith('/' + dir.toLowerCase().replace(/^\//, '') + '/')) return col;
           }
         }
-        for (const col of (window.LIBRARY_CONFIG || [])) {
-          for (const g of (col.groups || [])) {
-            for (const item of (g.items || [])) {
-              const dir = cmp((item.path || '').replace(/\/[^\/]*$/, ''));
-              if (dir && cmp(path).startsWith('/' + dir.replace(/^\//, '') + '/')) return col;
-            }
-          }
-        }
-        return null;
-      };
-      return tryMatch(false) || tryMatch(true);
+      }
+      return null;
     }
 
     _renderLibmapMenu() {
@@ -462,13 +452,14 @@
       // libmap
       const cp = location.pathname.replace(/\/$/, '');
       const menu = this.navTree.querySelector('.sidebar-menu');
-      const links = [...this.navTree.querySelectorAll('a[data-path]')];
-      let link = links.find(l => (l.dataset.path || '').replace(/\/$/, '') === cp);
-      if (!link) link = links.find(l => lc((l.dataset.path || '').replace(/\/$/, '')) === lc(cp));
-      if (link) {
-        link.classList.add('sidebar-link--active');
-        this._expandTo(link, menu);
-        if (innerWidth >= 997) requestAnimationFrame(() => link.scrollIntoView({ block: 'center', behavior: 'instant' }));
+      const match = [...this.navTree.querySelectorAll('a[data-path]')].find(l => {
+        const dp = (l.dataset.path || '').replace(/\/$/, '');
+        return dp === cp || dp.toLowerCase() === cp.toLowerCase();
+      });
+      if (match) {
+        match.classList.add('sidebar-link--active');
+        this._expandTo(match, menu);
+        if (innerWidth >= 997) requestAnimationFrame(() => match.scrollIntoView({ block: 'center', behavior: 'instant' }));
       }
     }
 
@@ -477,26 +468,22 @@
       const tree = this.navTree?.querySelector('.sidebar-menu');
       if (!tree) return;
 
-      const tryScore = (useLc) => {
-        const cmp = useLc ? lc : (x => x);
-        let best = null, bestScore = 0;
-        tree.querySelectorAll('.sidebar-link').forEach(a => {
-          const f = cmp((a.dataset.file || '').replace(/\.html$/i, '')), id = a.dataset.id || '', href = a.getAttribute('href') || '';
-          let score = 0;
-          if (f === cmp(curFile)) {
-            if (id && id === hash) score = 5;
-            else if (!id && !hash) score = 4;
-            else if (id && !hash) score = 3;
-            else score = 2;
-          } else if (!f && href.startsWith('#') && hash && href.slice(1) === hash) {
-            score = 1;
-          }
-          if (score > bestScore) { bestScore = score; best = a; }
-        });
-        return best;
-      };
+      let best = null, bestScore = 0;
+      tree.querySelectorAll('.sidebar-link').forEach(a => {
+        const f = (a.dataset.file || '').replace(/\.html$/i, ''), id = a.dataset.id || '', href = a.getAttribute('href') || '';
+        const isFile = f === curFile || f.toLowerCase() === curFile.toLowerCase();
+        let score = 0;
+        if (isFile) {
+          if (id && id === hash) score = 5;
+          else if (!id && !hash) score = 4;
+          else if (id && !hash) score = 3;
+          else score = 2;
+        } else if (!f && href.startsWith('#') && hash && href.slice(1) === hash) {
+          score = 1;
+        }
+        if (score > bestScore) { bestScore = score; best = a; }
+      });
 
-      const best = tryScore(false) || tryScore(true);
       if (best) {
         best.classList.add('sidebar-link--active');
         this._expandTo(best, tree);
