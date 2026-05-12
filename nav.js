@@ -1,6 +1,7 @@
 (function () {
   'use strict';
   const $ = s => document.querySelector(s);
+  const lc = s => (s || '').toLowerCase();
   const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const resolveUrl = href => { try { return new URL(href, location.href).href; } catch { return location.pathname.replace(/[^/]*$/, '') + href; } };
 
@@ -69,16 +70,20 @@
     }
 
     _detectVolume() {
-      const path = location.pathname;
+      const path = lc(location.pathname);
       for (const col of (window.LIBRARY_CONFIG || [])) {
         for (const g of (col.groups || [])) {
           for (const item of (g.items || [])) {
-            const p = item.path || '';
+            const p = lc(item.path || '');
             if (!p.endsWith('/index.html')) continue;
             const dir = p.replace(/^\//, '').replace(/\/index\.html$/, '');
             if (!dir) continue;
             const curDir = path.replace(/\/[^\/]+$/, '');
-            if (curDir === dir || path.startsWith('/' + dir + '/')) return { col, group: g, item, dir };
+            if (curDir === dir || path.startsWith('/' + dir + '/')) {
+              // 使用当前地址栏中的实际目录大小写，而非配置中的大小写
+              const actualDir = location.pathname.replace(/^\//, '').replace(/\/[^\/]+$/, '');
+              return { col, group: g, item, dir: actualDir };
+            }
           }
         }
       }
@@ -166,8 +171,8 @@
 
     _getPageHeadings() {
       if (this._mode !== 'epub') return this._getDomHeadings().map(h => ({ level: +h.tagName[1], text: h.textContent.trim(), id: h.id }));
-      const curFile = location.pathname.split('/').pop().replace(/\.html$/i, '');
-      const jsonH = (this._currentVol?.data?.headings || []).filter(h => (h.file || '').replace(/\.html$/i, '') === curFile);
+      const curFile = lc(location.pathname.split('/').pop().replace(/\.html$/i, ''));
+      const jsonH = (this._currentVol?.data?.headings || []).filter(h => lc((h.file || '').replace(/\.html$/i, '')) === curFile);
       const domAll = [...($('#content')?.querySelectorAll('h1,h2,h3,h4,h5,h6') || [])];
       let di = 0;
       return jsonH.map(jh => {
@@ -190,13 +195,13 @@
     }
 
     _renderSidebarTree(nodes, cls) {
-      const cf = location.pathname.split('/').pop().replace(/\.html$/i, '');
+      const cf = lc(location.pathname.split('/').pop().replace(/\.html$/i, ''));
       return `<ul class="sidebar-menu ${cls}">${this._renderSidebarNodes(nodes, cf)}</ul>`;
     }
 
     _renderSidebarNodes(nodes, cf) {
       return nodes.map(n => {
-        const nFile = (n.file || '').replace(/\.html$/i, '');
+        const nFile = lc((n.file || '').replace(/\.html$/i, ''));
         const isSameFile = nFile && nFile === cf;
         const href = n.id ? (isSameFile ? `#${esc(n.id)}` : `${esc(n.file || '')}#${esc(n.id)}`) : esc(n.file || '');
         const isFile = nFile === cf, hasKids = n.children.length > 0;
@@ -288,28 +293,28 @@
         return;
       }
 
-      const curFile = location.pathname.split('/').pop().replace(/\.html$/i, '') || 'index';
+      const curFile = lc(location.pathname.split('/').pop().replace(/\.html$/i, '') || 'index');
       const allLinks = [...tree.querySelectorAll('.sidebar-link')];
       let match = null;
 
       // 1) 精确匹配：当前文件 + 当前 id（统一去掉 .html 比对，避免 data-file="MEW24-018.html" 与 curFile="MEW24-018" 不匹配）
       if (id) {
         match = allLinks.find(a =>
-          (a.dataset.file || '').replace(/\.html$/i, '') === curFile && a.dataset.id === id
+          lc((a.dataset.file || '').replace(/\.html$/i, '')) === curFile && a.dataset.id === id
         );
       }
 
       // 2) fallback：当前文件的无 id 入口链接（对应 title heading 等）
       if (!match) {
         match = allLinks.find(a =>
-          (a.dataset.file || '').replace(/\.html$/i, '') === curFile && !a.dataset.id
+          lc((a.dataset.file || '').replace(/\.html$/i, '')) === curFile && !a.dataset.id
         );
       }
 
       // 3) 最终兜底：当前文件下任一链接
       if (!match) {
         match = allLinks.find(a =>
-          (a.dataset.file || '').replace(/\.html$/i, '') === curFile
+          lc((a.dataset.file || '').replace(/\.html$/i, '')) === curFile
         );
       }
 
@@ -340,17 +345,17 @@
     }
 
     _findCollectionByPath() {
-      const path = location.pathname;
+      const path = lc(location.pathname);
       for (const col of (window.LIBRARY_CONFIG || [])) {
         if (col.basePath) {
-          const bp = ('/' + col.basePath.replace(/^\/|\/$/g, '') + '/').replace(/\/+/g, '/');
+          const bp = lc(('/' + col.basePath.replace(/^\/|\/$/g, '') + '/').replace(/\/+/g, '/'));
           if (path.startsWith(bp)) return col;
         }
       }
       for (const col of (window.LIBRARY_CONFIG || [])) {
         for (const g of (col.groups || [])) {
           for (const item of (g.items || [])) {
-            const dir = (item.path || '').replace(/\/[^\/]*$/, '');
+            const dir = lc((item.path || '').replace(/\/[^\/]*$/, ''));
             if (dir && path.startsWith('/' + dir.replace(/^\//, '') + '/')) return col;
           }
         }
@@ -456,11 +461,11 @@
       if (this._mode === 'epub') return this._highlightEpubCurrent();
       if (this._mode === 'page-toc') return this._highlightPageTocCurrent();
       // libmap
-      const cp = location.pathname.replace(/\/$/, '');
+      const cp = lc(location.pathname.replace(/\/$/, ''));
       let found = false;
       this.navTree.querySelectorAll('a[data-path]').forEach(link => {
         if (found) return;
-        const dp = (link.dataset.path || '').replace(/\/$/, '');
+        const dp = lc((link.dataset.path || '').replace(/\/$/, ''));
         if (dp === cp) {
           found = true;
           link.classList.add('sidebar-link--active');
@@ -480,7 +485,7 @@
 
       let best = null, bestScore = 0;
       tree.querySelectorAll('.sidebar-link').forEach(a => {
-        const f = (a.dataset.file || '').replace(/\.html$/i, ''), id = a.dataset.id || '', href = a.getAttribute('href') || '';
+        const f = lc((a.dataset.file || '').replace(/\.html$/i, '')), id = a.dataset.id || '', href = a.getAttribute('href') || '';
         let score = 0;
         // 优先匹配当前文件，再按精确度打分
         if (f === curFile) {
