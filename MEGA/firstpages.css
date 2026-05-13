@@ -1,0 +1,7 @@
+.foot {font-size: 0.75em;text-align: center;line-height:1.5;}
+.foot ul {margin:2em 0 0 0;padding: 0;list-style: none;display: flex;flex-wrap: wrap;justify-content: center;}
+.foot li {display: inline-block;}
+.foot li:not(:last-child)::after {content: "|";margin: 0 0.5em;}
+.foot a {white-space: nowrap;}
+.foot a:hover {text-decoration:underline;}
+p.foot {margin:2em auto 0 auto;}
