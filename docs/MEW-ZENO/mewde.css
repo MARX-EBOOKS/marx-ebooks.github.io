@@ -1,6 +1,7 @@
 BODY {margin-right:4%; margin-left:4%;max-width:100%; -webkit-hyphens: auto;-moz-hyphens: auto; -ms-hyphens: auto; hyphens: auto;text-align: justify;text-justify: inter-word;font-family:"Times New Roman","Baskerville Old Face",Arial,Helvetica,serif;color:#2D3A53;background-color:#EEF0F5;line-height:200%;font-size:1.25em;}
 .seitenzahlen {font-size:0.6em;}
-.zitat,blockquote {font-size:0.75em;margin:1em 0;line-height:150%;text-indent:1em;}
+.zitat,blockquote,.que {font-size:0.75em;margin:1em 0;line-height:150%;}
+.zitat,blockquote {text-indent:1em;}
 .fn {font-size:0.75em;line-height:1.5em;}
 .fn table,blockquote table {font-size: 0.75em;margin:1em auto;line-height: 150%;}
 div.fnt {margin:1em 0;font-size:1.25rem;}
