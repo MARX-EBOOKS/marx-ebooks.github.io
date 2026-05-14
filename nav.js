@@ -102,12 +102,19 @@
       const volTitle = item.label || item.title || data.title || 'Contents';
       const volHref = item.path || ('/' + dir + '/index.html');
       const volLink = site ? `${site.replace(/\/$/, '')}/${volHref.replace(/^\//, '')}` : volHref;
+
+      // EPUB 目录树 + 分界线 + 完整 Libmap（包含本总目录）
       const html = this._buildBreadcrumb(col.label, volTitle, colHref, volLink) +
         this._renderSidebarTree(this._buildHeadingTree(data.headings || []), 'epub-toc') +
-        '<div class="section-divider"><span>Other Works</span></div>' +
-        `<ul class="sidebar-menu related-toc">${this._renderLazySections(col.id)}</ul>`;
+        '<div class="section-divider"><span>All works</span></div>' +
+        this._buildLibmapHtml();
+
       this.navTree.innerHTML = html;
-      this._initSidebarToggles(this.navTree);
+
+      // 仅对 epub-toc 初始化折叠，避免与下方 libmap 的懒加载逻辑冲突
+      const epubToc = this.navTree.querySelector('.sidebar-menu.epub-toc');
+      if (epubToc) this._initSidebarToggles(epubToc);
+
       this._initLazySections();
       this._initBreadcrumbFade();
     }
@@ -115,26 +122,17 @@
     async _renderPageTocMenu() {
       this._mode = 'page-toc';
       const headings = this._getPageHeadings();
-      const col = this._currentVol?.col || this._findCollectionByPath();
-
-      if (headings.length <= 1) {
-        this._renderLibmapMenu();
-        return;
-      }
-
+      if (headings.length <= 1) { this._renderLibmapMenu(); return; }
+      const col = this._findCollectionByPath();
       const pageTitle = headings[0]?.text || document.title;
       const colLabel = col?.label || col?.title || 'Library';
       const colHref = col?.path ? (col.path.startsWith('http') ? col.path : (document.body.dataset.site ? `${document.body.dataset.site.replace(/\/$/, '')}/${col.path.replace(/^\//, '')}` : col.path)) : '#';
-      const breadcrumb = this._buildBreadcrumb(colLabel, pageTitle, colHref, '');
-
-      // 本页目录树（不带“本页目录”文字）
-      const pageTocHtml = this._renderSidebarTree(this._buildHeadingTree(headings), 'page-toc');
-
-      const html = breadcrumb +
-        pageTocHtml +
-        (window.LIBRARY_CONFIG?.length ? '<div class="section-divider"><span>Other Works</span></div>' + `<ul class="sidebar-menu related-toc">${this._renderLazySections(col?.id)}</ul>` : '');
+      const html = this._buildBreadcrumb(colLabel, pageTitle, colHref, '') +
+        this._renderSidebarTree(this._buildHeadingTree(headings), 'page-toc') +
+        '<div class="section-divider"><span>All works</span></div>' +
+        this._buildLibmapHtml();
       this.navTree.innerHTML = html;
-      this._initSidebarToggles(this.navTree);
+      this._initSidebarToggles(this.navTree.querySelector('.sidebar-menu.page-toc'));
       this._initLazySections();
       this._initBreadcrumbFade();
     }
@@ -352,19 +350,22 @@
       return null;
     }
 
-    _renderLibmapMenu() {
+    // 生成 Libmap 菜单的 HTML 字符串（供 _renderLibmapMenu / _renderEpubMenu 复用）
+    _buildLibmapHtml() {
       if (!window.LIBRARY_CONFIG?.length) {
-        this.navTree.innerHTML = '<div class="sidebar-menu" style="padding:20px">Navigation unavailable</div>';
-        return;
+        return '<div class="sidebar-menu" style="padding:20px">Navigation unavailable</div>';
       }
-      this.navTree.innerHTML = '<ul class="sidebar-menu">' + this._renderLazySections() + '</ul>';
+      return '<ul class="sidebar-menu">' + this._renderLazySections() + '</ul>';
+    }
+
+    _renderLibmapMenu() {
+      this.navTree.innerHTML = this._buildLibmapHtml();
       this._initLazySections();
     }
 
-    _renderLazySections(skipColId) {
+    _renderLazySections() {
       const site = document.body.dataset.site || '';
       return (window.LIBRARY_CONFIG || []).map(col => {
-        if (col.id === skipColId) return '';
         const badge = col.badge ? ` <span class="sidebar-badge">${esc(col.badge)}</span>` : '';
         if (!col.groups?.length && col.path) {
           const ext = col.path.startsWith('http');

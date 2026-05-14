@@ -169,11 +169,6 @@ class MenuManager {
         return html;
     }
 
-    _renderRelatedSections(skipColId) {
-        if (!window.LIBRARY_CONFIG?.length) return '';
-        return `<div class="section-divider"><span>Other Works</span></div>
-<ul class="sidebar-menu related-toc">${this._renderLazySections(skipColId)}</ul>`;
-    }
 
     _postRenderMenu(docPath) {
         this._initSidebarToggles(this.navTree);
@@ -207,7 +202,7 @@ class MenuManager {
 
         const headings = data.headings || [];
         if (headings.length) html += this._renderSidebarTree(buildHeadingTree(headings), 'epub-toc');
-        html += this._renderRelatedSections(col.id);
+        html += '<div class="section-divider"><span>All works</span></div>' + this._buildLibmapHtml();
         this.navTree.innerHTML = html;
         this._postRenderMenu(docPath);
     }
@@ -234,7 +229,7 @@ class MenuManager {
             level: parseInt(h.tagName[1]), text: h.textContent.trim(), id: h.id, file: currentFileName
         }));
         html += this._renderSidebarTree(buildHeadingTree(pageHeadings), 'page-toc');
-        html += this._renderRelatedSections(col?.id);
+        html += '<div class="section-divider"><span>All works</span></div>' + this._buildLibmapHtml();
         this.navTree.innerHTML = html;
         this._postRenderMenu(state.doc);
     }
@@ -385,18 +380,20 @@ class MenuManager {
         this._io.observe(tocTree);
     }
 
-    _renderLibmapMenu() {
+    _buildLibmapHtml() {
         if (!window.LIBRARY_CONFIG?.length) {
-            this.navTree.innerHTML = '<div class="sidebar-menu" style="padding:20px">Navigation unavailable</div>';
-            return;
+            return '<div class="sidebar-menu" style="padding:20px">Navigation unavailable</div>';
         }
-        this.navTree.innerHTML = '<ul class="sidebar-menu">' + this._renderLazySections() + '</ul>';
+        return '<ul class="sidebar-menu">' + this._renderLazySections() + '</ul>';
+    }
+
+    _renderLibmapMenu() {
+        this.navTree.innerHTML = this._buildLibmapHtml();
         this._initLazySections();
     }
 
-    _renderLazySections(skipColId) {
+    _renderLazySections() {
         return (window.LIBRARY_CONFIG || []).map(col => {
-            if (col.id === skipColId) return '';
             const id = esc(col.id || '');
             const label = esc(col.label || col.title || col.id || '');
             const badge = col.badge ? ` <span class="sidebar-badge">${esc(col.badge)}</span>` : '';
