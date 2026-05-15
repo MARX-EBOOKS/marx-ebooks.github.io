@@ -104,7 +104,7 @@
       const volLink = site ? `${site.replace(/\/$/, '')}/${volHref.replace(/^\//, '')}` : volHref;
 
       // EPUB 目录树 + 分界线 + 完整 Libmap（包含本总目录）
-      const html = this._buildBreadcrumb(col.label, volTitle, colHref, volLink) +
+      const html = this._buildBreadcrumb(col.label, volTitle, colHref, volLink, col.id) +
         this._renderSidebarTree(this._buildHeadingTree(data.headings || []), 'epub-toc') +
         '<div class="section-divider"><span>All works</span></div>' +
         this._buildLibmapHtml();
@@ -117,6 +117,7 @@
 
       this._initLazySections();
       this._initBreadcrumbFade();
+      this._bindBreadcrumbClicks();
     }
 
     async _renderPageTocMenu() {
@@ -127,7 +128,7 @@
       const pageTitle = headings[0]?.text || document.title;
       const colLabel = col?.label || col?.title || 'Library';
       const colHref = col?.path ? (col.path.startsWith('http') ? col.path : (document.body.dataset.site ? `${document.body.dataset.site.replace(/\/$/, '')}/${col.path.replace(/^\//, '')}` : col.path)) : '#';
-      const html = this._buildBreadcrumb(colLabel, pageTitle, colHref, '') +
+      const html = this._buildBreadcrumb(colLabel, pageTitle, colHref, '', col?.id) +
         this._renderSidebarTree(this._buildHeadingTree(headings), 'page-toc') +
         '<div class="section-divider"><span>All works</span></div>' +
         this._buildLibmapHtml();
@@ -135,12 +136,35 @@
       this._initSidebarToggles(this.navTree.querySelector('.sidebar-menu.page-toc'));
       this._initLazySections();
       this._initBreadcrumbFade();
+      this._bindBreadcrumbClicks();
     }
 
-    _buildBreadcrumb(label1, label2, href1, href2) {
+    _buildBreadcrumb(label1, label2, href1, href2, expand1) {
       const span = l => `<span>${esc(l)}</span>`;
-      const a = (l, h) => h ? `<a href="${esc(h)}">${esc(l)}</a>` : span(l);
-      return `<div class="breadcrumb" aria-label="Breadcrumb">${a(label1, href1)}<span class="breadcrumb__sep">/</span>${a(label2, href2)}</div>`;
+      const a = (l, h, exp) => h ? `<a href="${esc(h)}"${exp ? ` data-expand-section="${esc(exp)}"` : ''}>${esc(l)}</a>` : span(l);
+      return `<div class="breadcrumb" aria-label="Breadcrumb">${a(label1, href1, expand1)}<span class="breadcrumb__sep">/</span>${a(label2, href2)}</div>`;
+    }
+
+    _expandSectionById(sectionId) {
+      const li = this.navTree.querySelector(`li[data-section="${sectionId}"]`);
+      if (!li) return;
+      const isCollapsed = li.getAttribute('data-collapsed') !== 'false';
+      if (isCollapsed) {
+        const trigger = li.querySelector('.sidebar-category-label') || li.querySelector('.sidebar-caret');
+        if (trigger) trigger.click();
+      }
+      requestAnimationFrame(() => li.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    }
+
+    _bindBreadcrumbClicks() {
+      const bc = this.navTree?.querySelector('.breadcrumb');
+      if (!bc) return;
+      bc.addEventListener('click', (e) => {
+        const link = e.target.closest('a[data-expand-section]');
+        if (!link) return;
+        e.preventDefault();
+        this._expandSectionById(link.dataset.expandSection);
+      });
     }
 
     _initBreadcrumbFade() {

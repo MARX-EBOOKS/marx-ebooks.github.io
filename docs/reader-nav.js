@@ -162,13 +162,36 @@ class MenuManager {
         let html = '<div class="breadcrumb" aria-label="Breadcrumb">';
         parts.forEach((p, i) => {
             if (i > 0) html += '<span class="breadcrumb__sep">/</span>';
-            if (p.href) html += `<a href="${esc(p.href)}">${esc(p.text)}</a>`;
+            if (p.href && p.expand) html += `<a href="${esc(p.href)}" data-expand-section="${esc(p.expand)}">${esc(p.text)}</a>`;
+            else if (p.href) html += `<a href="${esc(p.href)}">${esc(p.text)}</a>`;
             else html += `<span>${esc(p.text)}</span>`;
         });
         html += '</div>';
         return html;
     }
 
+
+    _expandSectionById(sectionId) {
+        const li = this.navTree.querySelector(`li[data-section="${sectionId}"]`);
+        if (!li) return;
+        const isCollapsed = li.getAttribute('data-collapsed') !== 'false';
+        if (isCollapsed) {
+            const trigger = li.querySelector('.sidebar-category-label') || li.querySelector('.sidebar-caret');
+            if (trigger) trigger.click();
+        }
+        requestAnimationFrame(() => li.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    }
+
+    _bindBreadcrumbClicks() {
+        const bc = this.navTree?.querySelector('.breadcrumb');
+        if (!bc) return;
+        bc.addEventListener('click', (e) => {
+            const link = e.target.closest('a[data-expand-section]');
+            if (!link) return;
+            e.preventDefault();
+            this._expandSectionById(link.dataset.expandSection);
+        });
+    }
 
     _postRenderMenu(docPath) {
         this._initSidebarToggles(this.navTree);
@@ -178,6 +201,7 @@ class MenuManager {
         this._initTocRail();
         this._initScrollTracking();
         this._bindSidebarLinkClicks(docPath);
+        this._bindBreadcrumbClicks();
         this._scrollToPendingAnchor();
     }
 
@@ -196,7 +220,7 @@ class MenuManager {
         const volLink = `?doc=${esc(volHref.replace(/^\//, ''))}`;
 
         let html = this._buildBreadcrumb([
-            colHref ? { href: colHref, text: col.label } : { text: col.label },
+            colHref ? { href: colHref, text: col.label, expand: col.id } : { text: col.label, expand: col.id },
             { href: volLink, text: volTitle }
         ]);
 
@@ -213,7 +237,7 @@ class MenuManager {
 
         const pageTitle = headings[0]?.textContent?.trim() || document.title;
         const col = this._currentVol?.col || this._findCollectionByPath();
-        const parts = [{ text: col?.label || 'Library' }];
+        const parts = [{ text: col?.label || 'Library', expand: col?.id }];
         if (col?.path && !col.path.startsWith('http')) parts[0].href = `?doc=${esc(col.path.replace(/^\//, ''))}`;
         if (this._currentVol?.item?.label) {
             parts.push({
