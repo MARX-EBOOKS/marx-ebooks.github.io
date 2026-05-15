@@ -121,7 +121,7 @@ window.LIBRARY_CONFIG = [
                 label: 'Ergänzung (Bände 40-43)',
                 items: [
                     { label: 'Band 40 (Karl Marx: Schriften und Briefe, November 1837 bis August 1844)', path: '/MEW/40/index.html' },
-                    { label: 'Band 42 (Karl Marx: Ökonomische Manuskripte 1857/1858', path: '/MEW/42/index.html' }
+                    { label: 'Band 42 (Karl Marx: Ökonomische Manuskripte 1857/1858)', path: '/MEW/42/index.html' }
                 ]
             }
         ]
