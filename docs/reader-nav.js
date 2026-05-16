@@ -186,9 +186,11 @@ class MenuManager {
         const bc = this.navTree?.querySelector('.breadcrumb');
         if (!bc) return;
         bc.addEventListener('click', (e) => {
-            const link = e.target.closest('a[data-expand-section]');
+            const el = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+            const link = el?.closest('a[data-expand-section]');
             if (!link) return;
             e.preventDefault();
+            e.stopPropagation();
             this._expandSectionById(link.dataset.expandSection);
         });
     }
@@ -663,7 +665,8 @@ class MenuManager {
         const normalizePath = p => (p || '').replace(/^\//, '').replace(/\.html$/i, '').replace(/\/$/, '');
 
         this._sidebarClickHandler = (e) => {
-            const link = e.target.closest('.sidebar-link');
+            const el = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+            const link = el?.closest('.sidebar-link');
             if (!link) return;
             const href = link.getAttribute('href') || '';
 
