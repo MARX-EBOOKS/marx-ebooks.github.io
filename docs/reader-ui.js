@@ -267,6 +267,7 @@ function renderDoc(h, path) {
 
     updatePrevNext(path);
     window.__NAV__?.reinit(state.doc);
+    window.__PAGE_BAR__?.scanContent($('#content'));
     const tocDesktop = $('#toc-desktop');
     if (tocDesktop) tocDesktop.style.display = '';
 }
@@ -291,6 +292,7 @@ function updateBreadcrumb(path, title) {
     const file = pts[pts.length - 1];
     if (file) parts.push(`<span class="crumb-sep">/</span><span class="crumb crumb--active">${esc(file)}</span>`);
     if (title) parts.push(`<span class="crumb-sep">/</span><span class="crumb crumb--active">${esc(title)}</span>`);
+    parts.push('<span class="page-badge" id="page-badge" style="display:none"></span>');
     bar.innerHTML = parts.join('');
 }
 
@@ -747,6 +749,7 @@ function bindEvents() {
                 document.title = '文库阅读器 — MLCLASSIC';
                 state.doc = null;
                 window.__NAV__?.reinit(null);
+                window.__PAGE_BAR__?.scanContent(null);
             }
             closeSidebar();
             return;
@@ -840,6 +843,8 @@ on(document, 'DOMContentLoaded', () => {
     applyLineHeight(state.lh, false);
     window.__NAV__ = new MenuManager();
     window.__NAV__.init();
+    window.__PAGE_BAR__ = new PageBarManager();
+    window.__PAGE_BAR__.init();
     buildWelcomeCards();
 
     const d = new URLSearchParams(location.search).get('doc');
