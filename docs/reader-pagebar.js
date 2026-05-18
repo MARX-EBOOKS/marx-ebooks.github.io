@@ -18,8 +18,8 @@ class PageBarManager {
     if (!container) { this._reset(); return; }
     this.pageNumbers = [];
     container.querySelectorAll('a[id^="S"]').forEach(a => {
-      const m = a.id.match(/^S([\d-]+)$/);
-      if (m) this.pageNumbers.push({ id: a.id, number: parseInt(m[1], 10), el: a });
+      const pageInfo = this._parsePageAnchor(a.id);
+      if (pageInfo) this.pageNumbers.push({ id: a.id, ...pageInfo, el: a });
     });
 
     this.hasPageAnchors = this.pageNumbers.length > 0;
@@ -51,7 +51,7 @@ class PageBarManager {
         .filter(Boolean);
       if (visible.length) {
         visible.sort((a, b) => a.top - b.top);
-        this.currentPage = visible[0].number;
+        this.currentPage = visible[0];
         this._updateBadge(this.currentPage);
       }
     }, { root: null, rootMargin: '-40% 0px -40% 0px', threshold: 0 });
@@ -62,13 +62,39 @@ class PageBarManager {
     if (this._io) { this._io.disconnect(); this._io = null; }
   }
 
-  _updateBadge(page) {
+  _parsePageAnchor(id) {
+    const plain = id.match(/^S(\d+)$/);
+    if (plain) {
+      return {
+        page: plain[1],
+        label: plain[1],
+        citePage: plain[1]
+      };
+    }
+
+    const scoped = id.match(/^S(.+?)-p?(\d+)$/i);
+    if (scoped) {
+      const scope = scoped[1].replace(/^[-_]+|[-_]+$/g, '');
+      const page = scoped[2];
+      return {
+        scope,
+        page,
+        label: `${scope}, S. ${page}`,
+        citePage: `${scope}, S. ${page}`
+      };
+    }
+
+    return null;
+  }
+
+  _updateBadge(pageInfo) {
     const link = document.getElementById('page-breadcrumb-link');
     if (link) {
-      if (page !== null && page !== undefined) {
-        link.textContent = 'S. ' + page;
+      if (pageInfo !== null && pageInfo !== undefined) {
+        const info = typeof pageInfo === 'object' ? pageInfo : { label: pageInfo, citePage: pageInfo };
+        link.textContent = info.scope ? info.label : 'S. ' + info.label;
         link.style.display = '';
-        link.dataset.page = page;
+        link.dataset.page = info.citePage || info.label;
         this._bindCopy(link);
       } else {
         link.textContent = '';
@@ -119,6 +145,12 @@ class PageBarManager {
     return null;
   }
 
+  _formatCitationPage(page, pageParam) {
+    const pageText = String(page);
+    if (/(^|,\s)(S|p)\.\s/i.test(pageText)) return pageText;
+    return pageParam.replace('${page}', pageText);
+  }
+
   _generateCitation(page) {
     const cit = this._findVolumeCitation(state.doc);
 
@@ -130,19 +162,20 @@ class PageBarManager {
       if (cit.publisher) text += (text ? ', ' : '') + cit.publisher;
       if (cit.year) text += (text ? ' ' : '') + `${cit.year}`;
       const pageParam = cit.pageParam || 'S. ${page}';
-      text += (text ? ', ' : '') + pageParam.replace('${page}', page);
+      text += (text ? ', ' : '') + this._formatCitationPage(page, pageParam);
       return text;
     }
 
     // 全集级 fallback：按 collection id 匹配
     const col = findCollection(state.doc);
     const id = col?.id || '';
-    if (id === 'mew') return `MEW, S. ${page}`;
-    if (id === 'mega') return `MEGA², S. ${page}`;
-    if (id === 'mecw') return `MECW, p. ${page}`;
-    if (id === 'hegel') return `G.W.F.Hegel Werke, S. ${page}`;
-    if (id === 'mlclassic') return `MLCLASSIC, S. ${page}`;
-    return `${id ? id.toUpperCase() + ', ' : ''}S. ${page}`;
+    const pageText = this._formatCitationPage(page, 'S. ${page}');
+    if (id === 'mew') return `MEW, ${pageText}`;
+    if (id === 'mega') return `MEGA², ${pageText}`;
+    if (id === 'mecw') return `MECW, ${this._formatCitationPage(page, 'p. ${page}')}`;
+    if (id === 'hegel') return `G.W.F.Hegel Werke, ${pageText}`;
+    if (id === 'mlclassic') return `MLCLASSIC, ${pageText}`;
+    return `${id ? id.toUpperCase() + ', ' : ''}${pageText}`;
   }
 
   _showCitationPopover(triggerEl) {
@@ -220,8 +253,8 @@ class PageBarManager {
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
-      const page = parseInt(e.currentTarget.dataset.page, 10);
-      if (!page && page !== 0) return;
+      const page = e.currentTarget.dataset.page;
+      if (!page) return;
       const citation = this._generateCitation(page);
       e.currentTarget.dataset.citation = citation;
       if (navigator.clipboard && navigator.clipboard.writeText) {
