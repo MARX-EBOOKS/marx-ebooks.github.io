@@ -292,7 +292,6 @@ function updateBreadcrumb(path, title) {
     const file = pts[pts.length - 1];
     if (file) parts.push(`<span class="crumb-sep">/</span><span class="crumb crumb--active">${esc(file)}</span>`);
     if (title) parts.push(`<span class="crumb-sep">/</span><span class="crumb crumb--active">${esc(title)}</span>`);
-    parts.push('<span class="page-badge" id="page-badge" style="display:none"></span>');
     bar.innerHTML = parts.join('');
 }
 
@@ -318,6 +317,53 @@ function showError(p, m) {
     $('#content').style.display = 'block';
     $('#content').style.opacity = '1';
 }
+
+// ── 轻量通知：给页码引用复制等非阻塞反馈使用 ──
+function showReaderNotice(message, options = {}) {
+    let notice = document.getElementById('reader-notice');
+    if (!notice) {
+        notice = document.createElement('div');
+        notice.id = 'reader-notice';
+        notice.setAttribute('role', 'status');
+        notice.setAttribute('aria-live', 'polite');
+        document.body.appendChild(notice);
+    }
+
+    clearTimeout(showReaderNotice._timer);
+    notice.textContent = message;
+    notice.style.cssText = `
+        position: fixed !important;
+        left: 50% !important;
+        bottom: 24px !important;
+        transform: translateX(-50%) translateY(12px) !important;
+        max-width: min(420px, calc(100vw - 32px)) !important;
+        padding: 10px 14px !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 10px !important;
+        background: var(--bg-card) !important;
+        color: ${options.type === 'error' ? 'var(--accent)' : 'var(--text)'} !important;
+        box-shadow: var(--shadow-md) !important;
+        font: 13px/1.5 var(--font-ui) !important;
+        text-align: center !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        z-index: 900 !important;
+        transition: opacity 160ms ease, transform 160ms ease !important;
+    `;
+
+    requestAnimationFrame(() => {
+        notice.style.setProperty('opacity', '1', 'important');
+        notice.style.setProperty('transform', 'translateX(-50%) translateY(0)', 'important');
+    });
+
+    showReaderNotice._timer = setTimeout(() => {
+        notice.style.setProperty('opacity', '0', 'important');
+        notice.style.setProperty('transform', 'translateX(-50%) translateY(12px)', 'important');
+    }, options.duration || 2400);
+}
+window.showReaderNotice = showReaderNotice;
 
 // ── 前后篇导航 ──
 const mf = {};

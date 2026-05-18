@@ -162,9 +162,15 @@ class MenuManager {
         let html = '<div class="breadcrumb" aria-label="Breadcrumb">';
         parts.forEach((p, i) => {
             if (i > 0) html += '<span class="breadcrumb__sep">/</span>';
-            if (p.href && p.expand) html += `<a href="${esc(p.href)}" data-expand-section="${esc(p.expand)}">${esc(p.text)}</a>`;
-            else if (p.href) html += `<a href="${esc(p.href)}">${esc(p.text)}</a>`;
-            else html += `<span>${esc(p.text)}</span>`;
+            if (p.isPageBadge) {
+                html += `<a href="#" id="${esc(p.id)}" style="display:none"></a>`;
+            } else if (p.href && p.expand) {
+                html += `<a href="${esc(p.href)}" data-expand-section="${esc(p.expand)}">${esc(p.text)}</a>`;
+            } else if (p.href) {
+                html += `<a href="${esc(p.href)}">${esc(p.text)}</a>`;
+            } else {
+                html += `<span>${esc(p.text)}</span>`;
+            }
         });
         html += '</div>';
         return html;
@@ -205,6 +211,10 @@ class MenuManager {
         this._bindSidebarLinkClicks(docPath);
         this._bindBreadcrumbClicks();
         this._scrollToPendingAnchor();
+        // 同步页码链接状态（菜单重建后恢复当前页码显示）
+        if (window.__PAGE_BAR__?.currentPage != null) {
+            window.__PAGE_BAR__._updateBadge(window.__PAGE_BAR__.currentPage);
+        }
     }
 
     async _renderEpubMenu(docPath) {
@@ -223,7 +233,8 @@ class MenuManager {
 
         let html = this._buildBreadcrumb([
             colHref ? { href: colHref, text: col.label, expand: col.id } : { text: col.label, expand: col.id },
-            { href: volLink, text: volTitle }
+            { href: volLink, text: volTitle },
+            { id: 'page-breadcrumb-link', isPageBadge: true }
         ]);
 
         const headings = data.headings || [];
@@ -333,7 +344,6 @@ class MenuManager {
         return nodes.map(n => {
             const fullFile = n.file ? (volDir.replace(/\/?$/, '/') + n.file).replace(/\/+/g, '/') : '';
             const targetFile = fullFile.replace(/\.html$/i, '');
-            // 用完整路径判断同页，避免只比较文件名时跨目录误判
             const isSameFile = !isPageToc && targetFile && targetFile === currentFullPath;
             let href = isPageToc ? (n.id ? `#${esc(n.id)}` : '#')
                 : isSameFile ? (n.id ? `#${esc(n.id)}` : '#')
@@ -670,7 +680,6 @@ class MenuManager {
             if (!link) return;
             const href = link.getAttribute('href') || '';
 
-            // 同页纯锚点 #id —— 直接滚动，保留 ?doc= 查询参数
             if (href.startsWith('#')) {
                 const id = href.slice(1);
                 if (id) {
@@ -693,7 +702,6 @@ class MenuManager {
                 const currentDoc = normalizePath(state.doc);
                 const targetDoc = normalizePath(doc);
 
-                // 同页带锚点 —— 直接滚动，不重新请求
                 if (doc && targetDoc === currentDoc && hash) {
                     e.preventDefault();
                     const el = document.getElementById(hash);
@@ -704,7 +712,6 @@ class MenuManager {
                     return;
                 }
 
-                // 跨页带锚点 —— 存标记，等 reinit 后滚动
                 if (hash) {
                     sessionStorage.setItem('__reader_pending_anchor', hash);
                     sessionStorage.setItem('__reader_pending_doc', doc);
