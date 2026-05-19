@@ -195,7 +195,7 @@ async function loadDoc(docPath) {
                 const hash = location.hash.slice(1);
                 if (hash) {
                     const el = document.getElementById(hash) || document.querySelector(`[name="${hash}"]`);
-                    if (el) scrollToEl(el);
+                    if (!window.__PAGE_BAR__?.highlightPageAnchor(hash) && el) scrollToEl(el);
                 } else if (state.rs) {
                     const s = localStorage.getItem('scroll_' + state.doc);
                     s && window.scrollTo(0, parseInt(s));
@@ -760,8 +760,9 @@ function bindEvents() {
         } else if (d !== state.doc) {
             loadDoc(d);
         } else if (location.hash) {
-            const el = document.getElementById(location.hash.slice(1)) || document.querySelector(`[name="${location.hash.slice(1)}"]`);
-            el && scrollToEl(el);
+            const id = location.hash.slice(1);
+            const el = document.getElementById(id) || document.querySelector(`[name="${id}"]`);
+            if (!window.__PAGE_BAR__?.highlightPageAnchor(id) && el) scrollToEl(el);
         }
     });
 
@@ -814,7 +815,7 @@ function bindEvents() {
             const id = href.slice(1);
             const el = document.getElementById(id) || document.querySelector(`[name="${id}"]`);
             if (el) {
-                scrollToEl(el);
+                if (!window.__PAGE_BAR__?.highlightPageAnchor(id)) scrollToEl(el);
                 const url = new URL(location.href);
                 url.hash = id;
                 history.replaceState({}, '', url.toString());
@@ -834,7 +835,7 @@ function bindEvents() {
                 if (r.hash) {
                     const el = document.getElementById(r.hash);
                     if (el) {
-                        scrollToEl(el);
+                        if (!window.__PAGE_BAR__?.highlightPageAnchor(r.hash)) scrollToEl(el);
                         history.pushState({}, '', r.href);
                     }
                 }
