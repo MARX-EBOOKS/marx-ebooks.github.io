@@ -58,7 +58,7 @@ window.LIBRARY_CONFIG = [
         id: 'mew',
         label: 'MEW',
         title: 'KARL MARX FRIEDRICH ENGELS WERKE',
-        desc: 'Marx-Engels-Werke (auf dem mlwerke.de)',
+        desc: 'Marx-Engels-Werke (von AI konvertiert und auf dem mlwerke.de)',
         basePath: '/MEW/',
         stylesheets: ['/MEW/mewde.css'],
         badge: 'DE',
