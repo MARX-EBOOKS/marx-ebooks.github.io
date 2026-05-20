@@ -210,7 +210,7 @@ window.LIBRARY_CONFIG = [
     {
         id: 'mega',
         label: 'MEGA2',
-        title: 'KARL MARX FRIEDRICH ENGELS GESAMTAUSGABE (MEGA)',
+        title: 'KARL MARX FRIEDRICH ENGELS GESAMTAUSGABE (von BBAW)',
         desc: 'ZWEITE ABTEILUNG',
         basePath: '/MEGA/',
         badge: 'DE',
@@ -525,7 +525,8 @@ window.LIBRARY_CONFIG = [
         basePath: '/docs/HEGEL/',
         stylesheets: ['/docs/HEGEL/hegel.css'],
         badge: 'DE',
-        path: '/docs/HEGEL/index.html#de',
+        path: '/docs/HEGEL/index.html#de ',
+        citation: { prefix: 'G.W.F. Hegel: Werke', title: 'Georg Wilhelm Friedrich: Werke in zwanzig Bänden', publisher: 'Frankfurt am Main: Suhrkamp',year:'1979ff' },
         groups: [
             {
                 label: 'Hegel Werke 1-20',
