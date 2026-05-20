@@ -26,6 +26,7 @@ class PageBarManager {
     if (!container) { this._reset(); return; }
     this.pageNumbers = [];
     container.querySelectorAll('a[id^="S"]').forEach(a => {
+      if (this._isFootnoteAsideAnchor(a)) return;
       const pageInfo = this._parsePageAnchor(a.id);
       if (pageInfo) this.pageNumbers.push({ id: a.id, ...pageInfo, el: a });
     });
@@ -211,6 +212,13 @@ class PageBarManager {
     return anchor && pageInfo ? { id, ...pageInfo, el: anchor } : null;
   }
 
+  _isFootnoteAsideAnchor(anchor) {
+    const aside = anchor?.closest?.('aside');
+    if (!aside) return false;
+    const marker = `${aside.className || ''} ${aside.id || ''} ${aside.getAttribute('role') || ''} ${aside.getAttribute('aria-label') || ''}`;
+    return /\b(fn|fni|footnote|endnote|note|notes)\b/i.test(marker) || aside.matches('[epub\\:type~="footnote"], [epub\\:type~="endnote"], [role="doc-footnote"], [role="doc-endnote"]');
+  }
+
   highlightPageAnchor(target, options = {}) {
     const info = this._resolvePageInfo(target);
     if (!info) return false;
@@ -241,6 +249,7 @@ class PageBarManager {
     const info = this._resolvePageInfo(pageInfo);
     const anchor = info?.el || (info?.id ? document.getElementById(info.id) : null);
     if (!info || !anchor) return false;
+    if (this._isFootnoteAsideAnchor(anchor)) return false;
 
     this._clearPageMarker();
     this._ensureMarkerStyles();
@@ -267,21 +276,48 @@ class PageBarManager {
       if (page) this._copyCitation(e.currentTarget, page);
     });
 
+    marker.style.visibility = 'hidden';
+    document.body.appendChild(marker);
+    this._pageMarkerEl = marker;
+
     const anchorRect = anchor.getClientRects()[0] || anchor.getBoundingClientRect();
     const contentRect = document.getElementById('content')?.getBoundingClientRect();
     const sidebarOpen = innerWidth < 997 && document.querySelector('.doc-sidebar--open');
-    const labelLeft = Number.isFinite(anchorRect.left) && anchorRect.left > 0
+    const anchorStyle = getComputedStyle(anchor);
+    const anchorParentStyle = anchor.parentElement ? getComputedStyle(anchor.parentElement) : null;
+    const lineHeight = parseFloat(anchorStyle.lineHeight) || parseFloat(anchorParentStyle?.lineHeight) || 32;
+    const anchorLeft = Number.isFinite(anchorRect.left) && anchorRect.left > 0
       ? anchorRect.left + scrollX
       : (contentRect?.left ?? 24) + scrollX;
     const labelTop = Math.max(0, anchorRect.top + scrollY);
+    const viewportAnchorLeft = anchorLeft - scrollX;
+    const viewportAnchorRight = Math.max(viewportAnchorLeft, Number.isFinite(anchorRect.right) ? anchorRect.right : viewportAnchorLeft);
+    const gap = 9;
+    const margin = 8;
+    const markerWidth = Math.min(marker.offsetWidth || 0, 240);
+    const rightSideLeft = viewportAnchorRight + gap;
+    const rightBoundary = Math.min(innerWidth - margin, (contentRect?.right ?? innerWidth) - margin);
+    const canFitRight = rightSideLeft + markerWidth <= rightBoundary;
+    let labelLeft = anchorLeft;
+    let markerTop = labelTop;
+
+    marker.classList.toggle('reader-page-marker--pointer-right', false);
+    marker.classList.toggle('reader-page-marker--pointer-left', true);
+    if (canFitRight) {
+      labelLeft = rightSideLeft + scrollX;
+    } else {
+      const fallbackLeft = contentRect
+        ? Math.min(Math.max(contentRect.left, margin), innerWidth - markerWidth - margin)
+        : margin;
+      labelLeft = fallbackLeft + scrollX;
+      markerTop = labelTop + Math.max(28, lineHeight);
+    }
 
     marker.style.left = `${Math.max(8, labelLeft)}px`;
-    marker.style.top = `${labelTop}px`;
+    marker.style.top = `${markerTop}px`;
     marker.style.maxWidth = `min(240px, calc(100vw - ${Math.max(24, labelLeft - scrollX + 16)}px))`;
     marker.style.zIndex = sidebarOpen || options.underMenu ? '90' : '250';
-
-    document.body.appendChild(marker);
-    this._pageMarkerEl = marker;
+    marker.style.visibility = '';
     setTimeout(() => {
       if (this._pageMarkerEl !== marker) return;
       this._dismissPageMarkerHandler = (e) => {
@@ -313,7 +349,6 @@ class PageBarManager {
         border-radius: 8px;
         background: color-mix(in srgb, var(--bg-card, #ffffff) 88%, var(--accent-bg, #fef3c7));
         border: 1px solid color-mix(in srgb, var(--accent-border, #78350f) 64%, transparent);
-        border-left: 4px solid var(--accent, #b45309);
         color: var(--text, #1c1917);
         box-shadow: var(--shadow-md, 0 10px 28px rgba(0, 0, 0, .18));
         font: 700 13px/1.25 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -324,6 +359,32 @@ class PageBarManager {
         opacity: 1;
         animation: readerPageMarkerBreathe 1600ms ease-in-out infinite;
         transition: opacity 260ms ease, transform 260ms ease;
+      }
+      .reader-page-marker::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        width: 9px;
+        height: 9px;
+        background: inherit;
+        border: inherit;
+        transform: translateY(-50%) rotate(45deg);
+      }
+      .reader-page-marker--pointer-left {
+        border-left: 4px solid var(--accent, #b45309);
+      }
+      .reader-page-marker--pointer-left::before {
+        left: -5px;
+        border-top: 0;
+        border-right: 0;
+      }
+      .reader-page-marker--pointer-right {
+        border-right: 4px solid var(--accent, #b45309);
+      }
+      .reader-page-marker--pointer-right::before {
+        right: -5px;
+        border-bottom: 0;
+        border-left: 0;
       }
       .reader-page-marker--leaving {
         opacity: 0;
