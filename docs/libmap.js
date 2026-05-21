@@ -98,13 +98,13 @@ window.LIBRARY_CONFIG = [
                     { label: 'Band 23 (Das Kapital, Erster Band)', path: '/MEW/23/index.html', volume: 'Band 23', citation: { year: 1962 } },
                     { label: 'Band 24 (Das Kapital, Zweiter Band)', path: '/MEW/24/index.html', volume: 'Band 24', citation: { year: 1963 } },
                     { label: 'Band 25 (Das Kapital, Dritter Band)', path: '/MEW/25/index.html', volume: 'Band 25', citation: { year: 1964 } },
-                    { label: 'Band 26 (Theorien über den Mehrwert, Teil 1 bis 3)', path: '/MEW/26/index.html', volume: 'Band 26', citation: { year: 1965 } },
+                    { label: 'Band 26 (Theorien über den Mehrwert, Teil 1 bis 3)', path: '/MEW/26/index.html', volume: 'Band 26', citation: { year: '1968ff' } },
                 ]
             },
             {
                 label: 'Briefe (Bände 27-39)',
                 items: [
-                    { label: 'Band 27 (Briefe Februar 1842 bis Dezember 1851)', path: '/MEW/27/index.html', volume: 'Band 27', citation: { year: 1959 } },
+                    { label: 'Band 27 (Briefe Februar 1842 bis Dezember 1851)', path: '/MEW/27/index.html', volume: 'Band 27', citation: { year: 1965 } },
                     { label: 'Band 28 (Briefe Januar 1852 bis Dezember 1855)', path: '/MEW/28/index.html', volume: 'Band 28', citation: { year: 1963 } },
                     { label: 'Band 29 (Briefe Januar 1856 bis Dezember 1859)', path: '/MEW/29/index.html', volume: 'Band 29', citation: { year: 1963 } },
                     { label: 'Band 30 (Briefe Januar 1860 bis September 1864)', path: '/MEW/30/index.html', volume: 'Band 30', citation: { year: 1964 } },
@@ -520,13 +520,13 @@ window.LIBRARY_CONFIG = [
     {
         id: 'hegel',
         label: 'HEGEL',
-        title: 'Hegel Werke 1-20',
-        desc: '黑格尔著作集1-20卷',
+        title: '黑格尔著作集1-20卷',
+        desc: 'Hegel Werke 1-20 (Suhrkamp)',
         basePath: '/HEGEL/',
         stylesheets: ['/HEGEL/hegel.css'],
         badge: 'DE',
         path: '/HEGEL/index.html#de',
-        citation: { prefix: 'G.W.F. Hegel: Werke', title: 'Georg Wilhelm Friedrich: Werke in zwanzig Bänden', publisher: 'Frankfurt am Main: Suhrkamp', year: '1979ff' },
+        citation: { prefix: 'G.W.F. Hegel: Werke in zwanzig Bänden', publisher: 'Frankfurt am Main: Suhrkamp', year: '1979ff' },
         groups: [
             {
                 label: 'Hegel Werke 1-20',

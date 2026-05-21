@@ -4,7 +4,6 @@ class PageBarManager {
     this.pageNumbers = [];
     this.currentPage = null;
     this.hasPageAnchors = false;
-    this._io = null;
     this._citationPopoverTimer = null;
     this._dismissPopoverHandler = null;
     this._pageMarkerEl = null;
@@ -15,6 +14,10 @@ class PageBarManager {
     this._scrollMarkerReady = false;
     this._scrollMarkerHandler = null;
     this._scrollMarkerRaf = null;
+    this._contentEl = null;
+    this._contentClickHandler = null;
+    this._selectionChangeHandler = null;
+    this._selectionMarkerTimer = null;
   }
 
   init() {
@@ -24,6 +27,8 @@ class PageBarManager {
   /* ---- 扫描正文中的页码锚点 <a id="S123"></a> ---- */
   scanContent(container) {
     if (!container) { this._reset(); return; }
+    this._cleanupObserver();
+    this._contentEl = container;
     this.pageNumbers = [];
     container.querySelectorAll('a[id^="S"]').forEach(a => {
       if (this._isFootnoteAsideAnchor(a)) return;
@@ -48,33 +53,16 @@ class PageBarManager {
     this._lastAutoMarkerAt = 0;
     this._clearPageMarker();
     this._updateBadge(null);
+    this._contentEl = null;
   }
 
   _setupObserver() {
     this._cleanupObserver();
     if (!this.pageNumbers.length) return;
-    this._io = new IntersectionObserver(entries => {
-      const visible = entries
-        .filter(e => e.isIntersecting)
-        .map(e => {
-          const p = this.pageNumbers.find(x => x.id === e.target.id);
-          return p ? { ...p, top: e.boundingClientRect.top } : null;
-        })
-        .filter(Boolean);
-      if (visible.length) {
-        visible.sort((a, b) => a.top - b.top);
-        const previousId = this.currentPage?.id || null;
-        this.currentPage = visible[0];
-        this._updateBadge(this.currentPage);
-        if (this._scrollMarkerReady && this.currentPage.id !== previousId) {
-          this._showAutoPageMarker(this.currentPage, { source: 'scroll', force: true });
-        }
-      }
-    }, { root: null, rootMargin: '-40% 0px -40% 0px', threshold: 0 });
-    this.pageNumbers.forEach(p => this._io.observe(p.el));
     this._scrollMarkerHandler = () => this._queueScrollPageMarker();
     window.addEventListener('scroll', this._scrollMarkerHandler, { passive: true });
     window.addEventListener('resize', this._scrollMarkerHandler, { passive: true });
+    this._setupInteractionHandlers();
     this._scrollMarkerReady = false;
     setTimeout(() => {
       this._scrollMarkerReady = true;
@@ -83,7 +71,6 @@ class PageBarManager {
   }
 
   _cleanupObserver() {
-    if (this._io) { this._io.disconnect(); this._io = null; }
     if (this._scrollMarkerHandler) {
       window.removeEventListener('scroll', this._scrollMarkerHandler);
       window.removeEventListener('resize', this._scrollMarkerHandler);
@@ -93,7 +80,42 @@ class PageBarManager {
       cancelAnimationFrame(this._scrollMarkerRaf);
       this._scrollMarkerRaf = null;
     }
+    this._cleanupInteractionHandlers();
     this._scrollMarkerReady = false;
+  }
+
+  _setupInteractionHandlers() {
+    this._cleanupInteractionHandlers();
+    const content = this._contentEl || document.getElementById('content');
+    if (!content) return;
+
+    this._contentClickHandler = (e) => {
+      const target = e.target?.nodeType === 1 ? e.target : e.target?.parentElement;
+      if (!target || this._shouldIgnoreInteractionTarget(target)) return;
+      const selection = document.getSelection();
+      if (selection && !selection.isCollapsed) return;
+      this._revealPageMarker({ rect: this._pointRect(e.clientY), source: 'content-click', force: true, toggleAny: true, sticky: true });
+    };
+    content.addEventListener('click', this._contentClickHandler);
+
+    this._selectionChangeHandler = () => {
+      clearTimeout(this._selectionMarkerTimer);
+      this._selectionMarkerTimer = setTimeout(() => this._showMarkerNearSelection(), 120);
+    };
+    document.addEventListener('selectionchange', this._selectionChangeHandler);
+  }
+
+  _cleanupInteractionHandlers() {
+    if (this._contentClickHandler && this._contentEl) {
+      this._contentEl.removeEventListener('click', this._contentClickHandler);
+    }
+    this._contentClickHandler = null;
+    if (this._selectionChangeHandler) {
+      document.removeEventListener('selectionchange', this._selectionChangeHandler);
+      this._selectionChangeHandler = null;
+    }
+    clearTimeout(this._selectionMarkerTimer);
+    this._selectionMarkerTimer = null;
   }
 
   _parsePageAnchor(id) {
@@ -152,22 +174,34 @@ class PageBarManager {
     }
   }
 
-  _showAutoPageMarker(pageInfo, options = {}) {
-    const info = this._resolvePageInfo(pageInfo);
+  _revealPageMarker(options = {}) {
+    const info = options.pageInfo
+      ? this._resolvePageInfo(options.pageInfo)
+      : this._findPageForRect(options.rect);
     if (!info) return false;
 
     const now = Date.now();
-    if (!options.force && now - this._lastAutoMarkerAt < 650) {
+    const isSameMarker = info.id === this._lastAutoMarkerId;
+    if (!options.force && isSameMarker && now - this._lastAutoMarkerAt < 1800) {
       return false;
     }
-    if (!options.force && info.id === this._lastAutoMarkerId && now - this._lastAutoMarkerAt < 1800) {
+    if (!options.force && !isSameMarker && now - this._lastAutoMarkerAt < 120) {
       return false;
     }
 
-    this._lastAutoMarkerId = info.id;
-    this._lastAutoMarkerAt = now;
+    if (options.toggleAny && this._pageMarkerEl) {
+      this._clearPageMarker();
+      return true;
+    }
+    if (options.toggle && this._pageMarkerEl?.dataset.pageAnchorId === info.id) {
+      this._clearPageMarker();
+      return true;
+    }
+
     this.currentPage = info;
     this._updateBadge(info);
+    this._lastAutoMarkerId = info.id;
+    this._lastAutoMarkerAt = now;
     return this._showPageMarker(info, options);
   }
 
@@ -175,28 +209,8 @@ class PageBarManager {
     if (!this._scrollMarkerReady || this._scrollMarkerRaf) return;
     this._scrollMarkerRaf = requestAnimationFrame(() => {
       this._scrollMarkerRaf = null;
-      this._syncScrollPageMarker();
+      this._revealPageMarker({ rect: this._pointRect(Math.max(80, innerHeight * 0.42)), source: 'scroll' });
     });
-  }
-
-  _syncScrollPageMarker() {
-    if (!this.pageNumbers.length) return false;
-
-    const readingLine = Math.max(80, innerHeight * 0.42);
-    let current = null;
-    for (const pageInfo of this.pageNumbers) {
-      const rect = pageInfo.el.getBoundingClientRect();
-      if (rect.top <= readingLine) {
-        current = pageInfo;
-      } else {
-        break;
-      }
-    }
-    current = current || this.pageNumbers[0];
-
-    this.currentPage = current;
-    this._updateBadge(current);
-    return this._showAutoPageMarker(current, { source: 'scroll', force: true });
   }
 
   _resolvePageInfo(target) {
@@ -213,10 +227,54 @@ class PageBarManager {
   }
 
   _isFootnoteAsideAnchor(anchor) {
-    const aside = anchor?.closest?.('aside');
+    return this._isFootnoteAsideElement(anchor);
+  }
+
+  _isFootnoteAsideElement(el) {
+    const aside = el?.closest?.('aside');
     if (!aside) return false;
     const marker = `${aside.className || ''} ${aside.id || ''} ${aside.getAttribute('role') || ''} ${aside.getAttribute('aria-label') || ''}`;
     return /\b(fn|fni|footnote|endnote|note|notes)\b/i.test(marker) || aside.matches('[epub\\:type~="footnote"], [epub\\:type~="endnote"], [role="doc-footnote"], [role="doc-endnote"]');
+  }
+
+  _shouldIgnoreInteractionTarget(target) {
+    const content = this._contentEl || document.getElementById('content');
+    if (!content || !content.contains(target)) return true;
+    if (this._isFootnoteAsideElement(target)) return true;
+    return !!target.closest('.reader-page-marker, #sidebar-backdrop, .sidebar-overlay, a, button, input, select, textarea, summary, [role="button"], .doc-sidebar, .dropdown, .popover, .navbar');
+  }
+
+  _pointRect(y) {
+    return { top: y, bottom: y };
+  }
+
+  _showMarkerNearSelection() {
+    const selection = document.getSelection();
+    if (!selection || selection.isCollapsed || !selection.rangeCount) return false;
+
+    const range = selection.getRangeAt(0);
+    const common = range.commonAncestorContainer?.nodeType === 1
+      ? range.commonAncestorContainer
+      : range.commonAncestorContainer?.parentElement;
+    if (!common || this._shouldIgnoreInteractionTarget(common)) return false;
+
+    const rects = Array.from(range.getClientRects()).filter(rect => rect.width || rect.height);
+    if (!rects.length) return false;
+    const top = Math.min(...rects.map(rect => rect.top));
+    const bottom = Math.max(...rects.map(rect => rect.bottom));
+    return this._revealPageMarker({ rect: { top, bottom }, source: 'content-selection', force: true });
+  }
+
+  _findPageForRect(rect) {
+    if (!this.pageNumbers.length || !rect) return null;
+    const mid = (rect.top + rect.bottom) / 2;
+    let current = null;
+    for (const pageInfo of this.pageNumbers) {
+      const anchorRect = pageInfo.el.getBoundingClientRect();
+      if (anchorRect.top <= mid) current = pageInfo;
+      else break;
+    }
+    return current || this.pageNumbers[0];
   }
 
   highlightPageAnchor(target, options = {}) {
@@ -283,9 +341,6 @@ class PageBarManager {
     const anchorRect = anchor.getClientRects()[0] || anchor.getBoundingClientRect();
     const contentRect = document.getElementById('content')?.getBoundingClientRect();
     const sidebarOpen = innerWidth < 997 && document.querySelector('.doc-sidebar--open');
-    const anchorStyle = getComputedStyle(anchor);
-    const anchorParentStyle = anchor.parentElement ? getComputedStyle(anchor.parentElement) : null;
-    const lineHeight = parseFloat(anchorStyle.lineHeight) || parseFloat(anchorParentStyle?.lineHeight) || 32;
     const anchorLeft = Number.isFinite(anchorRect.left) && anchorRect.left > 0
       ? anchorRect.left + scrollX
       : (contentRect?.left ?? 24) + scrollX;
@@ -298,23 +353,14 @@ class PageBarManager {
     const rightSideLeft = viewportAnchorRight + gap;
     const rightBoundary = Math.min(innerWidth - margin, (contentRect?.right ?? innerWidth) - margin);
     const canFitRight = rightSideLeft + markerWidth <= rightBoundary;
-    let labelLeft = anchorLeft;
-    let markerTop = labelTop;
+    const fallbackLeft = contentRect
+      ? Math.min(Math.max(contentRect.left, margin), innerWidth - markerWidth - margin)
+      : margin;
+    const labelLeft = (canFitRight ? rightSideLeft : fallbackLeft) + scrollX;
 
-    marker.classList.toggle('reader-page-marker--pointer-right', false);
-    marker.classList.toggle('reader-page-marker--pointer-left', true);
-    if (canFitRight) {
-      labelLeft = rightSideLeft + scrollX;
-    } else {
-      const fallbackLeft = contentRect
-        ? Math.min(Math.max(contentRect.left, margin), innerWidth - markerWidth - margin)
-        : margin;
-      labelLeft = fallbackLeft + scrollX;
-      markerTop = labelTop + Math.max(28, lineHeight);
-    }
-
+    marker.classList.add('reader-page-marker--pointer-left');
     marker.style.left = `${Math.max(8, labelLeft)}px`;
-    marker.style.top = `${markerTop}px`;
+    marker.style.top = `${labelTop}px`;
     marker.style.maxWidth = `min(240px, calc(100vw - ${Math.max(24, labelLeft - scrollX + 16)}px))`;
     marker.style.zIndex = sidebarOpen || options.underMenu ? '90' : '250';
     marker.style.visibility = '';
@@ -324,16 +370,18 @@ class PageBarManager {
         const target = e.target?.nodeType === 1 ? e.target : e.target?.parentElement;
         const mobileSidebarOpen = innerWidth < 997 && document.querySelector('.doc-sidebar--open');
         if (mobileSidebarOpen) return;
-        if (target?.closest('.reader-page-marker, #sidebar-backdrop, .sidebar-overlay, a, button, input, select, textarea, summary, [role="button"], .doc-sidebar, .dropdown, .popover, .navbar')) return;
+        if (target?.closest('.reader-page-marker, #content, #sidebar-backdrop, .sidebar-overlay, a, button, input, select, textarea, summary, [role="button"], .doc-sidebar, .dropdown, .popover, .navbar')) return;
         this._clearPageMarker();
       };
       document.addEventListener('click', this._dismissPageMarkerHandler, true);
     }, 0);
 
-    this._pageMarkerTimer = setTimeout(() => {
-      marker.classList.add('reader-page-marker--leaving');
-      this._pageMarkerTimer = setTimeout(() => this._clearPageMarker(), 320);
-    }, 1900);
+    if (!options.sticky) {
+      this._pageMarkerTimer = setTimeout(() => {
+        marker.classList.add('reader-page-marker--leaving');
+        this._pageMarkerTimer = setTimeout(() => this._clearPageMarker(), 320);
+      }, 1900);
+    }
 
     return true;
   }
@@ -377,14 +425,6 @@ class PageBarManager {
         left: -5px;
         border-top: 0;
         border-right: 0;
-      }
-      .reader-page-marker--pointer-right {
-        border-right: 4px solid var(--accent, #b45309);
-      }
-      .reader-page-marker--pointer-right::before {
-        right: -5px;
-        border-bottom: 0;
-        border-left: 0;
       }
       .reader-page-marker--leaving {
         opacity: 0;
