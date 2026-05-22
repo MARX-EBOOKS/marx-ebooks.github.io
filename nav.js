@@ -3,6 +3,22 @@
   const $ = s => document.querySelector(s);
   const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const resolveUrl = href => { try { return new URL(href, location.href).href; } catch { return location.pathname.replace(/[^/]*$/, '') + href; } };
+  const onScrollFrame = window.onScrollFrame || (window.onScrollFrame = (() => {
+    const callbacks = new Set();
+    let frame = 0;
+    const run = () => {
+      frame = 0;
+      callbacks.forEach(fn => fn());
+    };
+    const queue = () => {
+      if (!frame) frame = requestAnimationFrame(run);
+    };
+    window.addEventListener('scroll', queue, { passive: true });
+    return fn => {
+      callbacks.add(fn);
+      return () => callbacks.delete(fn);
+    };
+  })());
 
   class MenuManager {
     constructor() {
@@ -13,6 +29,12 @@
       this._mode = 'libmap';
       this._currentVol = null;
       this._activeHeadingId = null;
+      this._scrollFrame = 0;
+      this._sidebarTrackingCache = null;
+      this._activeSidebarLink = null;
+      this._activeTocLink = null;
+      this._lastSyncedNavId = null;
+      this._headingTops = [];
       this._lastWidth = innerWidth;
       window.addEventListener('resize', () => this._onResize());
     }
@@ -110,6 +132,7 @@
         this._buildLibmapHtml();
 
       this.navTree.innerHTML = html;
+      this._invalidateTrackingCache();
 
       // 仅对 epub-toc 初始化折叠，避免与下方 libmap 的懒加载逻辑冲突
       const epubToc = this.navTree.querySelector('.sidebar-menu.epub-toc');
@@ -133,6 +156,7 @@
         '<div class="section-divider"><span>All works</span></div>' +
         this._buildLibmapHtml();
       this.navTree.innerHTML = html;
+      this._invalidateTrackingCache();
       this._initSidebarToggles(this.navTree.querySelector('.sidebar-menu.page-toc'));
       this._initLazySections();
       this._initBreadcrumbFade();
@@ -263,11 +287,26 @@
       }
       this._scrollTrackingReady = true;
       let last = null;
-      window.addEventListener('scroll', () => {
-        const id = this._getActiveHeadingId(hds, 200);
+      let measureFrame = 0;
+      const measureHeadings = () => {
+        this._headingTops = hds.map(h => h.getBoundingClientRect().top + scrollY);
+      };
+      const queueMeasureHeadings = () => {
+        if (!measureFrame) measureFrame = requestAnimationFrame(() => {
+          measureFrame = 0;
+          measureHeadings();
+        });
+      };
+      measureHeadings();
+      window.addEventListener('resize', queueMeasureHeadings, { passive: true });
+      window.addEventListener('load', measureHeadings, { once: true });
+      setTimeout(measureHeadings, 500);
+      const track = () => {
+        const id = this._getActiveHeadingIdFromTops(hds, 200);
         if (id !== last) { last = id; this._activeHeadingId = id; this._updateNavTracking(id); this._syncNavScroll(id); }
-      }, { passive: true });
-      requestAnimationFrame(() => { this._updateNavTracking(last); this._syncNavScroll(last); });
+      };
+      onScrollFrame(track);
+      this._scrollFrame = requestAnimationFrame(track);
     }
 
     _initTocRail() {
@@ -276,6 +315,7 @@
       const hds = this._getPageHeadings();
       if (!hds.length) return;
       nav.innerHTML = this._renderTocTree(this._buildHeadingTree(hds));
+      this._activeTocLink = null;
       if (this._scrollTrackingReady) {
         const id = this._getActiveHeadingId(this._getDomHeadings(), 200);
         if (id) this._updateNavTracking(id);
@@ -292,10 +332,13 @@
 
     _syncNavScroll(id) {
       if (innerWidth >= 997 || !this.navTree) return;   // 桌面端不滚动侧边栏
-      const a = this.navTree.querySelector('.sidebar-link.sidebar-link--active');
+      if (!this.sidebar?.classList.contains('doc-sidebar--open')) return;
+      if (!id || id === this._lastSyncedNavId) return;
+      const a = this._activeSidebarLink || this.navTree.querySelector('.sidebar-link.sidebar-link--active');
       if (!a) return;
       this._expandTo(a, this.navTree.querySelector('.sidebar-menu'));
-      requestAnimationFrame(() => a.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+      this._lastSyncedNavId = id;
+      requestAnimationFrame(() => a.scrollIntoView({ block: 'center', behavior: 'auto' }));
     }
 
     _updateNavTracking(id) {
@@ -307,18 +350,20 @@
       if (!this.navTree) return;
       const tree = this.navTree.querySelector('.sidebar-menu');
       if (!tree) return;
-      tree.querySelectorAll('.sidebar-link').forEach(a => a.classList.remove('sidebar-link--active'));
+      if (this._activeSidebarLink && tree.contains(this._activeSidebarLink)) this._activeSidebarLink.classList.remove('sidebar-link--active');
+      else tree.querySelector('.sidebar-link.sidebar-link--active')?.classList.remove('sidebar-link--active');
+      this._activeSidebarLink = null;
 
       if (this._mode === 'page-toc') {
         if (!id) return;
-        const m = tree.querySelector(`.sidebar-link[data-id="${id}"]`);
-        if (m) { m.classList.add('sidebar-link--active'); this._expandTo(m, tree); }
+        const m = this._getSidebarTrackingCache(tree).links.find(a => a.dataset.id === id);
+        if (m) { m.classList.add('sidebar-link--active'); this._activeSidebarLink = m; this._expandTo(m, tree); }
         return;
       }
 
       const curFile = location.pathname.split('/').pop().replace(/\.html$/i, '') || 'index';
       const curFileL = curFile.toLowerCase();
-      const allLinks = [...tree.querySelectorAll('.sidebar-link')];
+      const allLinks = this._getSidebarTrackingCache(tree).links;
       const sameFile = a => {
         const f = (a.dataset.file || '').replace(/\.html$/i, '');
         return f === curFile || f.toLowerCase() === curFileL;
@@ -329,6 +374,7 @@
 
       if (match) {
         match.classList.add('sidebar-link--active');
+        this._activeSidebarLink = match;
         this._expandTo(match, tree);
       }
     }
@@ -336,10 +382,35 @@
     _updateTocRailTracking(id) {
       const nav = document.getElementById('toc-desktop-nav');
       if (!nav?.innerHTML) return;
-      nav.querySelectorAll('.theme-doc-toc-desktop-link__a').forEach(a => a.classList.remove('theme-doc-toc-desktop-link__a--active'));
+      if (this._activeTocLink && nav.contains(this._activeTocLink)) this._activeTocLink.classList.remove('theme-doc-toc-desktop-link__a--active');
+      else nav.querySelector('.theme-doc-toc-desktop-link__a--active')?.classList.remove('theme-doc-toc-desktop-link__a--active');
+      this._activeTocLink = null;
       if (!id) return;
-      const m = nav.querySelector(`a[href="#${id}"]`);
-      if (m) m.classList.add('theme-doc-toc-desktop-link__a--active');
+      const m = [...nav.querySelectorAll('.theme-doc-toc-desktop-link__a')].find(a => a.getAttribute('href') === `#${id}`);
+      if (m) { m.classList.add('theme-doc-toc-desktop-link__a--active'); this._activeTocLink = m; }
+    }
+
+    _getActiveHeadingIdFromTops(headings, threshold = 200) {
+      if (!headings.length) return null;
+      const y = scrollY + threshold;
+      for (let i = this._headingTops.length - 1; i >= 0; i--) {
+        if (this._headingTops[i] <= y) return headings[i].id;
+      }
+      return headings[0]?.id || null;
+    }
+
+    _invalidateTrackingCache() {
+      this._sidebarTrackingCache = null;
+      this._activeSidebarLink = null;
+      this._activeTocLink = null;
+      this._lastSyncedNavId = null;
+    }
+
+    _getSidebarTrackingCache(tree) {
+      if (!this._sidebarTrackingCache || this._sidebarTrackingCache.tree !== tree) {
+        this._sidebarTrackingCache = { tree, links: [...tree.querySelectorAll('.sidebar-link')] };
+      }
+      return this._sidebarTrackingCache;
     }
 
     _expandTo(el, container) {
@@ -384,6 +455,7 @@
 
     _renderLibmapMenu() {
       this.navTree.innerHTML = this._buildLibmapHtml();
+      this._invalidateTrackingCache();
       this._initLazySections();
     }
 
@@ -571,7 +643,7 @@
     }
 
     toggle() { this.sidebar.classList.contains('doc-sidebar--open') ? this.close() : this.open(); }
-    open() { if (innerWidth < 997) { this.sidebar.classList.add('doc-sidebar--open'); this.backdrop?.classList.add('sidebar-overlay--visible'); this._syncNavScroll(this._activeHeadingId); } }
+    open() { if (innerWidth < 997) { this.sidebar.classList.add('doc-sidebar--open'); this.backdrop?.classList.add('sidebar-overlay--visible'); this._lastSyncedNavId = null; this._syncNavScroll(this._activeHeadingId); } }
     close() { if (innerWidth < 997) { this.sidebar.classList.remove('doc-sidebar--open'); this.backdrop?.classList.remove('sidebar-overlay--visible'); } }
 
     async _loadLibmapConfig() {

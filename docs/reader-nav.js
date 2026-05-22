@@ -3,6 +3,22 @@ window.$ = s => document.querySelector(s);
 window.$$ = s => [...document.querySelectorAll(s)];
 window.on = (t, e, f, o) => t && t.addEventListener(e, f, o || false);
 window.esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+window.onScrollFrame = window.onScrollFrame || (function () {
+    const callbacks = new Set();
+    let frame = 0;
+    const run = () => {
+        frame = 0;
+        callbacks.forEach(fn => fn());
+    };
+    const queue = () => {
+        if (!frame) frame = requestAnimationFrame(run);
+    };
+    window.addEventListener('scroll', queue, { passive: true });
+    return fn => {
+        callbacks.add(fn);
+        return () => callbacks.delete(fn);
+    };
+})();
 window.syncFill = function (el) {
     var min = parseFloat(el.min) || 0, max = parseFloat(el.max) || 100, val = parseFloat(el.value) || 0;
     var pct = ((val - min) / (max - min) * 100).toFixed(2) + '%';
@@ -92,20 +108,42 @@ class MenuManager {
         this._activeHeadingId = null;
         this._scrollTrackingReady = false;
         this._tocScrollHandler = null;
+        this._scrollFrame = 0;
+        this._sidebarTrackingCache = null;
+        this._activeSidebarLink = null;
+        this._activeTocLink = null;
+        this._lastSyncedNavId = null;
+        this._headingTops = [];
+        this._headingResizeHandler = null;
+        this._headingResizeFrame = 0;
         this._io = null;
         this._sidebarClickHandler = null;
+        this._sidebarStateObserver = null;
     }
 
     init() {
         this.sidebar = $('#lsidebar');
         this.navTree = $('#nav-tree');
         if (!this.sidebar || !this.navTree) return;
+        this._observeSidebarOpen();
         this.reinit(state.doc);
+    }
+
+    _observeSidebarOpen() {
+        if (this._sidebarStateObserver) return;
+        this._sidebarStateObserver = new MutationObserver(() => {
+            if (innerWidth < 997 && this.sidebar.classList.contains('doc-sidebar--open')) {
+                this._lastSyncedNavId = null;
+                this._syncNavScroll(this._activeHeadingId);
+            }
+        });
+        this._sidebarStateObserver.observe(this.sidebar, { attributes: true, attributeFilter: ['class'] });
     }
 
     reinit(docPath) {
         this._cleanup();
         this.navTree.innerHTML = '';
+        this._invalidateTrackingCache();
         this._currentVol = docPath ? this._detectVolume(docPath) : null;
 
         if (!docPath) {
@@ -131,12 +169,26 @@ class MenuManager {
 
     _cleanup() {
         if (this._tocScrollHandler) {
-            window.removeEventListener('scroll', this._tocScrollHandler, { passive: true });
+            if (this._tocScrollHandler._isScrollFrameOff) this._tocScrollHandler();
+            else window.removeEventListener('scroll', this._tocScrollHandler, { passive: true });
             this._tocScrollHandler = null;
+        }
+        if (this._scrollFrame) {
+            cancelAnimationFrame(this._scrollFrame);
+            this._scrollFrame = 0;
+        }
+        if (this._headingResizeHandler) {
+            window.removeEventListener('resize', this._headingResizeHandler);
+            this._headingResizeHandler = null;
+        }
+        if (this._headingResizeFrame) {
+            cancelAnimationFrame(this._headingResizeFrame);
+            this._headingResizeFrame = 0;
         }
         if (this._io) { this._io.disconnect(); this._io = null; }
         this._scrollTrackingReady = false;
         this._activeHeadingId = null;
+        this._invalidateTrackingCache();
         if (this._sidebarClickHandler && this.navTree) {
             this.navTree.removeEventListener('click', this._sidebarClickHandler);
             this._sidebarClickHandler = null;
@@ -250,6 +302,7 @@ class MenuManager {
         if (headings.length) html += this._renderSidebarTree(buildHeadingTree(headings), 'epub-toc');
         html += '<div class="section-divider"><span>All works</span></div>' + this._buildLibmapHtml();
         this.navTree.innerHTML = html;
+        this._invalidateTrackingCache();
         this._postRenderMenu(docPath);
     }
 
@@ -277,6 +330,7 @@ class MenuManager {
         html += this._renderSidebarTree(buildHeadingTree(pageHeadings), 'page-toc');
         html += '<div class="section-divider"><span>All works</span></div>' + this._buildLibmapHtml();
         this.navTree.innerHTML = html;
+        this._invalidateTrackingCache();
         this._postRenderMenu(state.doc);
     }
 
@@ -441,6 +495,7 @@ class MenuManager {
 
     _renderLibmapMenu() {
         this.navTree.innerHTML = this._buildLibmapHtml();
+        this._invalidateTrackingCache();
         this._initLazySections();
     }
 
@@ -539,9 +594,11 @@ class MenuManager {
         const nav = $('#toc-desktop-nav');
         if (!nav) return;
         nav.innerHTML = '';
+        this._activeTocLink = null;
         const headings = this._getPageHeadings();
         if (!headings.length) { this._waitForHeadings(() => this._initTocRail()); return; }
         nav.innerHTML = this._renderTocTree(buildHeadingTree(headings));
+        this._activeTocLink = null;
         if (this._scrollTrackingReady) {
             const activeId = getActiveHeadingId(getDomHeadings($('#content')), 200);
             if (activeId) this._updateTracking(activeId);
@@ -565,36 +622,65 @@ class MenuManager {
         if (!headings.length) { this._waitForHeadings(() => this._initScrollTracking()); return; }
         this._scrollTrackingReady = true;
         let lastId = null;
-        const onScroll = () => {
-            const activeId = getActiveHeadingId(headings, 200);
+        const measureHeadings = () => {
+            this._headingTops = headings.map(h => h.getBoundingClientRect().top + scrollY);
+        };
+        const queueMeasureHeadings = () => {
+            if (!this._headingResizeFrame) this._headingResizeFrame = requestAnimationFrame(() => {
+                this._headingResizeFrame = 0;
+                measureHeadings();
+            });
+        };
+        measureHeadings();
+        this._headingResizeHandler = queueMeasureHeadings;
+        window.addEventListener('resize', this._headingResizeHandler, { passive: true });
+        window.addEventListener('load', measureHeadings, { once: true });
+        setTimeout(measureHeadings, 500);
+        const track = () => {
+            this._scrollFrame = 0;
+            const activeId = this._getActiveHeadingIdFromTops(headings, 200);
             if (activeId !== lastId) { lastId = activeId; this._activeHeadingId = activeId; this._updateTracking(activeId); }
         };
-        window.addEventListener('scroll', onScroll, { passive: true });
-        this._tocScrollHandler = onScroll;
-        requestAnimationFrame(onScroll);
+        const onScroll = () => {
+            if (!this._scrollFrame) this._scrollFrame = requestAnimationFrame(track);
+        };
+        if (window.onScrollFrame) {
+            const off = window.onScrollFrame(track);
+            off._isScrollFrameOff = true;
+            this._tocScrollHandler = off;
+        } else {
+            window.addEventListener('scroll', onScroll, { passive: true });
+            this._tocScrollHandler = onScroll;
+        }
+        this._scrollFrame = requestAnimationFrame(track);
     }
 
-    _syncNavScroll() {
+    _syncNavScroll(id) {
         if (innerWidth >= 997) return;
-        const active = this.navTree?.querySelector('.sidebar-link.sidebar-link--active');
+        if (!this.sidebar?.classList.contains('doc-sidebar--open')) return;
+        if (!id || id === this._lastSyncedNavId) return;
+        const active = this._activeSidebarLink || this.navTree?.querySelector('.sidebar-link.sidebar-link--active');
         if (!active) return;
         expandTo(active, this.navTree.querySelector('.sidebar-menu'));
-        requestAnimationFrame(() => active.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+        this._lastSyncedNavId = id;
+        requestAnimationFrame(() => active.scrollIntoView({ block: 'center', behavior: 'auto' }));
     }
 
     _updateTracking(id) {
         this._updateSidebarTracking(id);
         this._updateTocRailTracking(id);
-        this._syncNavScroll();
+        this._syncNavScroll(id);
     }
 
     _updateSidebarTracking(id) {
         if (!this.navTree) return;
         const tree = this.navTree.querySelector('.sidebar-menu');
         if (!tree) return;
-        tree.querySelectorAll('.sidebar-link').forEach(a => a.classList.remove('sidebar-link--active'));
+        if (this._activeSidebarLink && tree.contains(this._activeSidebarLink)) this._activeSidebarLink.classList.remove('sidebar-link--active');
+        else tree.querySelector('.sidebar-link.sidebar-link--active')?.classList.remove('sidebar-link--active');
+        this._activeSidebarLink = null;
         const currentFile = (state.doc || '').split('/').pop().replace(/\.html$/i, '') || 'index';
-        const links = [...tree.querySelectorAll('.sidebar-link')];
+        const links = this._getSidebarTrackingCache(tree).links;
         let match = null;
         if (id) {
             match = links.find(a =>
@@ -612,16 +698,41 @@ class MenuManager {
             );
         }
 
-        if (match) { match.classList.add('sidebar-link--active'); expandTo(match, tree); }
+        if (match) { match.classList.add('sidebar-link--active'); this._activeSidebarLink = match; expandTo(match, tree); }
     }
 
     _updateTocRailTracking(id) {
         const nav = $('#toc-desktop-nav');
         if (!nav?.innerHTML) return;
-        nav.querySelectorAll('.theme-doc-toc-desktop-link__a').forEach(a => a.classList.remove('theme-doc-toc-desktop-link__a--active'));
+        if (this._activeTocLink && nav.contains(this._activeTocLink)) this._activeTocLink.classList.remove('theme-doc-toc-desktop-link__a--active');
+        else nav.querySelector('.theme-doc-toc-desktop-link__a--active')?.classList.remove('theme-doc-toc-desktop-link__a--active');
+        this._activeTocLink = null;
         if (!id) return;
-        const match = nav.querySelector(`a[href="#${CSS.escape(id)}"]`);
-        if (match) match.classList.add('theme-doc-toc-desktop-link__a--active');
+        const match = [...nav.querySelectorAll('.theme-doc-toc-desktop-link__a')].find(a => a.getAttribute('href') === `#${id}`);
+        if (match) { match.classList.add('theme-doc-toc-desktop-link__a--active'); this._activeTocLink = match; }
+    }
+
+    _invalidateTrackingCache() {
+        this._sidebarTrackingCache = null;
+        this._activeSidebarLink = null;
+        this._activeTocLink = null;
+        this._lastSyncedNavId = null;
+    }
+
+    _getSidebarTrackingCache(tree) {
+        if (!this._sidebarTrackingCache || this._sidebarTrackingCache.tree !== tree) {
+            this._sidebarTrackingCache = { tree, links: [...tree.querySelectorAll('.sidebar-link')] };
+        }
+        return this._sidebarTrackingCache;
+    }
+
+    _getActiveHeadingIdFromTops(headings, threshold = 200) {
+        if (!headings.length) return null;
+        const y = scrollY + threshold;
+        for (let i = this._headingTops.length - 1; i >= 0; i--) {
+            if (this._headingTops[i] <= y) return headings[i].id;
+        }
+        return headings[0]?.id || null;
     }
 
     _highlightCurrent(docPath) {

@@ -6,7 +6,9 @@ const state = {
     th: localStorage.theme || 'light',
     doc: null,
     mob: innerWidth < 768,
-    tocScrollHandler: null
+    tocScrollHandler: null,
+    scrollFrame: 0,
+    scrollSaveTimer: null
 };
 
 // ── 主题 / 字体 / 行高 ──
@@ -551,10 +553,12 @@ class FootnotePopup {
         this._cache = new Map();
         this._dismiss = this._doDismiss.bind(this);
         this._reposition = () => { if (this._active) this._position(); };
+        this._scrollRepositionOff = null;
     }
 
     async show(a, e) {
         if (!this.tip) return;
+        if (this._active) this.forceClose();
         const href = a.getAttribute('href');
         if (!href) return;
 
@@ -575,7 +579,9 @@ class FootnotePopup {
         this._active = true;
         document.addEventListener('click', this._dismiss, true);
         document.addEventListener('keydown', this._dismiss);
-        window.addEventListener('scroll', this._reposition, { passive: true });
+        if (this._scrollRepositionOff) this._scrollRepositionOff();
+        this._scrollRepositionOff = window.onScrollFrame ? window.onScrollFrame(this._reposition) : null;
+        if (!this._scrollRepositionOff) window.addEventListener('scroll', this._reposition, { passive: true });
 
         const result = await this._resolveTarget(targetId, pageUrl, isCross);
         if (!result) { this._renderState('error', isCross); return; }
@@ -677,7 +683,12 @@ class FootnotePopup {
         this._trigger = null;
         document.removeEventListener('click', this._dismiss, true);
         document.removeEventListener('keydown', this._dismiss);
-        window.removeEventListener('scroll', this._reposition);
+        if (this._scrollRepositionOff) {
+            this._scrollRepositionOff();
+            this._scrollRepositionOff = null;
+        } else {
+            window.removeEventListener('scroll', this._reposition);
+        }
     }
 
     forceClose() { if (this._active) this._doDismiss(); }
@@ -766,12 +777,19 @@ function bindEvents() {
         }
     });
 
-    on(window, 'scroll', () => {
+    const progressBar = $('#progress-bar');
+    const updateScrollState = () => {
         const h = document.documentElement.scrollHeight - innerHeight;
-        const bar = $('#progress-bar');
-        if (bar) bar.style.width = (h > 0 ? (scrollY / h) * 100 : 0) + '%';
-        clearTimeout(window.st);
-        window.st = setTimeout(() => { if (state.rs && state.doc) localStorage.setItem('scroll_' + state.doc, scrollY); }, 300);
+        if (progressBar) progressBar.style.width = (h > 0 ? (scrollY / h) * 100 : 0) + '%';
+        clearTimeout(state.scrollSaveTimer);
+        state.scrollSaveTimer = setTimeout(() => { if (state.rs && state.doc) localStorage.setItem('scroll_' + state.doc, scrollY); }, 300);
+    };
+    if (window.onScrollFrame) window.onScrollFrame(updateScrollState);
+    else on(window, 'scroll', () => {
+        if (!state.scrollFrame) state.scrollFrame = requestAnimationFrame(() => {
+            state.scrollFrame = 0;
+            updateScrollState();
+        });
     }, { passive: true });
 
     on(document, 'click', e => {

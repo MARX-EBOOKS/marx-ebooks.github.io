@@ -13,6 +13,9 @@ class PageBarManager {
     this._lastAutoMarkerAt = 0;
     this._scrollMarkerReady = false;
     this._scrollMarkerHandler = null;
+    this._resizeMarkerHandler = null;
+    this._resizeMarkerRaf = null;
+    this._scrollMarkerOff = null;
     this._scrollMarkerRaf = null;
     this._contentEl = null;
     this._contentClickHandler = null;
@@ -59,22 +62,46 @@ class PageBarManager {
   _setupObserver() {
     this._cleanupObserver();
     if (!this.pageNumbers.length) return;
-    this._scrollMarkerHandler = () => this._queueScrollPageMarker();
-    window.addEventListener('scroll', this._scrollMarkerHandler, { passive: true });
-    window.addEventListener('resize', this._scrollMarkerHandler, { passive: true });
+    this._scrollMarkerHandler = () => this._updateScrollPageMarker();
+    this._resizeMarkerHandler = () => {
+      if (this._resizeMarkerRaf) return;
+      this._resizeMarkerRaf = requestAnimationFrame(() => {
+        this._resizeMarkerRaf = null;
+        this._measurePageAnchors();
+        this._queueScrollPageMarker();
+      });
+    };
+    if (window.onScrollFrame) {
+      this._scrollMarkerOff = window.onScrollFrame(this._scrollMarkerHandler);
+    } else {
+      window.addEventListener('scroll', this._scrollMarkerHandler, { passive: true });
+    }
+    window.addEventListener('resize', this._resizeMarkerHandler, { passive: true });
     this._setupInteractionHandlers();
     this._scrollMarkerReady = false;
     setTimeout(() => {
+      this._measurePageAnchors();
       this._scrollMarkerReady = true;
       this._queueScrollPageMarker();
     }, 500);
   }
 
   _cleanupObserver() {
+    if (this._scrollMarkerOff) {
+      this._scrollMarkerOff();
+      this._scrollMarkerOff = null;
+    }
     if (this._scrollMarkerHandler) {
       window.removeEventListener('scroll', this._scrollMarkerHandler);
-      window.removeEventListener('resize', this._scrollMarkerHandler);
       this._scrollMarkerHandler = null;
+    }
+    if (this._resizeMarkerHandler) {
+      window.removeEventListener('resize', this._resizeMarkerHandler);
+      this._resizeMarkerHandler = null;
+    }
+    if (this._resizeMarkerRaf) {
+      cancelAnimationFrame(this._resizeMarkerRaf);
+      this._resizeMarkerRaf = null;
     }
     if (this._scrollMarkerRaf) {
       cancelAnimationFrame(this._scrollMarkerRaf);
@@ -209,8 +236,13 @@ class PageBarManager {
     if (!this._scrollMarkerReady || this._scrollMarkerRaf) return;
     this._scrollMarkerRaf = requestAnimationFrame(() => {
       this._scrollMarkerRaf = null;
-      this._revealPageMarker({ rect: this._pointRect(Math.max(80, innerHeight * 0.42)), source: 'scroll' });
+      this._updateScrollPageMarker();
     });
+  }
+
+  _updateScrollPageMarker() {
+    if (!this._scrollMarkerReady) return;
+    this._revealPageMarker({ rect: this._pointRect(Math.max(80, innerHeight * 0.42)), source: 'scroll' });
   }
 
   _resolvePageInfo(target) {
@@ -267,14 +299,21 @@ class PageBarManager {
 
   _findPageForRect(rect) {
     if (!this.pageNumbers.length || !rect) return null;
-    const mid = (rect.top + rect.bottom) / 2;
+    if (this.pageNumbers.some(p => !Number.isFinite(p.top))) this._measurePageAnchors();
+    const mid = scrollY + (rect.top + rect.bottom) / 2;
     let current = null;
     for (const pageInfo of this.pageNumbers) {
-      const anchorRect = pageInfo.el.getBoundingClientRect();
-      if (anchorRect.top <= mid) current = pageInfo;
+      if ((pageInfo.top ?? 0) <= mid) current = pageInfo;
       else break;
     }
     return current || this.pageNumbers[0];
+  }
+
+  _measurePageAnchors() {
+    this.pageNumbers.forEach(pageInfo => {
+      const rect = pageInfo.el.getBoundingClientRect();
+      pageInfo.top = rect.top + scrollY;
+    });
   }
 
   highlightPageAnchor(target, options = {}) {
