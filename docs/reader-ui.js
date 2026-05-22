@@ -243,7 +243,7 @@ function renderDoc(h, path) {
     });
 
     const c = $('#content');
-    c.innerHTML = d.body.innerHTML;
+    c.innerHTML = (d.body.querySelector('div.prose#content') || d.body).innerHTML;
 
     c.querySelectorAll('a[name]').forEach(a => {
         if (a.parentElement && !a.parentElement.id) a.parentElement.id = a.getAttribute('name');
@@ -841,7 +841,6 @@ function bindEvents() {
                 }
                 return;
             }
-
             // 跨页跳转：pushState 后 loadDoc，loadDoc 会在 content 显示后自动处理 hash 滚动
             history.pushState({}, '', r.href);
             loadDoc(r.docPath);

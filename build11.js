@@ -21,7 +21,7 @@ class ConfigLoader {
       input: '.', output: 'dist', baseUrl: '', logo: '', logoText: 'MLREAD',
       concurrency: 4, config: './libmap.js', only: [], skip: [],
       copyOnly: ['en/archive/', 'en/history/', 'docs/VIL/', 'docs/MEW/', 'ru/VIL-UAIO/'],
-      template: './template.js', mitt: '', mps: '',notgenIndex: false 
+      template: './template.js', mitt: '', mps: '', notgenIndex: false
     };
     const boolFlags = new Set(['--noindex']);
     const flagMap = {
@@ -29,7 +29,7 @@ class ConfigLoader {
       '--config': 'config', '-c': 'config', '--template': 'template', '-t': 'template',
       '--logo': 'logo', '--logotext': 'logoText', '--concurrency': 'concurrency',
       '--only': 'only', '--skip': 'skip', '-s': 'skip', '--copy-only': 'copyOnly',
-      '--base-url': 'baseUrl', '--mitt': 'mitt', '--mps': 'mps','--noindex':'notgenIndex'
+      '--base-url': 'baseUrl', '--mitt': 'mitt', '--mps': 'mps', '--noindex': 'notgenIndex'
     };
 
     for (let i = 2; i < process.argv.length; i++) {
@@ -130,7 +130,7 @@ class PathMatcher {
     return patterns.some(pat => {
       const cp = normPath(pat);
       if (np === cp || np.startsWith(cp + '/')) return true;
-      if (this.only===patterns && cp.startsWith(np + '/')) return true;
+      if (this.only === patterns && cp.startsWith(np + '/')) return true;
       if (pat.includes('*')) return new RegExp('^' + pat.replace(/\*/g, '.*') + '$').test(np);
       return false;
     });
@@ -491,7 +491,7 @@ class VolumeIndexBuilder {
     };
 
     await ensure(path.dirname(outputJs));
-    await fs.writeFile(outputJs, `window.VOLUME_DATA=${JSON.stringify(data)};`, 'utf-8');
+    await fs.writeFile(outputJs, `export default ${JSON.stringify(data)};`, 'utf-8');
 
     if (this.config.generateTemplate) {
       const depth = vol.dir.split('/').length;

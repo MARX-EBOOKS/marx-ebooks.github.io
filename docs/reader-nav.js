@@ -51,15 +51,22 @@ window.buildHeadingTree = function (headings) {
 window.fetchVolData = async function (dir, cacheMap) {
     const cleanDir = dir.replace(/^\//, '').replace(/\/$/, '');
     if (cacheMap && cacheMap[cleanDir]) return cacheMap[cleanDir];
-    const url = '/' + cleanDir + '/index.json';
+    const jsonUrl = '/' + cleanDir + '/index.json';
     try {
-        const res = await fetch(url);
+        const res = await fetch(jsonUrl);
         if (res.ok) {
             const data = await res.json();
             if (cacheMap) cacheMap[cleanDir] = data;
             return data;
         }
-    } catch (e) { console.warn('[fetchVolData]', url, e); }
+    } catch (e) { /* ignore, fallback below */ }
+    const jsUrl = '/' + cleanDir + '/index.js';
+    try {
+        const mod = await import(jsUrl);
+        const data = mod?.default || null;
+        if (cacheMap && data) cacheMap[cleanDir] = data;
+        return data;
+    } catch (e) { console.warn('[fetchVolData] fallback failed', jsUrl, e); }
     return null;
 };
 window.expandTo = function (el, container) {
@@ -161,14 +168,15 @@ class MenuManager {
     _buildBreadcrumb(parts) {
         let html = '<div class="breadcrumb" aria-label="Breadcrumb">';
         parts.forEach((p, i) => {
-            if (i > 0) html += '<span class="breadcrumb__sep">/</span>';
-            if (p.isPageBadge) {
-                html += `<a href="#" id="${esc(p.id)}" style="display:none"></a>`;
+            if (i > 0 && p.id != 'page-breadcrumb-link') html += '<span class="breadcrumb__sep">/</span>';
+            if (p.isPageBadge && p.id == 'page-breadcrumb-link') {
+                html += `<span class="breadcrumb__sep">/</span>
+<a href="#" id="${esc(p.id)}" style="display:none"></a>`;
             } else if (p.href && p.expand) {
                 html += `<a href="${esc(p.href)}" data-expand-section="${esc(p.expand)}">${esc(p.text)}</a>`;
             } else if (p.href) {
                 html += `<a href="${esc(p.href)}">${esc(p.text)}</a>`;
-            } else {
+            } else if (p.text) {
                 html += `<span>${esc(p.text)}</span>`;
             }
         });
@@ -230,11 +238,12 @@ class MenuManager {
         const volHref = item.path || (dir + '/index.html');
         const colHref = col.path && !col.path.startsWith('http') ? `?doc=${esc(col.path.replace(/^\//, ''))}` : null;
         const volLink = `?doc=${esc(volHref.replace(/^\//, ''))}`;
+        const ispagebadge = window.__PAGE_BAR__.hasPageAnchors;
 
         let html = this._buildBreadcrumb([
             colHref ? { href: colHref, text: col.label, expand: col.id } : { text: col.label, expand: col.id },
             { href: volLink, text: volTitle },
-            { id: 'page-breadcrumb-link', isPageBadge: true }
+            { id: 'page-breadcrumb-link', isPageBadge: ispagebadge }
         ]);
 
         const headings = data.headings || [];
@@ -295,6 +304,13 @@ class MenuManager {
         const cleanDir = dir.replace(/^\//, '').replace(/\/$/, '');
         const raw = await fetchVolData(cleanDir, this._volCache);
         if (!raw) return null;
+
+        // 新格式：index.js 直接 export default 的 VolumeData 对象
+        if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.version === 1) {
+            return raw;
+        }
+
+        // 旧格式：index.json 返回的文件数组，需要转换
         return this._convertJsonToVolumeData(raw, cleanDir);
     }
 

@@ -464,9 +464,9 @@
     async _fetchVolData(url) {
       if (this._volCache.has(url)) return this._volCache.get(url);
       try {
-        const res = await fetch(url); if (!res.ok) throw new Error();
-        const win = {}; new Function('window', await res.text())(win);
-        const data = win.VOLUME_DATA || null; if (data) this._volCache.set(url, data);
+        const mod = await import(url);
+        const data = mod?.default || null;
+        if (data) this._volCache.set(url, data);
         return data;
       } catch { return null; }
     }
