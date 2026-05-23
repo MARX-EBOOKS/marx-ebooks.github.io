@@ -26,7 +26,6 @@
   --sidebar-w-desktop: clamp(220px, 20vw, 300px);
   --toc-w-desktop: 260px;
   --content-pad: max(0.75rem, 1.2vw);
-  --section-gap: max(0.5rem, 0.8vw);
   --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --font-serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", Georgia, "Times New Roman", serif;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
@@ -70,7 +69,7 @@ body {
   padding: 0 !important;
   font-family: var(--font-ui);
 }
-/* ── Global link reset ── */
+/* 全局链接重置 */
 a, a:link, a:visited, a:hover, a:active {
   color: var(--link) !important;
   text-decoration: none !important;
@@ -86,7 +85,7 @@ a:hover, a:active {
   color: var(--accent-2);
 }
 
-/* ── Scroll indicator ── */
+/* 阅读进度条 */
 .scroll-indicator {
   position: fixed;
   top: 0; left: 0;
@@ -98,7 +97,7 @@ a:hover, a:active {
   pointer-events: none;
 }
 
-/* ── Navbar ── */
+/* 顶部导航栏 */
 .navbar {
   position: fixed;
   top: 0; left: 0; right: 0;
@@ -114,7 +113,7 @@ a:hover, a:active {
   z-index: 300;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.07);
   font-family: var(--font-ui) !important;
-  box-sizing: border-box;        /* height includes border, strict match with --nav-h */
+  box-sizing: border-box;        /* 高度包含边框，严格匹配 --nav-h */
 }
 
 [data-theme="dark"] .navbar {
@@ -183,7 +182,8 @@ a:hover, a:active {
   border-color: var(--accent-border);
 }
 
-.font-control {
+.font-control,
+.lh-control {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -254,7 +254,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 
 .navbar__toggle { display: none; }
 
-/* ── Dropdown (mobile settings) ── */
+/* 移动端设置下拉菜单 */
 .dropdown {
   display: none;
   position: absolute;
@@ -330,7 +330,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 
 .dropdown__item:hover { background: var(--bg-hover); }
 
-/* ── Layout shell ── */
+/* 页面布局外壳 */
 .doc-root {
   display: flex;
   width: 100%;
@@ -342,7 +342,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   min-height: 100vh;
 }
 
-/* ── Sidebar (mobile: fixed overlay; desktop: sticky flex item) ── */
+/* 侧边栏：移动端固定浮层，桌面端粘性布局项 */
 .doc-sidebar {
   position: fixed;
   top: var(--nav-h); left: 0; bottom: 0;
@@ -573,7 +573,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   line-height: 1;
 }
 
-/* ── Sidebar header (mobile full-screen overlay) ── */
+/* 侧边栏头部：移动端全屏浮层使用 */
 .doc-sidebar__header {
   display: none;
   align-items: center;
@@ -613,7 +613,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 }
 .doc-sidebar__brand img { width: 28px; height: 28px; border-radius: 4px; }
 
-/* ── Sidebar overlay ── */
+/* 侧边栏遮罩 */
 .sidebar-overlay {
   display: none;
   position: fixed;
@@ -625,7 +625,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 
 .sidebar-overlay--visible { display: block; z-index: 300; }
 
-/* ── Breadcrumb ── */
+/* 面包屑导航 */
 .breadcrumb {
   display: block;
   padding: 10px 16px 14px;
@@ -666,7 +666,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   margin: 0 2px;
 }
 
-/* ── Section divider ── */
+/* 分区分隔线 */
 .section-divider {
   display: flex;
   align-items: center;
@@ -688,7 +688,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   background: var(--accent-border);
 }
 
-/* ── Main content area ── */
+/* 主内容区域 */
 .doc-main {
   flex: 1;
   margin-left: 0;
@@ -720,13 +720,13 @@ input[type="range"]:focus::-webkit-slider-thumb {
   box-sizing: border-box;
 }
 
-/* ── TOC rail (desktop) ── */
+/* 桌面端目录栏 */
 .theme-doc-toc-desktop {
   display: none;
   width: var(--toc-w-desktop);
   flex-shrink: 0;
   position: sticky;
-  top: var(--nav-h);             /* anchored to navbar bottom */
+  top: var(--nav-h);             /* 锚定到顶部导航栏下方 */
   align-self: flex-start;
   padding: 2rem 0 0 0;
   font-family: var(--font-ui);
@@ -745,16 +745,6 @@ input[type="range"]:focus::-webkit-slider-thumb {
 .theme-doc-toc-desktop-nav::-webkit-scrollbar { width: 4px; }
 .theme-doc-toc-desktop-nav::-webkit-scrollbar-track { background: transparent; }
 .theme-doc-toc-desktop-nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-.theme-doc-toc-desktop-header {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--text-3);
-  margin: 0 0 0.6rem;
-  padding: 0 1rem 0 0.75rem;
-}
 
 .theme-doc-toc-desktop-list,
 .theme-doc-toc-desktop-list ul {
@@ -806,7 +796,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 .theme-doc-toc-desktop-link--lvl3 .theme-doc-toc-desktop-link__a { padding-left: 28px; }
 .theme-doc-toc-desktop-link--lvl4 .theme-doc-toc-desktop-link__a { padding-left: 36px; }
 
-/* ── Prose (article body) ── */
+/* 正文排版 */
 .prose {
   font-size: var(--fs-user);
   line-height: var(--lh-user);
@@ -895,7 +885,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 .prose sup { font-size: 0.75em; vertical-align: super; line-height: 0; }
 .prose sup a { color: var(--accent); font-weight: 500; }
 
-/* ── Line-height scale system ── */
+/* 行高缩放系统 */
 /* 覆盖源文件 CSS 中的百分比 line-height（如 200%、150%）
    统一以 --lh-user 为基准，通过 --lh-scale 保持各元素原始比例 */
 .prose :is(p, ul, ol, li, dd, dt, td, th, figcaption, .caption) {
@@ -939,7 +929,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 .prose :is(h1, h2, h3, h4, h5, h6):hover .anchor { opacity: 1; }
 .prose .anchor:hover { color: var(--accent); }
 
-/* ── Table wrapper ── */
+/* 表格横向滚动容器 */
 .table-wrapper {
   overflow-x: auto;
   display: block;
@@ -955,7 +945,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   margin: 0;
 }
 
-/* ── Doc header (pathbar) ── */
+/* 文档头部路径栏 */
 .doc-header {
   padding: 2rem 0 0;
 }
@@ -1003,7 +993,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   font-size: 11px;
 }
 
-/* ── Pagination ── */
+/* 上一篇/下一篇导航 */
 .doc-footer {
   margin-top: 60px;
   padding-bottom: 60px;
@@ -1088,13 +1078,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 
 .pagination-link:hover .pagination-link__label { color: var(--accent-2); }
 
-.pagination-link--placeholder {
-  width: calc(50% - 8px);
-  visibility: hidden;
-  pointer-events: none;
-}
-
-/* ── Popover (footnote tooltip) ── */
+/* 脚注提示浮层 */
 .popover {
   display: none;
   position: absolute;
@@ -1142,7 +1126,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 .popover__jump--cross::before { content: "\2197 "; }
 .popover__jump:not(.popover__jump--cross)::before { content: "\2193 "; }
 
-/* ── Volume index page ── */
+/* 卷册索引页 */
 .vol-index-title {
   font-family: var(--font-serif);
   font-size: calc(var(--fs-user) * 1.6);
@@ -1159,7 +1143,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   text-align: center;
 }
 
-/* ── In-page TOC (volume index) ── */
+/* 页面内目录：卷册索引使用 */
 .doc-toc {
   font-family: var(--font-ui);
   font-size: calc(var(--fs-user) * 0.875);
@@ -1224,6 +1208,8 @@ input[type="range"]:focus::-webkit-slider-thumb {
 .doc-toc > ul > .toc-item > .toc-link,
 .doc-toc > ol > .toc-item > .toc-link {
   border-bottom-color: transparent;
+  font-weight: 500;
+  color: var(--text);
 }
 
 .doc-toc .toc-link:hover {
@@ -1266,12 +1252,6 @@ input[type="range"]:focus::-webkit-slider-thumb {
   margin-top: 4px;
 }
 
-.doc-toc .toc-item-row .toc-caret {
-  flex-shrink: 0;
-  margin-left: 2px;
-  margin-top: 4px;
-}
-
 .doc-toc .toc-caret:hover {
   background: var(--bg-hover);
   color: var(--text);
@@ -1292,11 +1272,6 @@ input[type="range"]:focus::-webkit-slider-thumb {
   box-sizing: border-box;
 }
 
-.doc-toc .toc-item:not(:has(> .toc-item-row)) > ol {
-  order: 2;
-  flex-basis: 100%;
-}
-
 .doc-toc .toc-item[data-collapsed="true"] > ul,
 .doc-toc .toc-item[data-collapsed="true"] > ol,
 .doc-toc .toc-item[data-collapsed="true"] > .toc-item-row ~ ul,
@@ -1309,12 +1284,6 @@ input[type="range"]:focus::-webkit-slider-thumb {
 .doc-toc .toc-item[data-collapsed="false"] > .toc-item-row ~ ul,
 .doc-toc .toc-item[data-collapsed="false"] > .toc-item-row ~ ol {
   max-height: 999999px;
-}
-
-.doc-toc > ul > .toc-item > .toc-link,
-.doc-toc > ol > .toc-item > .toc-link {
-  font-weight: 500;
-  color: var(--text);
 }
 
 .doc-toc ul ul .toc-link,
@@ -1358,7 +1327,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   left: -4px;
 }
 
-/* ── Card / index page ── */
+/* 卡片与首页 */
 .hero {
   max-width: 1200px;
   margin: 0 auto;
@@ -1424,7 +1393,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   margin: 0;
 }
 
-/* ── Desktop (≥997px) ── */
+/* 桌面端：宽度不小于 997px */
 @media (min-width: 997px) {
   .scroll-indicator { display: none; }
   .doc-sidebar {
@@ -1439,23 +1408,16 @@ input[type="range"]:focus::-webkit-slider-thumb {
     align-self: flex-start;
   }
   .doc-main {
-    margin-left: 0;
-    flex: 1;
-    min-width: 0;
     display: flex;
     justify-content: center;
   }
   .sidebar-overlay { display: none !important; }
-  .theme-doc-toc-desktop {
-    display: block;
-    top: var(--nav-h);        /* sticky anchored to navbar bottom */
-    padding: 2rem 0 0 0;     /* slight breathing room */
-  }
+  .theme-doc-toc-desktop { display: block; }
   #sidebar-toggle { display: none !important; }
   .navbar__brand { padding-left: 0; }
 }
 
-/* ── Tablet & Mobile (≤996px) ── */
+/* 平板与移动端：宽度不超过 996px */
 @media (max-width: 996px) {
   .doc-sidebar { top: 0; height: 100vh; width: min(85vw, 300px); overflow: hidden; }
   .doc-sidebar__header { display: flex; }
@@ -1464,12 +1426,9 @@ input[type="range"]:focus::-webkit-slider-thumb {
   .theme-doc-toc-desktop { display: none; }
 }
 
-/* ── Mobile (≤768px) ── */
+/* 移动端：宽度不超过 768px */
 @media (max-width: 768px) {
-  .navbar__items #theme-btn { display: none;   .doc-toc .toc-link {
-    padding: 5px 8px;
-  }
-}
+  .navbar__items #theme-btn { display: none; }
   .navbar__item { display: none; }
   .navbar { padding-left: 0.2vw; padding-right: 0.2vw; }
   .navbar__brand { gap: 0.1vw; }
@@ -1482,6 +1441,12 @@ input[type="range"]:focus::-webkit-slider-thumb {
   .card { padding: 16px; }
   .card__heading { font-size: 1.05rem; margin: 8px 0 4px; }
   .card__body { font-size: 0.85rem; }
+  .doc-toc li > ul,
+  .doc-toc li > ol {
+    padding-left: 12px;
+    margin-left: 0;
+  }
+  .doc-toc .toc-link { padding: 5px 8px; }
   .popover {
     position: fixed;
     left: 12px !important; right: 12px !important;
@@ -1491,7 +1456,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   }
 }
 
-/* ── Accessibility ── */
+/* 无障碍与减少动画 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -1526,35 +1491,12 @@ input[type="range"]:focus::-webkit-slider-thumb {
   border: 0;
 }
 
-/* ── Line-height control ── */
-.lh-control {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 2px;
-  height: 32px;
-}
-
-.lh-value {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-3);
-  min-width: 28px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  font-family: var(--font-mono);
-  user-select: none;
-}
-
 #lh-slider, #mobile-lh-slider {
   width: 50px;
   min-width: 50px;
 }
 
-/* ── TOC overflow guard ── */
+/* 目录溢出保护 */
 .doc-toc,
 .doc-toc ul,
 .doc-toc ol,
@@ -1564,29 +1506,4 @@ input[type="range"]:focus::-webkit-slider-thumb {
 .doc-toc .toc-link {
   max-width: 100%;
   box-sizing: border-box;
-}
-
-.doc-toc .toc-link {
-  overflow-wrap: anywhere;
-}
-
-/* ── Mobile TOC nesting margin reduction ── */
-@media (max-width: 768px) {
-  .doc-toc li > ul,
-  .doc-toc li > ol {
-    padding-left: 10px;
-    margin-left: 6px;
-  }
-}
-
-
-@media (max-width: 768px) {
-  .doc-toc li > ul,
-  .doc-toc li > ol {
-    padding-left: 12px;    /* 原 8px + 原 margin-left 4px */
-    margin-left: 0;
-  }
-  .doc-toc .toc-link {
-    padding: 5px 8px;
-  }
 }

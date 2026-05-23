@@ -3,6 +3,22 @@ window.$ = s => document.querySelector(s);
 window.$$ = s => [...document.querySelectorAll(s)];
 window.on = (t, e, f, o) => t && t.addEventListener(e, f, o || false);
 window.esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+window.onScrollFrame = window.onScrollFrame || (function () {
+    const callbacks = new Set();
+    let frame = 0;
+    const run = () => {
+        frame = 0;
+        callbacks.forEach(fn => fn());
+    };
+    const queue = () => {
+        if (!frame) frame = requestAnimationFrame(run);
+    };
+    window.addEventListener('scroll', queue, { passive: true });
+    return fn => {
+        callbacks.add(fn);
+        return () => callbacks.delete(fn);
+    };
+})();
 window.syncFill = function (el) {
     var min = parseFloat(el.min) || 0, max = parseFloat(el.max) || 100, val = parseFloat(el.value) || 0;
     var pct = ((val - min) / (max - min) * 100).toFixed(2) + '%';
@@ -51,15 +67,22 @@ window.buildHeadingTree = function (headings) {
 window.fetchVolData = async function (dir, cacheMap) {
     const cleanDir = dir.replace(/^\//, '').replace(/\/$/, '');
     if (cacheMap && cacheMap[cleanDir]) return cacheMap[cleanDir];
-    const url = '/' + cleanDir + '/index.json';
+    const jsonUrl = '/' + cleanDir + '/index.json';
     try {
-        const res = await fetch(url);
+        const res = await fetch(jsonUrl);
         if (res.ok) {
             const data = await res.json();
             if (cacheMap) cacheMap[cleanDir] = data;
             return data;
         }
-    } catch (e) { console.warn('[fetchVolData]', url, e); }
+    } catch (e) { /* ignore, fallback below */ }
+    const jsUrl = '/' + cleanDir + '/index.js';
+    try {
+        const mod = await import(jsUrl);
+        const data = mod?.default || null;
+        if (cacheMap && data) cacheMap[cleanDir] = data;
+        return data;
+    } catch (e) { console.warn('[fetchVolData] fallback failed', jsUrl, e); }
     return null;
 };
 window.expandTo = function (el, container) {
@@ -85,20 +108,42 @@ class MenuManager {
         this._activeHeadingId = null;
         this._scrollTrackingReady = false;
         this._tocScrollHandler = null;
+        this._scrollFrame = 0;
+        this._sidebarTrackingCache = null;
+        this._activeSidebarLink = null;
+        this._activeTocLink = null;
+        this._lastSyncedNavId = null;
+        this._headingTops = [];
+        this._headingResizeHandler = null;
+        this._headingResizeFrame = 0;
         this._io = null;
         this._sidebarClickHandler = null;
+        this._sidebarStateObserver = null;
     }
 
     init() {
         this.sidebar = $('#lsidebar');
         this.navTree = $('#nav-tree');
         if (!this.sidebar || !this.navTree) return;
+        this._observeSidebarOpen();
         this.reinit(state.doc);
+    }
+
+    _observeSidebarOpen() {
+        if (this._sidebarStateObserver) return;
+        this._sidebarStateObserver = new MutationObserver(() => {
+            if (innerWidth < 997 && this.sidebar.classList.contains('doc-sidebar--open')) {
+                this._lastSyncedNavId = null;
+                this._syncNavScroll(this._activeHeadingId);
+            }
+        });
+        this._sidebarStateObserver.observe(this.sidebar, { attributes: true, attributeFilter: ['class'] });
     }
 
     reinit(docPath) {
         this._cleanup();
         this.navTree.innerHTML = '';
+        this._invalidateTrackingCache();
         this._currentVol = docPath ? this._detectVolume(docPath) : null;
 
         if (!docPath) {
@@ -124,12 +169,26 @@ class MenuManager {
 
     _cleanup() {
         if (this._tocScrollHandler) {
-            window.removeEventListener('scroll', this._tocScrollHandler, { passive: true });
+            if (this._tocScrollHandler._isScrollFrameOff) this._tocScrollHandler();
+            else window.removeEventListener('scroll', this._tocScrollHandler, { passive: true });
             this._tocScrollHandler = null;
+        }
+        if (this._scrollFrame) {
+            cancelAnimationFrame(this._scrollFrame);
+            this._scrollFrame = 0;
+        }
+        if (this._headingResizeHandler) {
+            window.removeEventListener('resize', this._headingResizeHandler);
+            this._headingResizeHandler = null;
+        }
+        if (this._headingResizeFrame) {
+            cancelAnimationFrame(this._headingResizeFrame);
+            this._headingResizeFrame = 0;
         }
         if (this._io) { this._io.disconnect(); this._io = null; }
         this._scrollTrackingReady = false;
         this._activeHeadingId = null;
+        this._invalidateTrackingCache();
         if (this._sidebarClickHandler && this.navTree) {
             this.navTree.removeEventListener('click', this._sidebarClickHandler);
             this._sidebarClickHandler = null;
@@ -161,18 +220,45 @@ class MenuManager {
     _buildBreadcrumb(parts) {
         let html = '<div class="breadcrumb" aria-label="Breadcrumb">';
         parts.forEach((p, i) => {
-            if (i > 0) html += '<span class="breadcrumb__sep">/</span>';
-            if (p.href) html += `<a href="${esc(p.href)}">${esc(p.text)}</a>`;
-            else html += `<span>${esc(p.text)}</span>`;
+            if (i > 0 && p.id != 'page-breadcrumb-link') html += '<span class="breadcrumb__sep">/</span>';
+            if (p.isPageBadge && p.id == 'page-breadcrumb-link') {
+                html += `<span class="breadcrumb__sep">/</span>
+<a href="#" id="${esc(p.id)}" style="display:none"></a>`;
+            } else if (p.href && p.expand) {
+                html += `<a href="${esc(p.href)}" data-expand-section="${esc(p.expand)}">${esc(p.text)}</a>`;
+            } else if (p.href) {
+                html += `<a href="${esc(p.href)}">${esc(p.text)}</a>`;
+            } else if (p.text) {
+                html += `<span>${esc(p.text)}</span>`;
+            }
         });
         html += '</div>';
         return html;
     }
 
-    _renderRelatedSections(skipColId) {
-        if (!window.LIBRARY_CONFIG?.length) return '';
-        return `<div class="section-divider"><span>Other Works</span></div>
-<ul class="sidebar-menu related-toc">${this._renderLazySections(skipColId)}</ul>`;
+
+    _expandSectionById(sectionId) {
+        const li = this.navTree.querySelector(`li[data-section="${sectionId}"]`);
+        if (!li) return;
+        const isCollapsed = li.getAttribute('data-collapsed') !== 'false';
+        if (isCollapsed) {
+            const trigger = li.querySelector('.sidebar-category-label') || li.querySelector('.sidebar-caret');
+            if (trigger) trigger.click();
+        }
+        requestAnimationFrame(() => li.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    }
+
+    _bindBreadcrumbClicks() {
+        const bc = this.navTree?.querySelector('.breadcrumb');
+        if (!bc) return;
+        bc.addEventListener('click', (e) => {
+            const el = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+            const link = el?.closest('a[data-expand-section]');
+            if (!link) return;
+            e.preventDefault();
+            e.stopPropagation();
+            this._expandSectionById(link.dataset.expandSection);
+        });
     }
 
     _postRenderMenu(docPath) {
@@ -183,7 +269,12 @@ class MenuManager {
         this._initTocRail();
         this._initScrollTracking();
         this._bindSidebarLinkClicks(docPath);
+        this._bindBreadcrumbClicks();
         this._scrollToPendingAnchor();
+        // 同步页码链接状态（菜单重建后恢复当前页码显示）
+        if (window.__PAGE_BAR__?.currentPage != null) {
+            window.__PAGE_BAR__._updateBadge(window.__PAGE_BAR__.currentPage);
+        }
     }
 
     async _renderEpubMenu(docPath) {
@@ -199,16 +290,19 @@ class MenuManager {
         const volHref = item.path || (dir + '/index.html');
         const colHref = col.path && !col.path.startsWith('http') ? `?doc=${esc(col.path.replace(/^\//, ''))}` : null;
         const volLink = `?doc=${esc(volHref.replace(/^\//, ''))}`;
+        const ispagebadge = window.__PAGE_BAR__.hasPageAnchors;
 
         let html = this._buildBreadcrumb([
-            colHref ? { href: colHref, text: col.label } : { text: col.label },
-            { href: volLink, text: volTitle }
+            colHref ? { href: colHref, text: col.label, expand: col.id } : { text: col.label, expand: col.id },
+            { href: volLink, text: volTitle },
+            { id: 'page-breadcrumb-link', isPageBadge: ispagebadge }
         ]);
 
         const headings = data.headings || [];
         if (headings.length) html += this._renderSidebarTree(buildHeadingTree(headings), 'epub-toc');
-        html += this._renderRelatedSections(col.id);
+        html += '<div class="section-divider"><span>All works</span></div>' + this._buildLibmapHtml();
         this.navTree.innerHTML = html;
+        this._invalidateTrackingCache();
         this._postRenderMenu(docPath);
     }
 
@@ -218,7 +312,7 @@ class MenuManager {
 
         const pageTitle = headings[0]?.textContent?.trim() || document.title;
         const col = this._currentVol?.col || this._findCollectionByPath();
-        const parts = [{ text: col?.label || 'Library' }];
+        const parts = [{ text: col?.label || 'Library', expand: col?.id }];
         if (col?.path && !col.path.startsWith('http')) parts[0].href = `?doc=${esc(col.path.replace(/^\//, ''))}`;
         if (this._currentVol?.item?.label) {
             parts.push({
@@ -234,8 +328,9 @@ class MenuManager {
             level: parseInt(h.tagName[1]), text: h.textContent.trim(), id: h.id, file: currentFileName
         }));
         html += this._renderSidebarTree(buildHeadingTree(pageHeadings), 'page-toc');
-        html += this._renderRelatedSections(col?.id);
+        html += '<div class="section-divider"><span>All works</span></div>' + this._buildLibmapHtml();
         this.navTree.innerHTML = html;
+        this._invalidateTrackingCache();
         this._postRenderMenu(state.doc);
     }
 
@@ -263,6 +358,13 @@ class MenuManager {
         const cleanDir = dir.replace(/^\//, '').replace(/\/$/, '');
         const raw = await fetchVolData(cleanDir, this._volCache);
         if (!raw) return null;
+
+        // 新格式：index.js 直接 export default 的 VolumeData 对象
+        if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.version === 1) {
+            return raw;
+        }
+
+        // 旧格式：index.json 返回的文件数组，需要转换
         return this._convertJsonToVolumeData(raw, cleanDir);
     }
 
@@ -312,7 +414,6 @@ class MenuManager {
         return nodes.map(n => {
             const fullFile = n.file ? (volDir.replace(/\/?$/, '/') + n.file).replace(/\/+/g, '/') : '';
             const targetFile = fullFile.replace(/\.html$/i, '');
-            // 用完整路径判断同页，避免只比较文件名时跨目录误判
             const isSameFile = !isPageToc && targetFile && targetFile === currentFullPath;
             let href = isPageToc ? (n.id ? `#${esc(n.id)}` : '#')
                 : isSameFile ? (n.id ? `#${esc(n.id)}` : '#')
@@ -385,18 +486,21 @@ class MenuManager {
         this._io.observe(tocTree);
     }
 
-    _renderLibmapMenu() {
+    _buildLibmapHtml() {
         if (!window.LIBRARY_CONFIG?.length) {
-            this.navTree.innerHTML = '<div class="sidebar-menu" style="padding:20px">Navigation unavailable</div>';
-            return;
+            return '<div class="sidebar-menu" style="padding:20px">Navigation unavailable</div>';
         }
-        this.navTree.innerHTML = '<ul class="sidebar-menu">' + this._renderLazySections() + '</ul>';
+        return '<ul class="sidebar-menu">' + this._renderLazySections() + '</ul>';
+    }
+
+    _renderLibmapMenu() {
+        this.navTree.innerHTML = this._buildLibmapHtml();
+        this._invalidateTrackingCache();
         this._initLazySections();
     }
 
-    _renderLazySections(skipColId) {
+    _renderLazySections() {
         return (window.LIBRARY_CONFIG || []).map(col => {
-            if (col.id === skipColId) return '';
             const id = esc(col.id || '');
             const label = esc(col.label || col.title || col.id || '');
             const badge = col.badge ? ` <span class="sidebar-badge">${esc(col.badge)}</span>` : '';
@@ -490,9 +594,11 @@ class MenuManager {
         const nav = $('#toc-desktop-nav');
         if (!nav) return;
         nav.innerHTML = '';
+        this._activeTocLink = null;
         const headings = this._getPageHeadings();
         if (!headings.length) { this._waitForHeadings(() => this._initTocRail()); return; }
         nav.innerHTML = this._renderTocTree(buildHeadingTree(headings));
+        this._activeTocLink = null;
         if (this._scrollTrackingReady) {
             const activeId = getActiveHeadingId(getDomHeadings($('#content')), 200);
             if (activeId) this._updateTracking(activeId);
@@ -516,36 +622,65 @@ class MenuManager {
         if (!headings.length) { this._waitForHeadings(() => this._initScrollTracking()); return; }
         this._scrollTrackingReady = true;
         let lastId = null;
-        const onScroll = () => {
-            const activeId = getActiveHeadingId(headings, 200);
+        const measureHeadings = () => {
+            this._headingTops = headings.map(h => h.getBoundingClientRect().top + scrollY);
+        };
+        const queueMeasureHeadings = () => {
+            if (!this._headingResizeFrame) this._headingResizeFrame = requestAnimationFrame(() => {
+                this._headingResizeFrame = 0;
+                measureHeadings();
+            });
+        };
+        measureHeadings();
+        this._headingResizeHandler = queueMeasureHeadings;
+        window.addEventListener('resize', this._headingResizeHandler, { passive: true });
+        window.addEventListener('load', measureHeadings, { once: true });
+        setTimeout(measureHeadings, 500);
+        const track = () => {
+            this._scrollFrame = 0;
+            const activeId = this._getActiveHeadingIdFromTops(headings, 200);
             if (activeId !== lastId) { lastId = activeId; this._activeHeadingId = activeId; this._updateTracking(activeId); }
         };
-        window.addEventListener('scroll', onScroll, { passive: true });
-        this._tocScrollHandler = onScroll;
-        requestAnimationFrame(onScroll);
+        const onScroll = () => {
+            if (!this._scrollFrame) this._scrollFrame = requestAnimationFrame(track);
+        };
+        if (window.onScrollFrame) {
+            const off = window.onScrollFrame(track);
+            off._isScrollFrameOff = true;
+            this._tocScrollHandler = off;
+        } else {
+            window.addEventListener('scroll', onScroll, { passive: true });
+            this._tocScrollHandler = onScroll;
+        }
+        this._scrollFrame = requestAnimationFrame(track);
     }
 
-    _syncNavScroll() {
+    _syncNavScroll(id) {
         if (innerWidth >= 997) return;
-        const active = this.navTree?.querySelector('.sidebar-link.sidebar-link--active');
+        if (!this.sidebar?.classList.contains('doc-sidebar--open')) return;
+        if (!id || id === this._lastSyncedNavId) return;
+        const active = this._activeSidebarLink || this.navTree?.querySelector('.sidebar-link.sidebar-link--active');
         if (!active) return;
         expandTo(active, this.navTree.querySelector('.sidebar-menu'));
-        requestAnimationFrame(() => active.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+        this._lastSyncedNavId = id;
+        requestAnimationFrame(() => active.scrollIntoView({ block: 'center', behavior: 'auto' }));
     }
 
     _updateTracking(id) {
         this._updateSidebarTracking(id);
         this._updateTocRailTracking(id);
-        this._syncNavScroll();
+        this._syncNavScroll(id);
     }
 
     _updateSidebarTracking(id) {
         if (!this.navTree) return;
         const tree = this.navTree.querySelector('.sidebar-menu');
         if (!tree) return;
-        tree.querySelectorAll('.sidebar-link').forEach(a => a.classList.remove('sidebar-link--active'));
+        if (this._activeSidebarLink && tree.contains(this._activeSidebarLink)) this._activeSidebarLink.classList.remove('sidebar-link--active');
+        else tree.querySelector('.sidebar-link.sidebar-link--active')?.classList.remove('sidebar-link--active');
+        this._activeSidebarLink = null;
         const currentFile = (state.doc || '').split('/').pop().replace(/\.html$/i, '') || 'index';
-        const links = [...tree.querySelectorAll('.sidebar-link')];
+        const links = this._getSidebarTrackingCache(tree).links;
         let match = null;
         if (id) {
             match = links.find(a =>
@@ -563,16 +698,41 @@ class MenuManager {
             );
         }
 
-        if (match) { match.classList.add('sidebar-link--active'); expandTo(match, tree); }
+        if (match) { match.classList.add('sidebar-link--active'); this._activeSidebarLink = match; expandTo(match, tree); }
     }
 
     _updateTocRailTracking(id) {
         const nav = $('#toc-desktop-nav');
         if (!nav?.innerHTML) return;
-        nav.querySelectorAll('.theme-doc-toc-desktop-link__a').forEach(a => a.classList.remove('theme-doc-toc-desktop-link__a--active'));
+        if (this._activeTocLink && nav.contains(this._activeTocLink)) this._activeTocLink.classList.remove('theme-doc-toc-desktop-link__a--active');
+        else nav.querySelector('.theme-doc-toc-desktop-link__a--active')?.classList.remove('theme-doc-toc-desktop-link__a--active');
+        this._activeTocLink = null;
         if (!id) return;
-        const match = nav.querySelector(`a[href="#${CSS.escape(id)}"]`);
-        if (match) match.classList.add('theme-doc-toc-desktop-link__a--active');
+        const match = [...nav.querySelectorAll('.theme-doc-toc-desktop-link__a')].find(a => a.getAttribute('href') === `#${id}`);
+        if (match) { match.classList.add('theme-doc-toc-desktop-link__a--active'); this._activeTocLink = match; }
+    }
+
+    _invalidateTrackingCache() {
+        this._sidebarTrackingCache = null;
+        this._activeSidebarLink = null;
+        this._activeTocLink = null;
+        this._lastSyncedNavId = null;
+    }
+
+    _getSidebarTrackingCache(tree) {
+        if (!this._sidebarTrackingCache || this._sidebarTrackingCache.tree !== tree) {
+            this._sidebarTrackingCache = { tree, links: [...tree.querySelectorAll('.sidebar-link')] };
+        }
+        return this._sidebarTrackingCache;
+    }
+
+    _getActiveHeadingIdFromTops(headings, threshold = 200) {
+        if (!headings.length) return null;
+        const y = scrollY + threshold;
+        for (let i = this._headingTops.length - 1; i >= 0; i--) {
+            if (this._headingTops[i] <= y) return headings[i].id;
+        }
+        return headings[0]?.id || null;
     }
 
     _highlightCurrent(docPath) {
@@ -642,11 +802,11 @@ class MenuManager {
         const normalizePath = p => (p || '').replace(/^\//, '').replace(/\.html$/i, '').replace(/\/$/, '');
 
         this._sidebarClickHandler = (e) => {
-            const link = e.target.closest('.sidebar-link');
+            const el = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+            const link = el?.closest('.sidebar-link');
             if (!link) return;
             const href = link.getAttribute('href') || '';
 
-            // 同页纯锚点 #id —— 直接滚动，保留 ?doc= 查询参数
             if (href.startsWith('#')) {
                 const id = href.slice(1);
                 if (id) {
@@ -669,7 +829,6 @@ class MenuManager {
                 const currentDoc = normalizePath(state.doc);
                 const targetDoc = normalizePath(doc);
 
-                // 同页带锚点 —— 直接滚动，不重新请求
                 if (doc && targetDoc === currentDoc && hash) {
                     e.preventDefault();
                     const el = document.getElementById(hash);
@@ -680,7 +839,6 @@ class MenuManager {
                     return;
                 }
 
-                // 跨页带锚点 —— 存标记，等 reinit 后滚动
                 if (hash) {
                     sessionStorage.setItem('__reader_pending_anchor', hash);
                     sessionStorage.setItem('__reader_pending_doc', doc);

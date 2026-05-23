@@ -13,6 +13,22 @@
 
     const resolveUrl = href => { try { return new URL(href, location.href).href; } catch { return location.pathname.replace(/[^/]*$/, '') + href; } };
     const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+    const onScrollFrame = window.onScrollFrame || (window.onScrollFrame = (() => {
+        const callbacks = new Set();
+        let frame = 0;
+        const run = () => {
+            frame = 0;
+            callbacks.forEach(fn => fn());
+        };
+        const queue = () => {
+            if (!frame) frame = requestAnimationFrame(run);
+        };
+        window.addEventListener('scroll', queue, { passive: true });
+        return fn => {
+            callbacks.add(fn);
+            return () => callbacks.delete(fn);
+        };
+    })());
 
     function initResponsiveContent() {
         try {
@@ -52,10 +68,10 @@
         try {
             const bar = $('#progress-bar');
             if (!bar) return;
-            window.addEventListener('scroll', () => {
+            onScrollFrame(() => {
                 const h = document.documentElement.scrollHeight - innerHeight;
                 bar.style.width = (h > 0 ? (scrollY / h) * 100 : 0) + '%';
-            }, { passive: true });
+            });
         } catch (e) { console.warn('[Reader] Progress init failed:', e); }
     }
 
@@ -151,9 +167,9 @@
                 const saved = localStorage.getItem(key);
                 if (saved) requestAnimationFrame(() => window.scrollTo(0, parseInt(saved)));
             }
-            window.addEventListener('scroll', debounce(() => {
+            onScrollFrame(debounce(() => {
                 if (state.rs) localStorage.setItem(key, scrollY);
-            }, 300), { passive: true });
+            }, 300));
         } catch (e) { console.warn('[Reader] Scroll memory init failed:', e); }
     }
 
@@ -166,10 +182,12 @@
             this._sameCache = new Map();
             this._dismiss = this._doDismiss.bind(this);
             this._reposition = () => { if (this._active) this._position(); };
+            this._scrollRepositionOff = null;
         }
 
         async show(a, e) {
             if (!this.tip) return;
+            if (this._active) this.forceClose();
             const href = a.getAttribute('href');
             if (!href) return;
 
@@ -189,7 +207,8 @@
             this._active = true;
             document.addEventListener('click', this._dismiss, true);
             document.addEventListener('keydown', this._dismiss);
-            window.addEventListener('scroll', this._reposition, { passive: true });
+            if (this._scrollRepositionOff) this._scrollRepositionOff();
+            this._scrollRepositionOff = onScrollFrame(this._reposition);
         }
 
         async _resolveTarget(targetId, pageUrl, isCross) {
@@ -324,7 +343,10 @@
             this._trigger = null;
             document.removeEventListener('click', this._dismiss, true);
             document.removeEventListener('keydown', this._dismiss);
-            window.removeEventListener('scroll', this._reposition);
+            if (this._scrollRepositionOff) {
+                this._scrollRepositionOff();
+                this._scrollRepositionOff = null;
+            }
         }
 
         forceClose() { if (this._active) this._doDismiss(); }
@@ -343,7 +365,7 @@
     function initFootnotes() {
         try {
             const popup = new FootnotePopup();
-            const start = () => { popup.preloadCrossPage(); popup.preloadSamePage(); };
+            const start = () => { popup.preloadSamePage(); };
             if ('requestIdleCallback' in window) requestIdleCallback(start, { timeout: 2000 });
             else setTimeout(start, 500);
 
@@ -446,24 +468,42 @@
             if (!toc) return;
             const headings = Array.from(document.querySelectorAll('#content h1[id], #content h2[id], #content h3[id], #content h4[id], #content h5[id], #content h6[id]'));
             if (!headings.length) return;
-            const links = toc.querySelectorAll('a.toc-link');
+            const links = Array.from(toc.querySelectorAll('a.toc-link'));
             if (!links.length) return;
 
             let lastId = null;
+            let activeLink = null;
+            let headingTops = [];
+            let measureFrame = 0;
+            const measureHeadings = () => {
+                headingTops = headings.map(h => h.getBoundingClientRect().top + scrollY);
+            };
+            const queueMeasureHeadings = () => {
+                if (!measureFrame) measureFrame = requestAnimationFrame(() => {
+                    measureFrame = 0;
+                    measureHeadings();
+                });
+            };
+            measureHeadings();
+            window.addEventListener('resize', queueMeasureHeadings, { passive: true });
+            window.addEventListener('load', measureHeadings, { once: true });
+            setTimeout(measureHeadings, 500);
             const onScroll = () => {
                 let activeId = null;
+                const y = scrollY + 200;
                 for (let i = headings.length - 1; i >= 0; i--) {
-                    if (headings[i].getBoundingClientRect().top <= 200) {
+                    if (headingTops[i] <= y) {
                         activeId = headings[i].id; break;
                     }
                 }
                 if (!activeId && headings.length) activeId = headings[0].id;
                 if (activeId && activeId !== lastId) {
                     lastId = activeId;
-                    links.forEach(a => a.classList.remove('toc-link--active'));
-                    const match = toc.querySelector(`a[href$="#${CSS.escape(activeId)}"]`);
+                    if (activeLink) activeLink.classList.remove('toc-link--active');
+                    const match = links.find(a => (a.getAttribute('href') || '').endsWith(`#${activeId}`));
                     if (match) {
                         match.classList.add('toc-link--active');
+                        activeLink = match;
                         // Expand parent branches
                         let parent = match.closest('.toc-item--collapsible');
                         while (parent) {
@@ -476,7 +516,7 @@
                 }
             };
 
-            window.addEventListener('scroll', onScroll, { passive: true });
+            onScrollFrame(onScroll);
             requestAnimationFrame(onScroll);
         } catch (e) { console.warn('[Reader] Heading tracker init failed:', e); }
     }

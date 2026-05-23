@@ -6,7 +6,9 @@ const state = {
     th: localStorage.theme || 'light',
     doc: null,
     mob: innerWidth < 768,
-    tocScrollHandler: null
+    tocScrollHandler: null,
+    scrollFrame: 0,
+    scrollSaveTimer: null
 };
 
 // ── 主题 / 字体 / 行高 ──
@@ -195,7 +197,7 @@ async function loadDoc(docPath) {
                 const hash = location.hash.slice(1);
                 if (hash) {
                     const el = document.getElementById(hash) || document.querySelector(`[name="${hash}"]`);
-                    if (el) scrollToEl(el);
+                    if (!window.__PAGE_BAR__?.highlightPageAnchor(hash) && el) scrollToEl(el);
                 } else if (state.rs) {
                     const s = localStorage.getItem('scroll_' + state.doc);
                     s && window.scrollTo(0, parseInt(s));
@@ -243,7 +245,7 @@ function renderDoc(h, path) {
     });
 
     const c = $('#content');
-    c.innerHTML = d.body.innerHTML;
+    c.innerHTML = (d.body.querySelector('div.prose#content') || d.body).innerHTML;
 
     c.querySelectorAll('a[name]').forEach(a => {
         if (a.parentElement && !a.parentElement.id) a.parentElement.id = a.getAttribute('name');
@@ -267,6 +269,7 @@ function renderDoc(h, path) {
 
     updatePrevNext(path);
     window.__NAV__?.reinit(state.doc);
+    window.__PAGE_BAR__?.scanContent($('#content'));
     const tocDesktop = $('#toc-desktop');
     if (tocDesktop) tocDesktop.style.display = '';
 }
@@ -316,6 +319,53 @@ function showError(p, m) {
     $('#content').style.display = 'block';
     $('#content').style.opacity = '1';
 }
+
+// ── 轻量通知：给页码引用复制等非阻塞反馈使用 ──
+function showReaderNotice(message, options = {}) {
+    let notice = document.getElementById('reader-notice');
+    if (!notice) {
+        notice = document.createElement('div');
+        notice.id = 'reader-notice';
+        notice.setAttribute('role', 'status');
+        notice.setAttribute('aria-live', 'polite');
+        document.body.appendChild(notice);
+    }
+
+    clearTimeout(showReaderNotice._timer);
+    notice.textContent = message;
+    notice.style.cssText = `
+        position: fixed !important;
+        left: 50% !important;
+        bottom: 24px !important;
+        transform: translateX(-50%) translateY(12px) !important;
+        max-width: min(420px, calc(100vw - 32px)) !important;
+        padding: 10px 14px !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 10px !important;
+        background: var(--bg-card) !important;
+        color: ${options.type === 'error' ? 'var(--accent)' : 'var(--text)'} !important;
+        box-shadow: var(--shadow-md) !important;
+        font: 13px/1.5 var(--font-ui) !important;
+        text-align: center !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        z-index: 900 !important;
+        transition: opacity 160ms ease, transform 160ms ease !important;
+    `;
+
+    requestAnimationFrame(() => {
+        notice.style.setProperty('opacity', '1', 'important');
+        notice.style.setProperty('transform', 'translateX(-50%) translateY(0)', 'important');
+    });
+
+    showReaderNotice._timer = setTimeout(() => {
+        notice.style.setProperty('opacity', '0', 'important');
+        notice.style.setProperty('transform', 'translateX(-50%) translateY(12px)', 'important');
+    }, options.duration || 2400);
+}
+window.showReaderNotice = showReaderNotice;
 
 // ── 前后篇导航 ──
 const mf = {};
@@ -503,10 +553,12 @@ class FootnotePopup {
         this._cache = new Map();
         this._dismiss = this._doDismiss.bind(this);
         this._reposition = () => { if (this._active) this._position(); };
+        this._scrollRepositionOff = null;
     }
 
     async show(a, e) {
         if (!this.tip) return;
+        if (this._active) this.forceClose();
         const href = a.getAttribute('href');
         if (!href) return;
 
@@ -527,7 +579,9 @@ class FootnotePopup {
         this._active = true;
         document.addEventListener('click', this._dismiss, true);
         document.addEventListener('keydown', this._dismiss);
-        window.addEventListener('scroll', this._reposition, { passive: true });
+        if (this._scrollRepositionOff) this._scrollRepositionOff();
+        this._scrollRepositionOff = window.onScrollFrame ? window.onScrollFrame(this._reposition) : null;
+        if (!this._scrollRepositionOff) window.addEventListener('scroll', this._reposition, { passive: true });
 
         const result = await this._resolveTarget(targetId, pageUrl, isCross);
         if (!result) { this._renderState('error', isCross); return; }
@@ -629,7 +683,12 @@ class FootnotePopup {
         this._trigger = null;
         document.removeEventListener('click', this._dismiss, true);
         document.removeEventListener('keydown', this._dismiss);
-        window.removeEventListener('scroll', this._reposition);
+        if (this._scrollRepositionOff) {
+            this._scrollRepositionOff();
+            this._scrollRepositionOff = null;
+        } else {
+            window.removeEventListener('scroll', this._reposition);
+        }
     }
 
     forceClose() { if (this._active) this._doDismiss(); }
@@ -712,17 +771,25 @@ function bindEvents() {
         } else if (d !== state.doc) {
             loadDoc(d);
         } else if (location.hash) {
-            const el = document.getElementById(location.hash.slice(1)) || document.querySelector(`[name="${location.hash.slice(1)}"]`);
-            el && scrollToEl(el);
+            const id = location.hash.slice(1);
+            const el = document.getElementById(id) || document.querySelector(`[name="${id}"]`);
+            if (!window.__PAGE_BAR__?.highlightPageAnchor(id) && el) scrollToEl(el);
         }
     });
 
-    on(window, 'scroll', () => {
+    const progressBar = $('#progress-bar');
+    const updateScrollState = () => {
         const h = document.documentElement.scrollHeight - innerHeight;
-        const bar = $('#progress-bar');
-        if (bar) bar.style.width = (h > 0 ? (scrollY / h) * 100 : 0) + '%';
-        clearTimeout(window.st);
-        window.st = setTimeout(() => { if (state.rs && state.doc) localStorage.setItem('scroll_' + state.doc, scrollY); }, 300);
+        if (progressBar) progressBar.style.width = (h > 0 ? (scrollY / h) * 100 : 0) + '%';
+        clearTimeout(state.scrollSaveTimer);
+        state.scrollSaveTimer = setTimeout(() => { if (state.rs && state.doc) localStorage.setItem('scroll_' + state.doc, scrollY); }, 300);
+    };
+    if (window.onScrollFrame) window.onScrollFrame(updateScrollState);
+    else on(window, 'scroll', () => {
+        if (!state.scrollFrame) state.scrollFrame = requestAnimationFrame(() => {
+            state.scrollFrame = 0;
+            updateScrollState();
+        });
     }, { passive: true });
 
     on(document, 'click', e => {
@@ -747,6 +814,7 @@ function bindEvents() {
                 document.title = '文库阅读器 — MLCLASSIC';
                 state.doc = null;
                 window.__NAV__?.reinit(null);
+                window.__PAGE_BAR__?.scanContent(null);
             }
             closeSidebar();
             return;
@@ -765,7 +833,7 @@ function bindEvents() {
             const id = href.slice(1);
             const el = document.getElementById(id) || document.querySelector(`[name="${id}"]`);
             if (el) {
-                scrollToEl(el);
+                if (!window.__PAGE_BAR__?.highlightPageAnchor(id)) scrollToEl(el);
                 const url = new URL(location.href);
                 url.hash = id;
                 history.replaceState({}, '', url.toString());
@@ -785,13 +853,12 @@ function bindEvents() {
                 if (r.hash) {
                     const el = document.getElementById(r.hash);
                     if (el) {
-                        scrollToEl(el);
+                        if (!window.__PAGE_BAR__?.highlightPageAnchor(r.hash)) scrollToEl(el);
                         history.pushState({}, '', r.href);
                     }
                 }
                 return;
             }
-
             // 跨页跳转：pushState 后 loadDoc，loadDoc 会在 content 显示后自动处理 hash 滚动
             history.pushState({}, '', r.href);
             loadDoc(r.docPath);
@@ -840,6 +907,8 @@ on(document, 'DOMContentLoaded', () => {
     applyLineHeight(state.lh, false);
     window.__NAV__ = new MenuManager();
     window.__NAV__.init();
+    window.__PAGE_BAR__ = new PageBarManager();
+    window.__PAGE_BAR__.init();
     buildWelcomeCards();
 
     const d = new URLSearchParams(location.search).get('doc');
