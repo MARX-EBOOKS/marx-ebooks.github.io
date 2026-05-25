@@ -21,8 +21,6 @@
     saveTimer: null
   };
 
-  const FN_REF_RE = /^#(nref|cref|fn|FN|NA|FA|sd|ed|M|E|F|N|T|a|b|z|c|n|p)[-\d]+?/i;
-
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const resolveUrl = href => { try { return new URL(href, location.href).href; } catch { return location.pathname.replace(/[^/]*$/, '') + href; } };
 
@@ -176,12 +174,12 @@
     async show(a) {
       if (!this.tip) return;
       this.forceClose();
-      const parsed = this.parseHref(a.getAttribute('href') || '');
+      const href = a.getAttribute('href') || '';
+      const parsed = this.parseHref(href);
       if (!parsed) return;
       this.trigger = a;
       const result = await this.resolveTarget(parsed);
-      if (!result) return;
-      this.render(result.block, result.target, a.getAttribute('href') || '', parsed.cross);
+      this.render(result?.block || this.linkFallback(a), result?.target || null, href, parsed.cross);
       this.position();
       this.tip.classList.add('popover--visible');
       this.active = true;
@@ -224,8 +222,46 @@
 
     toBlock(target) {
       const notes = '.fni, .footnote, .endnote, .fn, .note';
-      if (/^(LI|DD)$/i.test(target.tagName)) return target;
-      return target.closest(notes) || target.closest('li,dd,p,div') || target;
+      const blocks = 'li,dd,dt,p,blockquote,pre,figure,figcaption,table,thead,tbody,tfoot,tr,td,th,section,article,aside,div,h1,h2,h3,h4,h5,h6';
+      const doc = target.ownerDocument || document;
+      const isContainer = el => {
+        if (!el || el === doc.body || el === doc.documentElement) return true;
+        return el.id === 'content' || el.id === 'main' || el.classList?.contains('prose') ||
+          el.classList?.contains('doc-content') || el.classList?.contains('doc-main') ||
+          el.classList?.contains('doc-main-inner');
+      };
+      const usable = el => el && !isContainer(el) && (el.textContent || '').trim();
+      if (target.matches?.(notes) || (target.matches?.(blocks) && usable(target))) return target;
+      const block = target.closest(`${notes},${blocks}`);
+      if (usable(block)) return block;
+      return this.lineFallback(target);
+    }
+
+    lineFallback(target) {
+      const parent = target.parentNode;
+      if (!parent) return null;
+      const doc = target.ownerDocument || document;
+      const frag = doc.createDocumentFragment();
+      const boundary = n => n.nodeType === 1 && (n.tagName === 'BR' ||
+        n.matches?.('li,dd,dt,p,blockquote,pre,figure,figcaption,table,thead,tbody,tfoot,tr,td,th,section,article,aside,div,h1,h2,h3,h4,h5,h6'));
+      const before = [];
+      for (let n = target.previousSibling; n; n = n.previousSibling) {
+        if (boundary(n)) break;
+        before.unshift(n);
+      }
+      const nodes = before.concat(target);
+      for (let n = target.nextSibling; n; n = n.nextSibling) {
+        if (boundary(n)) break;
+        nodes.push(n);
+      }
+      nodes.forEach(n => frag.appendChild(n.cloneNode(true)));
+      return (frag.textContent || '').trim() ? frag : null;
+    }
+
+    linkFallback(a) {
+      const frag = document.createDocumentFragment();
+      frag.appendChild(a.cloneNode(true));
+      return frag;
     }
 
     render(block, target, href, cross) {
@@ -278,12 +314,9 @@
   }
 
   function isFootnoteLink(a) {
-    if (a.hasAttribute('data-fn-ref') || a.hasAttribute('data-fn-cross')) return true;
     const href = a.getAttribute('href') || '';
     if (!href.includes('#') || /^(https?:|\/\/)/i.test(href)) return false;
-    if (!(a.closest('sup') || a.querySelector('sup'))) return false;
-    const fragment = href.startsWith('#') ? href : href.slice(href.indexOf('#'));
-    return FN_REF_RE.test(fragment);
+    return !!(a.closest('sup') || a.querySelector('sup'));
   }
 
   function setupFootnotes() {

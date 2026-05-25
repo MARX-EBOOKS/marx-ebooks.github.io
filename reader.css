@@ -801,7 +801,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   font-size: var(--fs-user);
   line-height: var(--lh-user);
   --lh-scale: calc(var(--lh-user) / 2.0);
-  color: var(--text);
+  color: var(--text) !important; 
   font-family: var(--font-serif);
   overflow-wrap: break-word;
 }

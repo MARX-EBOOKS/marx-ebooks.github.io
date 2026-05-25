@@ -261,26 +261,8 @@ class HTMLProcessor {
         if (!$a.closest('sup').length && !$a.find('sup').length) return;
         if (!href.includes('#') || href.startsWith('http') || href.startsWith('//')) return;
 
-        if (!$a.attr('data-fn-ref')) { $a.attr('data-fn-ref', ''); modified = true; }
-        if (!href.startsWith('#') && !$a.attr('data-fn-cross')) { $a.attr('data-fn-cross', ''); modified = true; }
-
-        if (href.startsWith('#')) {
-          const targetId = href.slice(1);
-          let target = $(`[id="${targetId}"]`);
-          if (!target.length) target = $(`a[name="${targetId}"]`);
-          if (!target.length) return;
-
-          let block = target.closest('.fni, .endnote, .fn, .note');
-          if (!block.length && /^LI|DD|P|DIV|SPAN$/i.test(target[0].tagName)) block = target;
-          if (!block.length) block = target.closest('li, dd, p, div');
-          if (!block.length) block = target;
-
-          if (target.attr('id') === targetId && !block.attr('id')) {
-            target.removeAttr('id');
-            block.attr('id', targetId);
-            modified = true;
-          }
-        }
+        if ($a.attr('data-fn-ref') !== undefined) { $a.removeAttr('data-fn-ref'); modified = true; }
+        if ($a.attr('data-fn-cross') !== undefined) { $a.removeAttr('data-fn-cross'); modified = true; }
       });
       return modified ? $('body').html() : html;
     } catch { return this._fnRegex(html); }
@@ -291,13 +273,13 @@ class HTMLProcessor {
     const re = /<a\s+([^>]*?)href\s*=\s*"([^"]*)"([^>]*?)>/gi;
     let match;
     while ((match = re.exec(html)) !== null) {
-      const [full, pre, href, post] = match;
-      if (full.includes('data-fn-ref') || !href.includes('#') || href.startsWith('http') || href.startsWith('//')) continue;
+      const [full, , href] = match;
+      if (!href.includes('#') || href.startsWith('http') || href.startsWith('//')) continue;
       const preceding = html.substring(Math.max(0, match.index - 200), match.index);
       if (preceding.lastIndexOf('<sup') <= preceding.lastIndexOf('</sup>')) continue;
 
-      const extra = ' data-fn-ref' + (!href.startsWith('#') ? ' data-fn-cross' : '');
-      const replacement = `<a ${pre}href="${href}"${post}${extra}>`;
+      const replacement = full.replace(/\s+data-fn-(?:ref|cross)(?:=(?:"[^"]*"|'[^']*'|[^\s>]+))?/gi, '');
+      if (replacement === full) continue;
       const idx = match.index + offset;
       result = result.substring(0, idx) + replacement + result.substring(idx + full.length);
       offset += replacement.length - full.length;
