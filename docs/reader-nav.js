@@ -459,33 +459,30 @@
       const pathNorm = normalizePath(docPath);
       const docNorm = normalizeDoc(pathNorm);
       const docDir = pathNorm.replace(/\/[^/]+$/, '');
-      const matchPath = (path, lowerFallback = false) => {
+      const pathLower = pathNorm.toLowerCase();
+      const docLower = docNorm.toLowerCase();
+      const dirLower = docDir.toLowerCase();
+      const matchPath = path => {
         if (!path || /^https?:/i.test(path)) return null;
-        const itemPath = lowerFallback ? normalizeLowerPath(path) : normalizePath(path);
+        const itemPath = normalizePath(path);
         if (!/\/index\.html$/i.test(itemPath)) return null;
         const dir = itemPath.replace(/\/index\.html$/i, '').replace(/\/nav\.html$/i, '');
-        const currentPath = lowerFallback ? pathNorm.toLowerCase() : pathNorm;
-        const currentDoc = lowerFallback ? docNorm.toLowerCase() : docNorm;
-        const currentDir = lowerFallback ? docDir.toLowerCase() : docDir;
-        return (currentDoc === normalizeDoc(itemPath) || currentDoc === normalizeDoc(dir) || currentDir === dir || currentPath.startsWith(dir + '/')) ? dir : null;
+        const dirLowerCandidate = dir.toLowerCase();
+        return (docLower === normalizeDoc(itemPath).toLowerCase() || docLower === normalizeDoc(dir).toLowerCase() || dirLower === dirLowerCandidate || pathLower.startsWith(dirLowerCandidate + '/')) ? dir : null;
       };
       let best = null;
       const consider = (col, group, item, dir) => {
         if (dir && (!best || dir.length > best.dir.length)) best = { col, group, item, dir };
       };
-      const scan = lowerFallback => {
-        for (const col of window.LIBRARY_CONFIG || []) {
-          consider(col, null, col, matchPath(col.path, lowerFallback));
-          for (const group of col.groups || []) {
-            consider(col, group, group, matchPath(group.path, lowerFallback));
-            for (const item of group.items || []) {
-              consider(col, group, item, matchPath(item.path, lowerFallback));
-            }
+      for (const col of window.LIBRARY_CONFIG || []) {
+        consider(col, null, col, matchPath(col.path));
+        for (const group of col.groups || []) {
+          consider(col, group, group, matchPath(group.path));
+          for (const item of group.items || []) {
+            consider(col, group, item, matchPath(item.path));
           }
         }
-      };
-      scan(false);
-      if (!best) scan(true);
+      }
       return best;
     }
 

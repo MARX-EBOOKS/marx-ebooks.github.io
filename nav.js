@@ -368,31 +368,28 @@
 
     detectVolume() {
       const current = normalizePath(location.pathname);
-      const matchPath = (path, lowerFallback = false) => {
+      const currentLower = current.toLowerCase();
+      const matchPath = path => {
         if (!path || /^https?:/i.test(path)) return null;
-        const itemPath = lowerFallback ? normalizeLowerPath(path) : normalizePath(path);
+        const itemPath = normalizePath(path);
         if (!/\/index\.html$/i.test(itemPath)) return null;
         const dir = itemPath.replace(/\/index\.html$/i, '');
-        const currentPath = lowerFallback ? current.toLowerCase() : current;
-        return (currentPath === itemPath || currentPath === dir || currentPath.startsWith(dir + '/')) ? dir : null;
+        const dirLower = dir.toLowerCase();
+        return (currentLower === itemPath.toLowerCase() || currentLower === dirLower || currentLower.startsWith(dirLower + '/')) ? dir : null;
       };
       let best = null;
       const consider = (col, group, item, dir) => {
         if (dir && (!best || dir.length > best.dir.length)) best = { col, group, item, dir };
       };
-      const scan = lowerFallback => {
-        for (const col of window.LIBRARY_CONFIG || []) {
-          consider(col, null, col, matchPath(col.path, lowerFallback));
-          for (const group of col.groups || []) {
-            consider(col, group, group, matchPath(group.path, lowerFallback));
-            for (const item of group.items || []) {
-              consider(col, group, item, matchPath(item.path, lowerFallback));
-            }
+      for (const col of window.LIBRARY_CONFIG || []) {
+        consider(col, null, col, matchPath(col.path));
+        for (const group of col.groups || []) {
+          consider(col, group, group, matchPath(group.path));
+          for (const item of group.items || []) {
+            consider(col, group, item, matchPath(item.path));
           }
         }
-      };
-      scan(false);
-      if (!best) scan(true);
+      }
       return best;
     }
 
@@ -466,12 +463,8 @@
       const lowerDir = cleanDir.toLowerCase();
       if (lowerDir !== cleanDir) dirs.push(lowerDir);
       for (const dir of dirs) {
-        try {
-          const res = await fetch(new URL(this.sitePath(dir + '/index.json'), location.href).href);
-          if (res.ok) return await res.json();
-        } catch { }
+        dirs.forEach(dir => urls.push(new URL(this.sitePath(dir + '/index.js'), location.href).href));
       }
-      dirs.forEach(dir => urls.push(new URL(this.sitePath(dir + '/index.js'), location.href).href));
       for (const url of [...new Set(urls)]) {
         try {
           const mod = await import(url);

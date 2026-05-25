@@ -25,7 +25,9 @@
   const startsWithPathValue = (path, base) => {
     const cleanPath = normalizePath(path);
     const cleanBase = normalizePath(base);
-    return cleanBase && (cleanPath.startsWith(cleanBase + '/') || cleanPath.toLowerCase().startsWith(cleanBase.toLowerCase() + '/'));
+    if (!cleanBase) return false;
+    if (cleanPath.startsWith(cleanBase + '/')) return true;
+    return cleanPath.toLowerCase().startsWith(cleanBase.toLowerCase() + '/');
   };
 
   class PageBarManager {

@@ -45,25 +45,21 @@
   };
   async function fetchWithLowerFallback(url, options) {
     const lower = lowerUrlFallback(url);
-    let firstError = null;
     try {
       const res = await fetch(url, options);
       if (res.ok || lower === url) return { res, url };
       try {
         const fallback = await fetch(lower, options);
-        return fallback.ok ? { res: fallback, url: lower } : { res, url };
-      } catch {
-        return { res, url };
-      }
+        if (fallback.ok) return { res: fallback, url: lower };
+      } catch { }
+      return { res, url };
     } catch (error) {
-      firstError = error;
-    }
-    if (lower === url) throw firstError;
-    try {
-      const fallback = await fetch(lower, options);
-      return { res: fallback, url: lower };
-    } catch {
-      throw firstError;
+      if (lower === url) throw error;
+      try {
+        return { res: await fetch(lower, options), url: lower };
+      } catch {
+        throw error;
+      }
     }
   }
 

@@ -30,25 +30,21 @@ const lowerPathFallback = value => {
 };
 async function fetchWithLowerFallback(path, options) {
     const lower = lowerPathFallback(path);
-    let firstError = null;
     try {
         const res = await fetch(path, options);
         if (res.ok || !lower || lower === path) return { res, path };
         try {
             const fallback = await fetch(lower, options);
-            return fallback.ok ? { res: fallback, path: lower } : { res, path };
-        } catch {
-            return { res, path };
-        }
+            if (fallback.ok) return { res: fallback, path: lower };
+        } catch { }
+        return { res, path };
     } catch (error) {
-        firstError = error;
-    }
-    if (!lower || lower === path) throw firstError;
-    try {
-        const fallback = await fetch(lower, options);
-        return { res: fallback, path: lower };
-    } catch {
-        throw firstError;
+        if (!lower || lower === path) throw error;
+        try {
+            return { res: await fetch(lower, options), path: lower };
+        } catch {
+            throw error;
+        }
     }
 }
 
@@ -100,6 +96,13 @@ function isFootnoteLink(a) {
     const href = a.getAttribute('href') || '';
     if (!href.includes('#') || /^(https?:|\/\/)/i.test(href)) return false;
     return !!(a.closest('sup') || a.querySelector('sup'));
+}
+
+function injectContentLanguage(parsed, content) {
+    if (!content) return;
+    const lang = parsed?.documentElement?.getAttribute('lang')?.trim();
+    if (lang) content.setAttribute('lang', lang);
+    else content.removeAttribute('lang');
 }
 
 class FootnotePopup {
@@ -548,6 +551,7 @@ class ReaderApp {
         this.injectDocStyles(parsed, base);
         this.rewriteDocUrls(parsed, base);
         const content = $('#content');
+        injectContentLanguage(parsed, content);
         content.innerHTML = (parsed.body.querySelector('div.prose#content') || parsed.body).innerHTML;
         this.prepareAnchors(content);
         state.doc = docPath;
