@@ -247,7 +247,7 @@ class ReaderApp {
 
     normalizeDocPath(path) {
         const clean = String(path || '').replace(/^\/+/, '').replace(/[?#].*$/, '');
-        return clean.startsWith('docs/') ? clean.slice(5) : clean;
+        return clean;
     }
 
     applyTheme(theme) {
@@ -512,6 +512,7 @@ class ReaderApp {
         parsed.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
             const href = link.getAttribute('href');
             if (!href) return;
+            if (/\/?reader\.css(?:[?#].*)?$/i.test(href)) return;
             document.head.appendChild(Object.assign(document.createElement('link'), {
                 rel: 'stylesheet',
                 className: 'dynamic-doc-style',

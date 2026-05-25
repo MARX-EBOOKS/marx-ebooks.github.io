@@ -66,10 +66,11 @@
   function resolveCssHref(href, base) {
     if (!href) return '';
     if (/^(https?:|\/\/)/i.test(href)) return href;
-    if (href.startsWith('/')) return href.slice(1);
+    if (href.startsWith('/')) return href;
     try {
       const dir = String(base || '').replace(/^\/+/, '').replace(/\/?$/, '/');
-      return new URL(href, location.origin + '/' + dir).pathname.replace(/^\/+/, '');
+      const url = new URL(href, new URL(dir, location.href));
+      return url.pathname + url.search + url.hash;
     } catch {
       return [String(base || '').replace(/^\/+|\/+$/g, ''), href.replace(/^\.+\//, '')].filter(Boolean).join('/');
     }
@@ -129,13 +130,21 @@
 
     let data = null;
     try {
-      const res = await fetch('/' + cleanDir + '/index.json');
+      const res = await fetch(new URL(cleanDir + '/index.json', location.href).href);
       if (res.ok) data = await res.json();
     } catch { }
 
     if (!data) {
       try {
-        const mod = await import('/' + cleanDir + '/index.js');
+        const jsUrl = new URL(cleanDir + '/index.js', location.href).href;
+        const res = await fetch(jsUrl);
+        const type = res.headers.get('content-type') || '';
+        if (!res.ok || /text\/html/i.test(type)) return null;
+        const js = await res.text();
+        if (!/\bexport\s+default\b/.test(js)) return null;
+        const blobUrl = URL.createObjectURL(new Blob([js], { type: 'text/javascript' }));
+        const mod = await import(blobUrl);
+        URL.revokeObjectURL(blobUrl);
         data = mod?.default || null;
       } catch { }
     }
