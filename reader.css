@@ -1344,7 +1344,8 @@ input[type="range"]:focus::-webkit-slider-thumb {
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: 24px;
   text-align: left;
   margin-top: 40px;
@@ -1437,8 +1438,8 @@ input[type="range"]:focus::-webkit-slider-thumb {
   .doc-content { overflow-x: hidden; width: 100%; box-sizing: border-box; min-width: 0; }
   .doc-header { padding: 24px 16px 0; }
   .doc-footer { padding-bottom: 40px; }
-  .card-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-  .card { padding: 16px; }
+  .card-grid { grid-template-columns: 1fr;gap: 12px;}
+  .card { padding: 16px; min-width: 0;}
   .card__heading { font-size: 1.05rem; margin: 8px 0 4px; }
   .card__body { font-size: 0.85rem; }
   .doc-toc li > ul,

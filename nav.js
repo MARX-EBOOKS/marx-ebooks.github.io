@@ -1,42 +1,190 @@
 (function () {
   'use strict';
-  const $ = s => document.querySelector(s);
-  const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const resolveUrl = href => { try { return new URL(href, location.href).href; } catch { return location.pathname.replace(/[^/]*$/, '') + href; } };
-  const onScrollFrame = window.onScrollFrame || (window.onScrollFrame = (() => {
-    const callbacks = new Set();
-    let frame = 0;
-    const run = () => {
-      frame = 0;
-      callbacks.forEach(fn => fn());
-    };
-    const queue = () => {
-      if (!frame) frame = requestAnimationFrame(run);
-    };
-    window.addEventListener('scroll', queue, { passive: true });
-    return fn => {
-      callbacks.add(fn);
-      return () => callbacks.delete(fn);
-    };
-  })());
+
+  const doc = document;
+  const win = window;
+
+  class EventBag {
+    constructor() { this.off = []; }
+    on(target, type, handler, options) {
+      if (!target) return () => {};
+      target.addEventListener(type, handler, options || false);
+      const cleanup = () => target.removeEventListener(type, handler, options || false);
+      this.off.push(cleanup);
+      return cleanup;
+    }
+    clear() { while (this.off.length) this.off.pop()(); }
+  }
+
+  const $ = (selector, root = doc) => root.querySelector(selector);
+  const $$ = (selector, root = doc) => Array.from(root.querySelectorAll(selector));
+  const esc = value => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+  const cssEsc = value => (win.CSS?.escape ? CSS.escape(String(value)) : String(value).replace(/["\\]/g, '\\$&'));
+  const normalizePath = value => String(value || '')
+    .replace(/^https?:\/\/[^/]+/i, '')
+    .replace(/[?#].*$/, '')
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '');
+  const normalizeDoc = value => normalizePath(value).replace(/\.html$/i, '');
+  const withoutDocs = value => normalizePath(value).replace(/^docs\//, '');
+  const resolveUrl = href => { try { return new URL(href, location.href).href; } catch { return href; } };
+  const hasSelection = () => {
+    const selection = doc.getSelection();
+    return !!(selection && !selection.isCollapsed && selection.rangeCount);
+  };
+  const scrollToEl = (el, offset = 80, behavior = 'smooth') => {
+    if (!el) return;
+    win.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + scrollY - offset), behavior });
+  };
+  const syncFill = el => {
+    if (!el) return;
+    const min = parseFloat(el.min) || 0;
+    const max = parseFloat(el.max) || 100;
+    const val = parseFloat(el.value) || 0;
+    el.style.setProperty('--_fill', (((val - min) / (max - min)) * 100).toFixed(2) + '%');
+  };
+
+  const scrollCallbacks = new Set();
+  let scrollFrame = 0;
+  win.addEventListener('scroll', () => {
+    if (!scrollFrame) scrollFrame = requestAnimationFrame(() => {
+      scrollFrame = 0;
+      scrollCallbacks.forEach(fn => fn());
+    });
+  }, { passive: true });
+  const onScrollFrame = fn => {
+    scrollCallbacks.add(fn);
+    return () => scrollCallbacks.delete(fn);
+  };
+
+  function getDomHeadings(container) {
+    return container ? $$('h1,h2,h3,h4,h5,h6', container).filter(h => h.id) : [];
+  }
+
+  function buildHeadingTree(headings) {
+    const root = { level: 0, children: [] };
+    const stack = [root];
+    headings.forEach(item => {
+      const node = { ...item, children: [] };
+      while (stack.length > 1 && stack[stack.length - 1].level >= item.level) stack.pop();
+      stack[stack.length - 1].children.push(node);
+      stack.push(node);
+    });
+    return root.children;
+  }
+
+  function expandTo(el, container) {
+    if (!el || !container) return;
+    let parent = el.closest('li');
+    while (parent && container.contains(parent)) {
+      if (parent.classList.contains('sidebar-item--collapsible')) {
+        parent.setAttribute('data-collapsed', 'false');
+        const caret = $('.sidebar-caret', parent);
+        if (caret) caret.textContent = '\u25be';
+      }
+      parent = parent.parentElement?.closest('.sidebar-item');
+    }
+  }
+
+  class HeadingTracker {
+    constructor({ getHeadings, onChange, threshold = 200 }) {
+      this.getHeadings = getHeadings;
+      this.onChange = onChange;
+      this.threshold = threshold;
+      this.headings = [];
+      this.tops = [];
+      this.activeId = null;
+      this.bag = new EventBag();
+      this.frame = 0;
+      this.offScroll = null;
+    }
+    start() {
+      this.stop();
+      this.headings = this.getHeadings();
+      if (!this.headings.length) return false;
+      this.measure();
+      const queueMeasure = () => {
+        if (!this.frame) this.frame = requestAnimationFrame(() => {
+          this.frame = 0;
+          this.measure();
+          this.track(true);
+        });
+      };
+      this.bag.on(win, 'resize', queueMeasure, { passive: true });
+      this.bag.on(win, 'load', queueMeasure, { once: true });
+      setTimeout(queueMeasure, 500);
+      this.offScroll = onScrollFrame(() => this.track(false));
+      this.track(true);
+      return true;
+    }
+    stop() {
+      this.bag.clear();
+      if (this.offScroll) this.offScroll();
+      this.offScroll = null;
+      if (this.frame) cancelAnimationFrame(this.frame);
+      this.frame = 0;
+      this.headings = [];
+      this.tops = [];
+      this.activeId = null;
+    }
+    measure() {
+      this.tops = this.headings.map(h => h.getBoundingClientRect().top + scrollY);
+    }
+    track(force) {
+      if (hasSelection()) return;
+      const id = this.pick();
+      if (force || id !== this.activeId) {
+        this.activeId = id;
+        this.onChange(id);
+      }
+    }
+    pick() {
+      if (!this.tops.length) return this.headings[0]?.id || null;
+      const y = scrollY + this.threshold;
+      let lo = 0;
+      let hi = this.tops.length - 1;
+      let best = 0;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (this.tops[mid] <= y) {
+          best = mid;
+          lo = mid + 1;
+        } else {
+          hi = mid - 1;
+        }
+      }
+      return this.headings[best]?.id || null;
+    }
+  }
+
+  const ReaderCore = win.ReaderCore || {
+    $, $$, esc, cssEsc, EventBag, HeadingTracker,
+    normalizePath, normalizeDoc, withoutDocs, resolveUrl, hasSelection,
+    scrollToEl, syncFill, onScrollFrame, getDomHeadings, buildHeadingTree, expandTo
+  };
+  Object.assign(win, { ReaderCore, $, $$, esc, syncFill, onScrollFrame });
 
   class MenuManager {
     constructor() {
       this.sidebar = null;
-      this.navTree = null;
       this.backdrop = null;
-      this._volCache = new Map();
-      this._mode = 'libmap';
-      this._currentVol = null;
-      this._activeHeadingId = null;
-      this._scrollFrame = 0;
-      this._sidebarTrackingCache = null;
-      this._activeSidebarLink = null;
-      this._activeTocLink = null;
-      this._lastSyncedNavId = null;
-      this._headingTops = [];
-      this._lastWidth = innerWidth;
-      window.addEventListener('resize', () => this._onResize());
+      this.navTree = null;
+      this.mode = 'libmap';
+      this.currentVol = null;
+      this.activeHeadingId = null;
+      this.activeSidebarLink = null;
+      this.activeTocLink = null;
+      this.lastSyncedId = null;
+      this.linkCache = null;
+      this.volCache = new Map();
+      this.tracker = null;
+      this.waitObserver = null;
+      this.fadeObserver = null;
+      this.lastWidth = innerWidth;
     }
 
     async init() {
@@ -44,632 +192,534 @@
       this.backdrop = $('#sidebar-backdrop');
       this.navTree = $('#nav-tree');
       if (!this.sidebar || !this.navTree) return;
-      this._bindSidebarToggle();
-      if (!window.LIBRARY_CONFIG?.length) try { await this._loadLibmapConfig(); } catch (e) { }
-      await this._buildMenu();
-      this._initTocRail();
-      this._initScrollTracking();
-      const docToc = document.querySelector('.doc-toc');
-      if (docToc) {
-        this._initTocToggles(docToc);
-        this._highlightTocCurrent(docToc);
-      }
+      this.bindChrome();
+      this.bindDelegatedEvents();
+      if (!win.LIBRARY_CONFIG?.length) await this.loadLibmap();
+      await this.buildMenu();
+      this.initSourceToc();
     }
 
-    async _buildMenu() {
-      this._currentVol = this._detectVolume();
-      if (this._currentVol) {
-        this._mode = 'epub';
-        await this._renderEpubMenu();
+    bindChrome() {
+      $('#sidebar-toggle')?.addEventListener('click', () => this.toggle());
+      this.backdrop?.addEventListener('click', () => this.close());
+      $('#sidebar-close-btn')?.addEventListener('click', () => this.close());
+      win.addEventListener('resize', () => this.handleResize(), { passive: true });
+    }
+
+    bindDelegatedEvents() {
+      this.navTree.addEventListener('click', e => this.handleClick(e));
+      this.navTree.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const target = e.target.closest('.sidebar-caret, .sidebar-category-label');
+        if (!target || target.closest('a')) return;
+        e.preventDefault();
+        this.toggleItem(target.closest('.sidebar-item--collapsible'));
+      });
+    }
+
+    async handleResize() {
+      const width = innerWidth;
+      if ((this.lastWidth < 997 && width >= 997) || (this.lastWidth >= 997 && width < 997)) {
+        this.lastWidth = width;
+        await this.buildMenu();
+        this.syncSidebar(this.activeHeadingId);
       } else {
-        const pageName = location.pathname.split('/').pop().toLowerCase();
-        const isHome = pageName === 'index.html' || pageName === 'nav.html' || pageName === '';
-        if (isHome) {
-          this._mode = 'libmap';
-          this._renderLibmapMenu();
-        } else if (innerWidth < 997) {
-          this._mode = 'page-toc';
-          await this._renderPageTocMenu();
-        } else {
-          this._mode = 'libmap';
-          this._renderLibmapMenu();
-        }
+        this.lastWidth = width;
       }
-      this._highlightCurrent();
     }
 
-    _onResize() {
-      const w = innerWidth;
-      if ((this._lastWidth < 997 && w >= 997) || (this._lastWidth >= 997 && w < 997)) {
-        this._lastWidth = w;
-        this._buildMenu().then(() => {
-          if (this.sidebar.classList.contains('doc-sidebar--open')) this._syncNavScroll(this._activeHeadingId);
-        });
+    async buildMenu() {
+      this.cleanupRender();
+      this.currentVol = this.detectVolume();
+      if (this.currentVol) {
+        this.mode = 'epub';
+        await this.renderEpubMenu();
+      } else if (innerWidth < 997 && getDomHeadings($('#content')).length > 1 && !this.isHomePage()) {
+        this.mode = 'page-toc';
+        this.renderPageTocMenu();
       } else {
-        this._lastWidth = w;
+        this.mode = 'libmap';
+        this.renderLibmapMenu();
+      }
+      this.afterRender();
+    }
+
+    cleanupRender() {
+      if (this.tracker) this.tracker.stop();
+      this.tracker = null;
+      if (this.waitObserver) this.waitObserver.disconnect();
+      if (this.fadeObserver) this.fadeObserver.disconnect();
+      this.waitObserver = null;
+      this.fadeObserver = null;
+      this.activeHeadingId = null;
+      this.activeSidebarLink = null;
+      this.activeTocLink = null;
+      this.lastSyncedId = null;
+      this.linkCache = null;
+    }
+
+    afterRender() {
+      this.highlightCurrent();
+      this.renderTocRail();
+      this.startTracking();
+      this.initBreadcrumbFade();
+    }
+
+    isHomePage() {
+      const page = location.pathname.split('/').pop().toLowerCase();
+      return !page || page === 'index.html' || page === 'nav.html';
+    }
+
+    handleClick(e) {
+      const target = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+      const expand = target?.closest('a[data-expand-section]');
+      if (expand) {
+        e.preventDefault();
+        this.expandSection(expand.dataset.expandSection);
+        return;
+      }
+      const toggle = target?.closest('.sidebar-caret, .sidebar-category-label');
+      if (toggle && !toggle.closest('a')) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.toggleItem(toggle.closest('.sidebar-item--collapsible'));
+        return;
+      }
+      const link = target?.closest('.sidebar-link');
+      if (!link) return;
+      const href = link.getAttribute('href') || '';
+      if (href.startsWith('#')) {
+        e.preventDefault();
+        this.scrollToHash(href.slice(1));
+      } else {
+        try {
+          const url = new URL(href, location.href);
+          if (url.pathname === location.pathname && url.hash) {
+            e.preventDefault();
+            this.scrollToHash(url.hash.slice(1));
+          }
+        } catch { }
       }
     }
 
-    _detectVolume() {
-      const path = location.pathname;
-      for (const col of (window.LIBRARY_CONFIG || [])) {
-        for (const g of (col.groups || [])) {
-          for (const item of (g.items || [])) {
-            const p = item.path || '';
-            if (!p.endsWith('/index.html')) continue;
-            const dir = p.replace(/^\//, '').replace(/\/index\.html$/, '');
-            if (!dir) continue;
-            const curDir = path.replace(/\/[^\/]+$/, '');
-            if (curDir === dir || path.startsWith('/' + dir + '/')) return { col, group: g, item, dir };
-            const dirL = dir.toLowerCase();
-            if (curDir.toLowerCase() === dirL || path.toLowerCase().startsWith('/' + dirL + '/')) return { col, group: g, item, dir: path.replace(/^\//, '').replace(/\/[^\/]+$/, '') };
+    toggleItem(item) {
+      if (!item) return;
+      if (item.dataset.section && !item.dataset.loaded) this.loadSection(item);
+      const collapsed = item.getAttribute('data-collapsed') !== 'false';
+      item.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
+      const caret = $('.sidebar-caret', item);
+      if (caret) caret.textContent = collapsed ? '\u25be' : '\u25b8';
+    }
+
+    loadSection(item) {
+      const col = (win.LIBRARY_CONFIG || []).find(c => c.id === item.dataset.section);
+      if (!col) return;
+      const html = (col.groups || []).map(group => this.renderGroup(group)).join('');
+      if (html) {
+        const ul = doc.createElement('ul');
+        ul.className = 'sidebar-menu sidebar-menu--nested';
+        ul.innerHTML = html;
+        item.appendChild(ul);
+      }
+      item.dataset.loaded = 'true';
+    }
+
+    expandSection(id) {
+      const item = this.navTree.querySelector(`.sidebar-item[data-section="${cssEsc(id)}"]`);
+      if (!item) return;
+      if (item.getAttribute('data-collapsed') !== 'false') this.toggleItem(item);
+      requestAnimationFrame(() => item.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    }
+
+    scrollToHash(hash) {
+      const el = doc.getElementById(hash) || doc.querySelector(`[name="${cssEsc(hash)}"]`);
+      if (!el) return;
+      scrollToEl(el);
+      history.replaceState({}, '', '#' + hash);
+    }
+
+    detectVolume() {
+      const current = normalizePath(location.pathname);
+      const currentNoDocs = withoutDocs(current);
+      for (const col of win.LIBRARY_CONFIG || []) {
+        for (const group of col.groups || []) {
+          for (const item of group.items || []) {
+            const itemPath = normalizePath(item.path);
+            if (!/\/index\.html$/i.test(itemPath)) continue;
+            const dir = itemPath.replace(/\/index\.html$/i, '');
+            const dirNoDocs = withoutDocs(dir);
+            if (current === itemPath || current.startsWith(dir + '/') || currentNoDocs.startsWith(dirNoDocs + '/')) {
+              return { col, group, item, dir };
+            }
           }
         }
       }
       return null;
     }
 
-    async _renderEpubMenu() {
-      const { col, item, dir } = this._currentVol;
-      const site = document.body.dataset.site || '';
-      const volJs = '/' + dir + '/index.js';
-      const data = await this._fetchVolData(resolveUrl(volJs));
+    async renderEpubMenu() {
+      const data = await this.fetchVolumeData(this.currentVol.dir);
       if (!data) {
-        if (innerWidth >= 997) { this._mode = 'libmap'; this._renderLibmapMenu(); }
-        else await this._renderPageTocMenu();
+        this.mode = innerWidth < 997 ? 'page-toc' : 'libmap';
+        this.mode === 'page-toc' ? this.renderPageTocMenu() : this.renderLibmapMenu();
         return;
       }
-      this._currentVol.data = data;
-      const colHref = col.path && !col.path.startsWith('http') ? (site ? `${site.replace(/\/$/, '')}/${col.path.replace(/^\//, '')}` : col.path) : '#';
-      const volTitle = item.label || item.title || data.title || 'Contents';
-      const volHref = item.path || ('/' + dir + '/index.html');
-      const volLink = site ? `${site.replace(/\/$/, '')}/${volHref.replace(/^\//, '')}` : volHref;
-
-      // EPUB 目录树 + 分界线 + 完整 Libmap（包含本总目录）
-      const html = this._buildBreadcrumb(col.label, volTitle, colHref, volLink, col.id) +
-        this._renderSidebarTree(this._buildHeadingTree(data.headings || []), 'epub-toc') +
+      this.currentVol.data = data;
+      const { col, item } = this.currentVol;
+      this.navTree.innerHTML =
+        this.renderBreadcrumb([
+          { text: col.label, href: this.sitePath(col.path), expand: col.id },
+          { text: item.label || item.title || data.title || 'Contents', href: this.sitePath(item.path || (this.currentVol.dir + '/index.html')) }
+        ]) +
+        this.renderSidebarTree(buildHeadingTree(data.headings || []), 'epub-toc') +
         '<div class="section-divider"><span>All works</span></div>' +
-        this._buildLibmapHtml();
-
-      this.navTree.innerHTML = html;
-      this._invalidateTrackingCache();
-
-      // 仅对 epub-toc 初始化折叠，避免与下方 libmap 的懒加载逻辑冲突
-      const epubToc = this.navTree.querySelector('.sidebar-menu.epub-toc');
-      if (epubToc) this._initSidebarToggles(epubToc);
-
-      this._initLazySections();
-      this._initBreadcrumbFade();
-      this._bindBreadcrumbClicks();
+        this.buildLibmapHtml();
     }
 
-    async _renderPageTocMenu() {
-      this._mode = 'page-toc';
-      const headings = this._getPageHeadings();
-      if (headings.length <= 1) { this._renderLibmapMenu(); return; }
-      const col = this._findCollectionByPath();
-      const pageTitle = headings[0]?.text || document.title;
-      const colLabel = col?.label || col?.title || 'Library';
-      const colHref = col?.path ? (col.path.startsWith('http') ? col.path : (document.body.dataset.site ? `${document.body.dataset.site.replace(/\/$/, '')}/${col.path.replace(/^\//, '')}` : col.path)) : '#';
-      const html = this._buildBreadcrumb(colLabel, pageTitle, colHref, '', col?.id) +
-        this._renderSidebarTree(this._buildHeadingTree(headings), 'page-toc') +
-        '<div class="section-divider"><span>All works</span></div>' +
-        this._buildLibmapHtml();
-      this.navTree.innerHTML = html;
-      this._invalidateTrackingCache();
-      this._initSidebarToggles(this.navTree.querySelector('.sidebar-menu.page-toc'));
-      this._initLazySections();
-      this._initBreadcrumbFade();
-      this._bindBreadcrumbClicks();
-    }
-
-    _buildBreadcrumb(label1, label2, href1, href2, expand1) {
-      const span = l => `<span>${esc(l)}</span>`;
-      const a = (l, h, exp) => h ? `<a href="${esc(h)}"${exp ? ` data-expand-section="${esc(exp)}"` : ''}>${esc(l)}</a>` : span(l);
-      return `<div class="breadcrumb" aria-label="Breadcrumb">${a(label1, href1, expand1)}<span class="breadcrumb__sep">/</span>${a(label2, href2)}</div>`;
-    }
-
-    _expandSectionById(sectionId) {
-      const li = this.navTree.querySelector(`li[data-section="${sectionId}"]`);
-      if (!li) return;
-      const isCollapsed = li.getAttribute('data-collapsed') !== 'false';
-      if (isCollapsed) {
-        const trigger = li.querySelector('.sidebar-category-label') || li.querySelector('.sidebar-caret');
-        if (trigger) trigger.click();
+    renderPageTocMenu() {
+      const headings = getDomHeadings($('#content'));
+      if (headings.length <= 1) {
+        this.mode = 'libmap';
+        this.renderLibmapMenu();
+        return;
       }
-      requestAnimationFrame(() => li.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+      const col = this.findCollectionByPath();
+      const nodes = headings.map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id, file: location.pathname.split('/').pop() }));
+      this.navTree.innerHTML =
+        this.renderBreadcrumb([
+          { text: col?.label || 'Library', href: col?.path ? this.sitePath(col.path) : '#', expand: col?.id },
+          { text: nodes[0]?.text || doc.title }
+        ]) +
+        this.renderSidebarTree(buildHeadingTree(nodes), 'page-toc') +
+        '<div class="section-divider"><span>All works</span></div>' +
+        this.buildLibmapHtml();
     }
 
-    _bindBreadcrumbClicks() {
-      const bc = this.navTree?.querySelector('.breadcrumb');
-      if (!bc) return;
-      bc.addEventListener('click', (e) => {
-        const link = e.target.closest('a[data-expand-section]');
-        if (!link) return;
-        e.preventDefault();
-        this._expandSectionById(link.dataset.expandSection);
-      });
+    renderLibmapMenu() {
+      this.navTree.innerHTML = this.buildLibmapHtml();
     }
 
-    _initBreadcrumbFade() {
-      const bc = this.navTree?.querySelector('.breadcrumb');
-      const menu = this.navTree?.querySelector('.sidebar-menu');
-      if (!bc || !menu) return;
-      const io = new IntersectionObserver(entries => {
-        entries.forEach(e => bc.classList.toggle('breadcrumb--faded', !e.isIntersecting));
-      }, { root: this.navTree, threshold: 0 });
-      io.observe(menu);
+    async fetchVolumeData(dir) {
+      const cleanDir = normalizePath(dir);
+      if (this.volCache.has(cleanDir)) return this.volCache.get(cleanDir);
+      const raw = await this.importVolumeData(cleanDir);
+      const data = this.normalizeVolumeData(raw, cleanDir);
+      if (data) this.volCache.set(cleanDir, data);
+      return data;
     }
 
-    _getDomHeadings() {
-      const c = $('#content');
-      if (!c) return [];
-      return [...c.querySelectorAll('h1,h2,h3,h4,h5,h6')].map((h, i) => { if (!h.id) h.id = 'auto-h' + i; return h; });
+    async importVolumeData(cleanDir) {
+      const urls = [];
+      const meta = win.__PAGE_META__ || {};
+      if (meta.indexJsPath) urls.push(new URL(meta.indexJsPath, location.href).href);
+      urls.push(new URL(this.sitePath(cleanDir + '/index.js'), location.href).href);
+      for (const url of [...new Set(urls)]) {
+        try {
+          const mod = await import(url);
+          if (mod?.default) return mod.default;
+        } catch { }
+      }
+      return null;
     }
 
-    _getActiveHeadingId(headings, threshold = 200) {
-      for (let i = headings.length - 1; i >= 0; i--) if (headings[i].getBoundingClientRect().top <= threshold) return headings[i].id;
-      return headings[0]?.id || null;
+    normalizeVolumeData(raw, dir) {
+      if (!raw) return null;
+      if (!Array.isArray(raw) && raw.version === 1) return raw;
+      if (!Array.isArray(raw)) return null;
+      const headings = [];
+      raw.forEach(file => (file.headings || []).forEach(h => headings.push({
+        level: h.level || 2,
+        text: h.text || '',
+        id: h.id || null,
+        file: h.filename || file.file || file.path || ''
+      })));
+      return { version: 1, title: this.currentVol?.item?.label || dir, files: raw, headings };
     }
 
-    _getPageHeadings() {
-      if (this._mode !== 'epub') return this._getDomHeadings().map(h => ({ level: +h.tagName[1], text: h.textContent.trim(), id: h.id }));
-      const curFile = location.pathname.split('/').pop().replace(/\.html$/i, '');
-      const curFileL = curFile.toLowerCase();
-      const jsonH = (this._currentVol?.data?.headings || []).filter(h => {
-        const f = (h.file || '').replace(/\.html$/i, '');
-        return f === curFile || f.toLowerCase() === curFileL;
-      });
-      const domAll = [...($('#content')?.querySelectorAll('h1,h2,h3,h4,h5,h6') || [])];
-      let di = 0;
-      return jsonH.map(jh => {
-        let id = jh.id;
-        if (!id && di < domAll.length) id = domAll[di].id || null;
-        di++;
-        return { level: jh.level, text: jh.text, id };
-      }).filter(h => h.id);
+    renderBreadcrumb(parts) {
+      return '<div class="breadcrumb" aria-label="Breadcrumb">' + parts.map((part, i) => {
+        const sep = i ? '<span class="breadcrumb__sep">/</span>' : '';
+        if (part.href) return sep + `<a href="${esc(part.href)}"${part.expand ? ` data-expand-section="${esc(part.expand)}"` : ''}>${esc(part.text)}</a>`;
+        return sep + `<span>${esc(part.text || '')}</span>`;
+      }).join('') + '</div>';
     }
 
-    _buildHeadingTree(headings) {
-      const root = { level: 0, children: [] }, stack = [root];
-      headings.forEach(h => {
-        const node = { ...h, children: [] };
-        while (stack.length > 1 && stack[stack.length - 1].level >= h.level) stack.pop();
-        stack[stack.length - 1].children.push(node);
-        stack.push(node);
-      });
-      return root.children;
+    renderSidebarTree(nodes, className) {
+      return `<ul class="sidebar-menu ${esc(className)}">${this.renderSidebarNodes(nodes)}</ul>`;
     }
 
-    _renderSidebarTree(nodes, cls) {
-      const cf = location.pathname.split('/').pop().replace(/\.html$/i, '');
-      return `<ul class="sidebar-menu ${cls}">${this._renderSidebarNodes(nodes, cf)}</ul>`;
-    }
-
-    _renderSidebarNodes(nodes, cf) {
-      return nodes.map(n => {
-        const nFile = (n.file || '').replace(/\.html$/i, '');
-        const isSameFile = nFile && (nFile === cf || nFile.toLowerCase() === cf.toLowerCase());
-        const href = n.id ? (isSameFile ? `#${esc(n.id)}` : `${esc(n.file || '')}#${esc(n.id)}`) : esc(n.file || '');
-        const isFile = isSameFile, hasKids = n.children.length > 0;
-        const kidsHtml = hasKids ? `<ul class="sidebar-menu sidebar-menu--nested">${this._renderSidebarNodes(n.children, cf)}</ul>` : '';
-        const active = (this._mode === 'page-toc' ? (n.id && n.id === this._activeHeadingId) : (isFile && ((this._activeHeadingId && n.id === this._activeHeadingId) || (!this._activeHeadingId && !n.id)))) ? ' sidebar-link--active' : '';
-        const caret = hasKids ? `<button class="sidebar-caret" tabindex="0" aria-label="Expand">\u25b8</button>` : '';
-        const link = `<a href="${href}"${n.file ? ` data-file="${esc(n.file)}"` : ''}${n.id ? ` data-id="${esc(n.id)}"` : ''} class="sidebar-link${active}">${esc(n.text)}</a>`;
-        return hasKids ? `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-collapsed="true"><div class="sidebar-item-row">${link}${caret}</div>${kidsHtml}</li>`
+    renderSidebarNodes(nodes) {
+      const currentFile = location.pathname.split('/').pop().replace(/\.html$/i, '');
+      return nodes.map(node => {
+        const rawFile = node.file || '';
+        const fullFile = rawFile && this.mode !== 'page-toc' ? normalizePath((this.currentVol.dir + '/' + rawFile).replace(/\/+/g, '/')) : rawFile;
+        const file = rawFile.replace(/\.html$/i, '');
+        const sameFile = this.mode === 'page-toc' || file === currentFile || !rawFile;
+        const href = this.mode === 'page-toc'
+          ? (node.id ? '#' + esc(node.id) : '#')
+          : sameFile
+            ? (node.id ? '#' + esc(node.id) : this.sitePath(fullFile || rawFile))
+            : (node.id ? this.sitePath(fullFile) + '#' + esc(node.id) : this.sitePath(fullFile));
+        const children = node.children?.length ? `<ul class="sidebar-menu sidebar-menu--nested">${this.renderSidebarNodes(node.children)}</ul>` : '';
+        const caret = children ? '<button class="sidebar-caret" tabindex="0" aria-label="Expand">\u25b8</button>' : '';
+        const link = `<a href="${href}" data-file="${esc(rawFile)}" data-id="${esc(node.id || '')}" class="sidebar-link">${esc(node.text)}</a>`;
+        return children
+          ? `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-collapsed="true"><div class="sidebar-item-row">${link}${caret}</div>${children}</li>`
           : `<li class="sidebar-item">${link}</li>`;
       }).join('');
     }
 
-    _initSidebarToggles(container) {
-      container.querySelectorAll('.sidebar-item--collapsible').forEach(li => {
-        const caret = li.querySelector('.sidebar-caret'), nested = li.querySelector(':scope > ul');
-        if (!caret || !nested) return;
-        const toggle = e => {
-          e?.preventDefault(); e?.stopPropagation();
-          const collapsed = li.getAttribute('data-collapsed') !== 'false';
-          li.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
-          caret.textContent = collapsed ? '\u25be' : '\u25b8';
-        };
-        caret.addEventListener('click', toggle);
-        caret.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
-      });
+    buildLibmapHtml() {
+      if (!win.LIBRARY_CONFIG?.length) return '<div class="sidebar-menu" style="padding:20px">Navigation unavailable</div>';
+      return '<ul class="sidebar-menu">' + win.LIBRARY_CONFIG.map(col => this.renderSection(col)).join('') + '</ul>';
     }
 
-    _initScrollTracking() {
-      if (this._scrollTrackingReady) return;
-      const c = $('#content'); if (!c) return;
-      let hds = this._getDomHeadings();
-      if (!hds.length) {
-        const mo = new MutationObserver(() => { if (this._getDomHeadings().length) { mo.disconnect(); this._initScrollTracking(); } });
-        mo.observe(c, { subtree: true, attributes: true, attributeFilter: ['id'] });
-        return;
+    renderSection(col) {
+      const label = esc(col.label || col.title || col.id || '');
+      const badge = col.badge ? ` <span class="sidebar-badge">${esc(col.badge)}</span>` : '';
+      if (!col.groups?.length && col.path) {
+        const external = /^https?:/i.test(col.path);
+        return `<li class="sidebar-item"><a href="${external ? esc(col.path) : this.sitePath(col.path)}" class="sidebar-link"${external ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + normalizePath(col.path))}"`}>${label}${badge}</a></li>`;
       }
-      this._scrollTrackingReady = true;
-      let last = null;
-      let measureFrame = 0;
-      const measureHeadings = () => {
-        this._headingTops = hds.map(h => h.getBoundingClientRect().top + scrollY);
-      };
-      const queueMeasureHeadings = () => {
-        if (!measureFrame) measureFrame = requestAnimationFrame(() => {
-          measureFrame = 0;
-          measureHeadings();
-        });
-      };
-      measureHeadings();
-      window.addEventListener('resize', queueMeasureHeadings, { passive: true });
-      window.addEventListener('load', measureHeadings, { once: true });
-      setTimeout(measureHeadings, 500);
-      const track = () => {
-        const id = this._getActiveHeadingIdFromTops(hds, 200);
-        if (id !== last) { last = id; this._activeHeadingId = id; this._updateNavTracking(id); this._syncNavScroll(id); }
-      };
-      onScrollFrame(track);
-      this._scrollFrame = requestAnimationFrame(track);
+      if (col.groups?.length) {
+        return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-section="${esc(col.id)}" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}${badge}</span><button class="sidebar-caret" tabindex="0">\u25b8</button></div></li>`;
+      }
+      return `<li class="sidebar-item"><span class="sidebar-category-label">${label}${badge}</span></li>`;
     }
 
-    _initTocRail() {
-      const nav = document.getElementById('toc-desktop-nav');
+    renderGroup(group) {
+      const label = esc(group.label || '');
+      const items = group.items || [];
+      if (!items.length) {
+        const external = /^https?:/i.test(group.path || '');
+        const path = normalizePath(group.path);
+        return `<li class="sidebar-item"><a href="${external ? esc(group.path) : this.sitePath(path)}" class="sidebar-link"${external ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + path)}"`}>${label}</a></li>`;
+      }
+      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}</span><button class="sidebar-caret" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(item => {
+        const external = /^https?:/i.test(item.path || '');
+        const path = normalizePath(item.path);
+        return `<li class="sidebar-item"><a href="${external ? esc(item.path) : this.sitePath(path)}" class="sidebar-link"${external ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + path)}"`}>${esc(item.label || item.title || '')}</a></li>`;
+      }).join('')}</ul></li>`;
+    }
+
+    sitePath(path) {
+      if (!path) return '#';
+      if (/^https?:/i.test(path)) return path;
+      const site = (doc.body.dataset.site || '').replace(/\/$/, '');
+      const clean = normalizePath(path);
+      return site ? `${site}/${clean}` : '/' + clean;
+    }
+
+    getPageHeadings() {
+      if (this.mode === 'epub') {
+        const currentFile = location.pathname.split('/').pop().replace(/\.html$/i, '');
+        const domHeadings = getDomHeadings($('#content'));
+        let domIndex = 0;
+        return (this.currentVol?.data?.headings || []).filter(h => (h.file || '').replace(/\.html$/i, '') === currentFile).map(h => {
+          const id = h.id || domHeadings[domIndex++]?.id || null;
+          return { level: h.level || 2, text: h.text || '', id };
+        }).filter(h => h.id);
+      }
+      return getDomHeadings($('#content')).map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id }));
+    }
+
+    renderTocRail() {
+      const nav = $('#toc-desktop-nav');
       if (!nav) return;
-      const hds = this._getPageHeadings();
-      if (!hds.length) return;
-      nav.innerHTML = this._renderTocTree(this._buildHeadingTree(hds));
-      this._activeTocLink = null;
-      if (this._scrollTrackingReady) {
-        const id = this._getActiveHeadingId(this._getDomHeadings(), 200);
-        if (id) this._updateNavTracking(id);
+      const headings = this.getPageHeadings();
+      nav.innerHTML = headings.length ? this.renderTocNodes(buildHeadingTree(headings)) : '';
+      this.activeTocLink = null;
+    }
+
+    renderTocNodes(nodes) {
+      if (!nodes.length) return '';
+      return '<ul class="theme-doc-toc-desktop-list">' + nodes.map(node =>
+        `<li class="theme-doc-toc-desktop-link theme-doc-toc-desktop-link--lvl${node.level}"><a href="#${esc(node.id)}" class="theme-doc-toc-desktop-link__a">${esc(node.text)}</a>${this.renderTocNodes(node.children || [])}</li>`
+      ).join('') + '</ul>';
+    }
+
+    startTracking() {
+      const content = $('#content');
+      const start = () => {
+        this.tracker = new HeadingTracker({
+          getHeadings: () => getDomHeadings(content),
+          onChange: id => this.updateTracking(id)
+        });
+        return this.tracker.start();
+      };
+      if (!content || start()) return;
+      this.waitObserver = new MutationObserver((_, observer) => {
+        if (start()) observer.disconnect();
+      });
+      this.waitObserver.observe(content, { subtree: true, attributes: true, attributeFilter: ['id'] });
+    }
+
+    updateTracking(id) {
+      this.activeHeadingId = id;
+      this.updateSidebarTracking(id);
+      this.updateTocTracking(id);
+      this.syncSidebar(id);
+    }
+
+    getSidebarLinks() {
+      const tree = this.navTree.querySelector('.sidebar-menu');
+      if (!tree) return [];
+      if (!this.linkCache || this.linkCache.tree !== tree) this.linkCache = { tree, links: $$('.sidebar-link', tree) };
+      return this.linkCache.links;
+    }
+
+    updateSidebarTracking(id) {
+      const links = this.getSidebarLinks();
+      if (!links.length) return;
+      this.activeSidebarLink?.classList.remove('sidebar-link--active');
+      this.activeSidebarLink = null;
+      const currentFile = location.pathname.split('/').pop().replace(/\.html$/i, '');
+      const sameFile = link => (link.dataset.file || '').replace(/\.html$/i, '') === currentFile;
+      const match = (id && links.find(link => sameFile(link) && link.dataset.id === id))
+        || links.find(link => sameFile(link) && !link.dataset.id)
+        || links.find(sameFile);
+      if (!match) return;
+      match.classList.add('sidebar-link--active');
+      this.activeSidebarLink = match;
+      expandTo(match, this.navTree.querySelector('.sidebar-menu'));
+    }
+
+    updateTocTracking(id) {
+      const nav = $('#toc-desktop-nav');
+      this.activeTocLink?.classList.remove('theme-doc-toc-desktop-link__a--active');
+      this.activeTocLink = null;
+      if (!nav || !id) return;
+      const match = $$('.theme-doc-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id);
+      if (match) {
+        match.classList.add('theme-doc-toc-desktop-link__a--active');
+        this.activeTocLink = match;
       }
     }
 
-    _renderTocTree(nodes) {
-      if (!nodes.length) return '';
-      return '<ul class="theme-doc-toc-desktop-list">' + nodes.map(n => {
-        const cls = 'theme-doc-toc-desktop-link theme-doc-toc-desktop-link--lvl' + n.level;
-        return `<li class="${cls}"><a href="#${n.id}" class="theme-doc-toc-desktop-link__a">${esc(n.text)}</a>${this._renderTocTree(n.children)}</li>`;
-      }).join('') + '</ul>';
-    }
-
-    _syncNavScroll(id) {
-      if (innerWidth >= 997 || !this.navTree) return;   // 桌面端不滚动侧边栏
+    syncSidebar(id) {
+      if (innerWidth >= 997 || hasSelection() || !id || id === this.lastSyncedId) return;
       if (!this.sidebar?.classList.contains('doc-sidebar--open')) return;
-      if (!id || id === this._lastSyncedNavId) return;
-      const a = this._activeSidebarLink || this.navTree.querySelector('.sidebar-link.sidebar-link--active');
-      if (!a) return;
-      this._expandTo(a, this.navTree.querySelector('.sidebar-menu'));
-      this._lastSyncedNavId = id;
-      requestAnimationFrame(() => a.scrollIntoView({ block: 'center', behavior: 'auto' }));
+      const active = this.activeSidebarLink || $('.sidebar-link.sidebar-link--active', this.navTree);
+      if (!active) return;
+      this.lastSyncedId = id;
+      requestAnimationFrame(() => active.scrollIntoView({ block: 'center', behavior: 'auto' }));
     }
 
-    _updateNavTracking(id) {
-      this._updateSidebarTracking(id);
-      this._updateTocRailTracking(id);
-    }
-
-    _updateSidebarTracking(id) {
-      if (!this.navTree) return;
+    highlightCurrent() {
       const tree = this.navTree.querySelector('.sidebar-menu');
       if (!tree) return;
-      if (this._activeSidebarLink && tree.contains(this._activeSidebarLink)) this._activeSidebarLink.classList.remove('sidebar-link--active');
-      else tree.querySelector('.sidebar-link.sidebar-link--active')?.classList.remove('sidebar-link--active');
-      this._activeSidebarLink = null;
-
-      if (this._mode === 'page-toc') {
-        if (!id) return;
-        const m = this._getSidebarTrackingCache(tree).links.find(a => a.dataset.id === id);
-        if (m) { m.classList.add('sidebar-link--active'); this._activeSidebarLink = m; this._expandTo(m, tree); }
+      if (this.mode === 'libmap') {
+        const current = normalizePath(location.pathname);
+        const match = $$('a[data-path]', tree).find(a => {
+          const path = normalizePath(a.dataset.path);
+          return path === current || withoutDocs(path) === withoutDocs(current);
+        });
+        if (match) {
+          match.classList.add('sidebar-link--active');
+          this.activeSidebarLink = match;
+          expandTo(match, tree);
+        }
         return;
       }
-
-      const curFile = location.pathname.split('/').pop().replace(/\.html$/i, '') || 'index';
-      const curFileL = curFile.toLowerCase();
-      const allLinks = this._getSidebarTrackingCache(tree).links;
-      const sameFile = a => {
-        const f = (a.dataset.file || '').replace(/\.html$/i, '');
-        return f === curFile || f.toLowerCase() === curFileL;
-      };
-      let match = id ? allLinks.find(a => sameFile(a) && a.dataset.id === id) : null;
-      if (!match) match = allLinks.find(a => sameFile(a) && !a.dataset.id);
-      if (!match) match = allLinks.find(sameFile);
-
-      if (match) {
-        match.classList.add('sidebar-link--active');
-        this._activeSidebarLink = match;
-        this._expandTo(match, tree);
-      }
-    }
-
-    _updateTocRailTracking(id) {
-      const nav = document.getElementById('toc-desktop-nav');
-      if (!nav?.innerHTML) return;
-      if (this._activeTocLink && nav.contains(this._activeTocLink)) this._activeTocLink.classList.remove('theme-doc-toc-desktop-link__a--active');
-      else nav.querySelector('.theme-doc-toc-desktop-link__a--active')?.classList.remove('theme-doc-toc-desktop-link__a--active');
-      this._activeTocLink = null;
-      if (!id) return;
-      const m = [...nav.querySelectorAll('.theme-doc-toc-desktop-link__a')].find(a => a.getAttribute('href') === `#${id}`);
-      if (m) { m.classList.add('theme-doc-toc-desktop-link__a--active'); this._activeTocLink = m; }
-    }
-
-    _getActiveHeadingIdFromTops(headings, threshold = 200) {
-      if (!headings.length) return null;
-      const y = scrollY + threshold;
-      for (let i = this._headingTops.length - 1; i >= 0; i--) {
-        if (this._headingTops[i] <= y) return headings[i].id;
-      }
-      return headings[0]?.id || null;
-    }
-
-    _invalidateTrackingCache() {
-      this._sidebarTrackingCache = null;
-      this._activeSidebarLink = null;
-      this._activeTocLink = null;
-      this._lastSyncedNavId = null;
-    }
-
-    _getSidebarTrackingCache(tree) {
-      if (!this._sidebarTrackingCache || this._sidebarTrackingCache.tree !== tree) {
-        this._sidebarTrackingCache = { tree, links: [...tree.querySelectorAll('.sidebar-link')] };
-      }
-      return this._sidebarTrackingCache;
-    }
-
-    _expandTo(el, container) {
-      let p = el.closest('li');
-      while (p && container.contains(p)) {
-        if (p.classList.contains('sidebar-item--collapsible')) {
-          p.setAttribute('data-collapsed', 'false');
-          const c = p.querySelector('.sidebar-caret'); if (c) c.textContent = '\u25be';
+      const file = location.pathname.split('/').pop().replace(/\.html$/i, '');
+      const hash = location.hash.slice(1);
+      let best = null;
+      let score = 0;
+      $$('.sidebar-link', tree).forEach(link => {
+        const linkFile = (link.dataset.file || '').replace(/\.html$/i, '');
+        const id = link.dataset.id || '';
+        let s = 0;
+        if (linkFile === file) {
+          s = 1;
+          if (id && hash && id === hash) s = 3;
+          else if (!id && !hash) s = 2;
         }
-        p = p.parentElement?.closest('.sidebar-item');
-      }
-    }
-
-    _findCollectionByPath() {
-      const path = location.pathname;
-      for (const col of (window.LIBRARY_CONFIG || [])) {
-        if (col.basePath) {
-          const bp = ('/' + col.basePath.replace(/^\/|\/$/g, '') + '/').replace(/\/+/g, '/');
-          if (path.startsWith(bp)) return col;
-          if (path.toLowerCase().startsWith(bp.toLowerCase())) return col;
-        }
-      }
-      for (const col of (window.LIBRARY_CONFIG || [])) {
-        for (const g of (col.groups || [])) {
-          for (const item of (g.items || [])) {
-            const dir = (item.path || '').replace(/\/[^\/]*$/, '');
-            if (dir && path.startsWith('/' + dir.replace(/^\//, '') + '/')) return col;
-            if (dir && path.toLowerCase().startsWith('/' + dir.toLowerCase().replace(/^\//, '') + '/')) return col;
-          }
-        }
-      }
-      return null;
-    }
-
-    // 生成 Libmap 菜单的 HTML 字符串（供 _renderLibmapMenu / _renderEpubMenu 复用）
-    _buildLibmapHtml() {
-      if (!window.LIBRARY_CONFIG?.length) {
-        return '<div class="sidebar-menu" style="padding:20px">Navigation unavailable</div>';
-      }
-      return '<ul class="sidebar-menu">' + this._renderLazySections() + '</ul>';
-    }
-
-    _renderLibmapMenu() {
-      this.navTree.innerHTML = this._buildLibmapHtml();
-      this._invalidateTrackingCache();
-      this._initLazySections();
-    }
-
-    _renderLazySections() {
-      const site = document.body.dataset.site || '';
-      return (window.LIBRARY_CONFIG || []).map(col => {
-        const badge = col.badge ? ` <span class="sidebar-badge">${esc(col.badge)}</span>` : '';
-        if (!col.groups?.length && col.path) {
-          const ext = col.path.startsWith('http');
-          const href = ext ? col.path : (site ? `${site.replace(/\/$/, '')}/${col.path.replace(/^\//, '')}` : col.path);
-          return `<li class="sidebar-item"><a href="${esc(href)}" class="sidebar-link"${ext ? ' target="_blank" rel="noopener"' : ''}>${esc(col.label || col.title || col.id)}${badge}</a></li>`;
-        }
-        if (col.groups?.length) {
-          return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-section="${esc(col.id)}" data-collapsed="true">
-            <div class="sidebar-item-row"><span class="sidebar-category-label">${esc(col.label || col.title || col.id)}${badge}</span><button class="sidebar-caret" tabindex="0">\u25b8</button></div></li>`;
-        }
-        return `<li class="sidebar-item"><span class="sidebar-category-label">${esc(col.label || col.title || col.id)}${badge}</span></li>`;
-      }).join('');
-    }
-
-    _initLazySections() {
-      this.navTree.querySelectorAll('.sidebar-item--collapsible[data-section]').forEach(li => {
-        const header = li.querySelector('.sidebar-category-label'), caret = li.querySelector('.sidebar-caret');
-        const toggle = e => {
-          if (li.dataset.loaded) {
-            const coll = li.getAttribute('data-collapsed') !== 'false';
-            li.setAttribute('data-collapsed', coll ? 'false' : 'true');
-            if (caret) caret.textContent = coll ? '\u25be' : '\u25b8';
-            return;
-          }
-          e.preventDefault(); e.stopPropagation();
-          const col = (window.LIBRARY_CONFIG || []).find(c => c.id === li.dataset.section);
-          if (!col) return;
-          const site = document.body.dataset.site || '';
-          const html = (col.groups || []).map(g => this._renderGroup(g, site)).join('');
-          if (html) { const ul = document.createElement('ul'); ul.className = 'sidebar-menu sidebar-menu--nested'; ul.innerHTML = html; li.appendChild(ul); }
-          li.dataset.loaded = 'true'; li.setAttribute('data-collapsed', 'false');
-          if (caret) caret.textContent = '\u25be';
-          this._bindTogglesIn(li);
-        };
-        if (header) header.addEventListener('click', toggle);
-        if (caret) { caret.addEventListener('click', toggle); caret.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(e); } }); }
+        if (s > score) { score = s; best = link; }
       });
-    }
-
-    _bindTogglesIn(container) {
-      container.querySelectorAll('.sidebar-item--collapsible').forEach(li => {
-        const caret = li.querySelector('.sidebar-caret'), header = li.querySelector('.sidebar-category-label');
-        if (!caret) return;
-        const toggle = e => {
-          e.preventDefault(); e.stopPropagation();
-          const coll = li.getAttribute('data-collapsed') !== 'false';
-          li.setAttribute('data-collapsed', coll ? 'false' : 'true');
-          caret.textContent = coll ? '\u25be' : '\u25b8';
-        };
-        caret.addEventListener('click', toggle);
-        caret.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(e); } });
-        if (header) header.addEventListener('click', toggle);
-      });
-    }
-
-    _renderGroup(group, site) {
-      const label = esc(group.label || ''), items = group.items || [], gp = (group.path || '').replace(/^\//, '');
-      if (!items.length) {
-        if (!gp) return `<li class="sidebar-item"><span class="sidebar-category-label">${label}</span></li>`;
-        const isExt = gp.startsWith('http'), href = isExt ? gp : (site ? `${site.replace(/\/$/, '')}/${gp}` : `/${gp}`);
-        return `<li class="sidebar-item"><a href="${esc(href)}" data-path="${esc('/' + gp)}" class="sidebar-link">${label}</a></li>`;
-      }
-      const itemsHtml = items.map(i => {
-        const p = (i.path || '').replace(/^\//, ''), href = site ? `${site.replace(/\/$/, '')}/${p}` : `/${p}`;
-        return `<li class="sidebar-item"><a href="${esc(href)}" data-path="${esc('/' + p)}" class="sidebar-link">${esc(i.label || i.title || '')}</a></li>`;
-      }).join('');
-      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-group-path="${esc(gp)}" data-collapsed="true">
-        <div class="sidebar-item-row"><span class="sidebar-category-label">${label}</span><button class="sidebar-caret" tabindex="0">\u25b8</button></div>
-        <ul class="sidebar-menu sidebar-menu--nested">${itemsHtml}</ul></li>`;
-    }
-
-    async _fetchVolData(url) {
-      if (this._volCache.has(url)) return this._volCache.get(url);
-      try {
-        const mod = await import(url);
-        const data = mod?.default || null;
-        if (data) this._volCache.set(url, data);
-        return data;
-      } catch { return null; }
-    }
-
-    _highlightCurrent() {
-      if (this._mode === 'epub') return this._highlightEpubCurrent();
-      if (this._mode === 'page-toc') return this._highlightPageTocCurrent();
-      // libmap
-      const cp = location.pathname.replace(/\/$/, '');
-      const menu = this.navTree.querySelector('.sidebar-menu');
-      const match = [...this.navTree.querySelectorAll('a[data-path]')].find(l => {
-        const dp = (l.dataset.path || '').replace(/\/$/, '');
-        return dp === cp || dp.toLowerCase() === cp.toLowerCase();
-      });
-      if (match) {
-        match.classList.add('sidebar-link--active');
-        this._expandTo(match, menu);
-        if (innerWidth >= 997) requestAnimationFrame(() => match.scrollIntoView({ block: 'center', behavior: 'instant' }));
-      }
-    }
-
-    _highlightEpubCurrent() {
-      const curFile = location.pathname.split('/').pop().replace(/\.html$/i, ''), hash = location.hash.slice(1);
-      const tree = this.navTree?.querySelector('.sidebar-menu');
-      if (!tree) return;
-
-      let best = null, bestScore = 0;
-      tree.querySelectorAll('.sidebar-link').forEach(a => {
-        const f = (a.dataset.file || '').replace(/\.html$/i, ''), id = a.dataset.id || '', href = a.getAttribute('href') || '';
-        const isFile = f === curFile || f.toLowerCase() === curFile.toLowerCase();
-        let score = 0;
-        if (isFile) {
-          if (id && id === hash) score = 5;
-          else if (!id && !hash) score = 4;
-          else if (id && !hash) score = 3;
-          else score = 2;
-        } else if (!f && href.startsWith('#') && hash && href.slice(1) === hash) {
-          score = 1;
-        }
-        if (score > bestScore) { bestScore = score; best = a; }
-      });
-
       if (best) {
         best.classList.add('sidebar-link--active');
-        this._expandTo(best, tree);
-        if (innerWidth >= 997) requestAnimationFrame(() => best.scrollIntoView({ block: 'center', behavior: 'instant' }));
+        this.activeSidebarLink = best;
+        expandTo(best, tree);
       }
     }
 
-    _highlightPageTocCurrent() {
-      const hash = location.hash.slice(1), tree = this.navTree?.querySelector('.sidebar-menu'); if (!tree) return;
-      let best = hash ? tree.querySelector(`.sidebar-link[data-id="${hash}"]`) : null;
-      if (!best) best = tree.querySelector('.sidebar-link');
-      if (best) { best.classList.add('sidebar-link--active'); this._expandTo(best, tree); if (innerWidth < 997) requestAnimationFrame(() => best.scrollIntoView({ block: 'center', behavior: 'instant' })); }
+    initBreadcrumbFade() {
+      if (this.mode !== 'epub' && this.mode !== 'page-toc') return;
+      const bc = $('.breadcrumb', this.navTree);
+      const menu = $('.sidebar-menu', this.navTree);
+      if (!bc || !menu) return;
+      this.fadeObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => bc.classList.toggle('breadcrumb--faded', entry.boundingClientRect.bottom < entry.rootBounds.top));
+      }, { root: this.navTree, threshold: 0 });
+      this.fadeObserver.observe(menu);
     }
 
-    _highlightTocCurrent(container) {
-      if (!container) return;
-      const cur = location.pathname.split('/').pop(), hash = location.hash.slice(1);
-      let best = null, bestScore = 0;
-      container.querySelectorAll('a').forEach(a => {
-        const href = a.getAttribute('href') || '';
-        const idx = href.indexOf('#'), f = (idx >= 0 ? href.slice(0, idx) : href).split('/').pop(), h = idx >= 0 ? href.slice(idx + 1) : '';
-        let score = 0;
-        if (f === cur) { score = 1; if (h && hash && h === hash) score = 3; else if (h && hash && hash.startsWith(h)) score = 2; else if (!h && !hash) score = 3; }
-        if (!f && href.startsWith('#') && hash) { const hh = href.slice(1); if (hh === hash) score = 3; else if (hash.startsWith(hh)) score = 2; }
-        if (score > bestScore) { bestScore = score; best = a; }
+    initSourceToc() {
+      const toc = $('.doc-toc');
+      if (!toc) return;
+      toc.addEventListener('click', e => {
+        const caret = e.target.closest('.toc-caret');
+        if (!caret) return;
+        const item = caret.closest('.toc-item--collapsible');
+        if (!item) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const collapsed = item.getAttribute('data-collapsed') !== 'false';
+        item.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
+        caret.textContent = collapsed ? '\u25be' : '\u25b8';
       });
-      if (best) { best.classList.add('toc-link--active'); this._expandBranchTo(best, container); }
     }
 
-    _expandBranchTo(el, container) {
-      let p = el.parentElement;
-      while (p) {
-        if (p.classList?.contains('toc-item--collapsible')) {
-          p.setAttribute('data-collapsed', 'false');
-          const c = p.querySelector(':scope > .toc-item-row > .toc-caret') || p.querySelector(':scope > .toc-caret');
-          if (c) c.textContent = '\u25be';
-        }
-        p = p.parentElement;
-        if (p?.classList?.contains('doc-toc') || p === container) break;
+    findCollectionByPath() {
+      const path = normalizePath(location.pathname);
+      return (win.LIBRARY_CONFIG || []).find(col => {
+        const base = normalizePath(col.basePath || col.basepath || '');
+        return base && (path.startsWith(base) || withoutDocs(path).startsWith(withoutDocs(base)));
+      }) || null;
+    }
+
+    toggle() { this.sidebar?.classList.contains('doc-sidebar--open') ? this.close() : this.open(); }
+    open() {
+      if (innerWidth >= 997) return;
+      this.sidebar?.classList.add('doc-sidebar--open');
+      this.backdrop?.classList.add('sidebar-overlay--visible');
+      this.lastSyncedId = null;
+      this.syncSidebar(this.activeHeadingId);
+    }
+    close() {
+      if (innerWidth >= 997) return;
+      this.sidebar?.classList.remove('doc-sidebar--open');
+      this.backdrop?.classList.remove('sidebar-overlay--visible');
+    }
+
+    async loadLibmap() {
+      const script = doc.querySelector('script[src*="/assets/libmap.js"]');
+      if (script) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        if (win.LIBRARY_CONFIG) return;
       }
-    }
-    _initTocToggles(container) {
-      container.querySelectorAll('.toc-item--collapsible').forEach(li => {
-        const nested = li.querySelector(':scope > ul, :scope > ol'), caret = li.querySelector(':scope > .toc-item-row > .toc-caret') || li.querySelector(':scope > .toc-caret');
-        if (!nested || !caret) return;
-        const toggle = e => {
-          e.preventDefault(); e.stopPropagation();
-          const coll = li.getAttribute('data-collapsed') !== 'false';
-          li.setAttribute('data-collapsed', coll ? 'false' : 'true');
-          caret.textContent = coll ? '\u25be' : '\u25b8';
-        };
-        caret.addEventListener('click', toggle);
-        caret.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
-      });
-    }
-    _bindSidebarToggle() {
-      $('#sidebar-toggle')?.addEventListener('click', () => this.toggle());
-      this.backdrop?.addEventListener('click', () => this.close());
-      $('#sidebar-close-btn')?.addEventListener('click', () => this.close());
-    }
-
-    toggle() { this.sidebar.classList.contains('doc-sidebar--open') ? this.close() : this.open(); }
-    open() { if (innerWidth < 997) { this.sidebar.classList.add('doc-sidebar--open'); this.backdrop?.classList.add('sidebar-overlay--visible'); this._lastSyncedNavId = null; this._syncNavScroll(this._activeHeadingId); } }
-    close() { if (innerWidth < 997) { this.sidebar.classList.remove('doc-sidebar--open'); this.backdrop?.classList.remove('sidebar-overlay--visible'); } }
-
-    async _loadLibmapConfig() {
-      if (window.LIBRARY_CONFIG) return;
-      const s = document.querySelector('script[src*="/assets/libmap.js"]'); if (s) { await new Promise(r => setTimeout(r, 50)); if (window.LIBRARY_CONFIG) return; }
-      const res = await fetch(`${document.body.dataset.site || ''}/assets/libmap.js`); if (!res.ok) throw new Error();
-      new Function(await res.text())();
+      const res = await fetch(`${doc.body.dataset.site || ''}/assets/libmap.js`);
+      if (res.ok) new Function(await res.text())();
     }
   }
 
-  // NavigationManager 保持原样
   class NavigationManager {
     init() {
-      const meta = window.__PAGE_META__ || {};
-      ['prev', 'next'].forEach(dir => {
-        const btn = $(`#${dir}-btn`), data = meta[dir];
+      const meta = win.__PAGE_META__ || {};
+      ['prev', 'next'].forEach(kind => {
+        const btn = $('#' + kind + '-btn');
+        const data = meta[kind];
         if (!btn || !data) return;
-        const label = btn.querySelector('.pagination-link__label');
+        const label = $('.pagination-link__label', btn);
         if (label && data.title) label.textContent = data.title;
         if (data.file) btn.href = data.file.startsWith('/') ? data.file : location.pathname.replace(/[^/]*$/, '') + data.file;
       });
     }
   }
 
-  const menu = new MenuManager(), nav = new NavigationManager();
-  window.__NAV__ = { menu, nav };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { menu.init(); nav.init(); });
-  else { menu.init(); nav.init(); }
+  const menu = new MenuManager();
+  const nav = new NavigationManager();
+  win.__NAV__ = { menu, nav };
+  const init = () => { menu.init(); nav.init(); };
+  doc.readyState === 'loading' ? doc.addEventListener('DOMContentLoaded', init) : init();
 })();
