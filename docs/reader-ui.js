@@ -453,6 +453,8 @@ class ReaderApp {
     }
 
     showLoading(docPath) {
+        window.__PAGE_BAR__?.reset?.();
+        this.popup.forceClose();
         $('#welcome-view').style.display = 'none';
         $('#article-view').style.display = 'block';
         $('#toc-desktop').style.display = 'none';
@@ -705,6 +707,21 @@ class ReaderApp {
 
     showHome(push = true) {
         this.clearDynamicStyles();
+        this.popup.forceClose();
+        window.__PAGE_BAR__?.reset?.();
+        const skeleton = $('#doc-skeleton');
+        if (skeleton) {
+            skeleton.classList.remove('active');
+            skeleton.style.display = 'none';
+            skeleton.style.opacity = '1';
+        }
+        const content = $('#content');
+        if (content) {
+            content.innerHTML = '';
+            content.style.display = 'block';
+            content.style.opacity = '1';
+        }
+        $('#doc-footer').style.display = 'none';
         $('#article-view').style.display = 'none';
         $('#welcome-view').style.display = 'block';
         $('#toc-desktop').style.display = 'none';
@@ -713,7 +730,7 @@ class ReaderApp {
         state.doc = null;
         if (push) history.pushState({}, '', location.pathname);
         window.__NAV__?.reinit(null);
-        window.__PAGE_BAR__?.scanContent(null);
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     }
 
     handlePopState() {

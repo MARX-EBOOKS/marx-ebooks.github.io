@@ -19,7 +19,7 @@ window.LIBRARY_CONFIG = [
         title: 'KARL MARX FRIEDRICH ENGELS WERKE',
         desc: 'Marx-Engels-Werke (auf dem Zeno.org)',
         basepath: '/docs/MEW-ZENO/',
-        stylesheets: ['/MEW-ZENO/mewde.css'],
+        stylesheets: ['/docs/MEW-ZENO/mewde.css'],
         badge: 'DE',
         citation: { prefix: 'MEW', title: 'Marx-Engels-Werke', publisher: 'Berlin: Dietz Verlag' },
         path: '/docs/MEW-ZENO/index.html',

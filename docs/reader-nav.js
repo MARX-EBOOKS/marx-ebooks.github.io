@@ -246,7 +246,7 @@
     onScrollFrame
   });
 
-  const currentDoc = () => (window.ReaderState?.document || (typeof state !== 'undefined' ? state.document : null) || '');
+  const currentDoc = () => (window.ReaderState?.doc || (typeof state !== 'undefined' ? state.doc : null) || '');
 
   class MenuManager {
     constructor() {
@@ -280,7 +280,7 @@
       this.cleanupRender();
       this.navTree.innerHTML = '';
       this.currentVol = docPath ? this.detectVolume(docPath) : null;
-      // reader 用 ?document= 表示当前文档：有卷册数据时显示卷册目录，否则按本页/总目录降级。
+      // reader 用 ?doc= 表示当前文档：有卷册数据时显示卷册目录，否则按本页/总目录降级。
       if (!docPath) {
         this.mode = 'libmap';
         this.renderLibmapMenu();
@@ -328,7 +328,7 @@
     observeSidebar() {
       if (this.sidebarObserver) return;
       this.sidebarObserver = new MutationObserver(() => {
-        if (innerWidth < 997 && this.sidebar.classList.contains('document-sidebar--open')) {
+        if (innerWidth < 997 && this.sidebar.classList.contains('doc-sidebar--open')) {
           this.lastSyncedId = null;
           this.syncSidebar(this.activeHeadingId);
         }
@@ -365,9 +365,9 @@
         this.scrollToHash(href.slice(1), true);
         return;
       }
-      if (href.startsWith('?document=')) {
+      if (href.startsWith('?doc=')) {
         const url = new URL(href, location.href);
-        const docPath = url.searchParams.get('document') || '';
+        const docPath = url.searchParams.get('doc') || '';
         const hash = url.hash.slice(1);
         if (normalizeDoc(docPath) === normalizeDoc(currentDoc()) && hash) {
           e.preventDefault();
@@ -458,7 +458,8 @@
     }
 
     async renderEpubMenu(docPath) {
-      const data = await this.fetchVolumeData(this.currentVol.dir);
+      const dir = this.currentVol?.dir || '';
+      const data = await this.fetchVolumeData(dir);
       if (!data) {
         const norpath = normalizePath(docPath);
         this.mode = (norpath === dir || norpath === dir + '/index.html' || norpath === dir + '/nav.html') ? 'libmap' : (innerWidth < 997 ? 'page-toc' : 'libmap');
@@ -470,10 +471,10 @@
       this.currentVol.data = data;
       const { col, item } = this.currentVol;
       const colPath = normalizePath(col.path);
-      const parts = [colPath ? { text: col.label, href: '?document=' + esc(colPath), expand: col.id } : { text: col.label, expand: col.id }];
+      const parts = [colPath ? { text: col.label, href: '?doc=' + esc(colPath), expand: col.id } : { text: col.label, expand: col.id }];
       if (item !== col) {
         const volPath = normalizePath(item.path || (this.currentVol.dir + '/index.html'));
-        parts.push({ text: item.label || item.title || data.title || 'Contents', href: '?document=' + esc(volPath) });
+        parts.push({ text: item.label || item.title || data.title || 'Contents', href: '?doc=' + esc(volPath) });
       }
       parts.push({ id: 'page-breadcrumb-link', isPageBadge: window.__PAGE_BAR__?.hasPageAnchors });
       const tree = buildHeadingTree(data.headings || []);
@@ -502,7 +503,7 @@
         file: currentFile
       }));
       const parts = [
-        col?.path ? { text: col.label || 'Library', href: '?document=' + esc(normalizePath(col.path)), expand: col.id } : { text: col?.label || 'Library', expand: col?.id },
+        col?.path ? { text: col.label || 'Library', href: '?doc=' + esc(normalizePath(col.path)), expand: col.id } : { text: col?.label || 'Library', expand: col?.id },
         { text: nodes[0]?.text || document.title }
       ];
       this.navTree.innerHTML =
@@ -576,7 +577,7 @@
           ? (node.id ? `#${esc(node.id)}` : '#')
           : sameFile
             ? (node.id ? `#${esc(node.id)}` : '#')
-            : (node.id ? `?document=${esc(fullFile)}#${esc(node.id)}` : `?document=${esc(fullFile)}`);
+            : (node.id ? `?doc=${esc(fullFile)}#${esc(node.id)}` : `?doc=${esc(fullFile)}`);
         const children = node.children?.length ? `<ul class="sidebar-menu sidebar-menu--nested">${this.renderSidebarNodes(node.children, currentFull)}</ul>` : '';
         const caret = children ? '<button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button>' : '';
         const link = `<a href="${href}" data-file="${esc(rawFile)}" data-id="${esc(node.id || '')}" class="sidebar-link">${esc(node.text)}</a>`;
@@ -598,7 +599,7 @@
       if (!groups.length && col.path) {
         const ext = /^https?:/i.test(col.path);
         const path = normalizePath(col.path);
-        const href = ext ? col.path : '?document=' + esc(path);
+        const href = ext ? col.path : '?doc=' + esc(path);
         return `<li class="sidebar-item"><a href="${esc(href)}"${ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + path)}"`} class="sidebar-link">${label}${badge}</a></li>`;
       }
       if (groups.length) {
@@ -614,13 +615,13 @@
       if (!items.length) {
         if (!groupPath) return `<li class="sidebar-item"><span class="sidebar-category-label">${label}</span></li>`;
         const ext = /^https?:/i.test(group.path);
-        return `<li class="sidebar-item"><a href="${ext ? esc(group.path) : '?document=' + esc(groupPath)}"${ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + groupPath)}"`} class="sidebar-link">${label}</a></li>`;
+        return `<li class="sidebar-item"><a href="${ext ? esc(group.path) : '?doc=' + esc(groupPath)}"${ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + groupPath)}"`} class="sidebar-link">${label}</a></li>`;
       }
       return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-group-path="${esc(groupPath)}" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}</span><button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(item => {
         const raw = item.path || '';
         const ext = /^https?:/i.test(raw);
         const path = normalizePath(raw);
-        return `<li class="sidebar-item"><a href="${ext ? esc(raw) : '?document=' + esc(path)}"${ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + path)}"`} class="sidebar-link">${esc(item.label || item.title || '')}</a></li>`;
+        return `<li class="sidebar-item"><a href="${ext ? esc(raw) : '?doc=' + esc(path)}"${ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + path)}"`} class="sidebar-link">${esc(item.label || item.title || '')}</a></li>`;
       }).join('')}</ul></li>`;
     }
 
@@ -651,8 +652,8 @@
 
     renderTocNodes(nodes) {
       if (!nodes.length) return '';
-      return '<ul class="theme-document-toc-desktop-list">' + nodes.map(node =>
-        `<li class="theme-document-toc-desktop-link theme-document-toc-desktop-link--lvl${node.level}"><a href="#${esc(node.id)}" class="theme-document-toc-desktop-link__a">${esc(node.text)}</a>${this.renderTocNodes(node.children || [])}</li>`
+      return '<ul class="theme-doc-toc-desktop-list">' + nodes.map(node =>
+        `<li class="theme-doc-toc-desktop-link theme-doc-toc-desktop-link--lvl${node.level}"><a href="#${esc(node.id)}" class="theme-doc-toc-desktop-link__a">${esc(node.text)}</a>${this.renderTocNodes(node.children || [])}</li>`
       ).join('') + '</ul>';
     }
 
@@ -713,19 +714,19 @@
     updateTocTracking(id) {
       const nav = $('#toc-desktop-nav');
       if (!nav) return;
-      this.activeTocLink?.classList.remove('theme-document-toc-desktop-link__a--active');
+      this.activeTocLink?.classList.remove('theme-doc-toc-desktop-link__a--active');
       this.activeTocLink = null;
       if (!id) return;
-      const match = $$('.theme-document-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id);
+      const match = $$('.theme-doc-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id);
       if (match) {
-        match.classList.add('theme-document-toc-desktop-link__a--active');
+        match.classList.add('theme-doc-toc-desktop-link__a--active');
         this.activeTocLink = match;
       }
     }
 
     syncSidebar(id) {
       if (innerWidth >= 997 || hasSelection() || !id || id === this.lastSyncedId) return;
-      if (!this.sidebar?.classList.contains('document-sidebar--open')) return;
+      if (!this.sidebar?.classList.contains('doc-sidebar--open')) return;
       const active = this.activeSidebarLink || $('.sidebar-link.sidebar-link--active', this.navTree);
       if (!active) return;
       this.lastSyncedId = id;

@@ -27,7 +27,6 @@
     .replace(/^\/+/, '')
     .replace(/\/+$/, '');
   const normalizeDoc = value => normalizePath(value).replace(/\.html$/i, '');
-  const withoutDocs = value => normalizePath(value).replace(/^docs\//, '');
   const resolveUrl = href => { try { return new URL(href, location.href).href; } catch { return href; } };
   const hasSelection = () => {
     const selection = document.getSelection();
@@ -162,7 +161,7 @@
 
   const ReaderCore = window.ReaderCore || {
     $, $$, esc, cssEsc, EventBag, HeadingTracker,
-    normalizePath, normalizeDoc, withoutDocs, resolveUrl, hasSelection,
+    normalizePath, normalizeDoc, resolveUrl, hasSelection,
     scrollToEl, syncFill, onScrollFrame, getDomHeadings, buildHeadingTree, expandTo
   };
   Object.assign(window, { ReaderCore, $, $$, esc, syncFill, onScrollFrame });
@@ -272,7 +271,7 @@
 
     currentVolumePath() {
       const current = normalizePath(location.pathname);
-      if (this.currentVol && (current === this.currentVol.dir || withoutDocs(current) === withoutDocs(this.currentVol.dir))) return this.currentVol.dir + '/index.html';
+      if (this.currentVol && current === this.currentVol.dir) return this.currentVol.dir + '/index.html';
       return current;
     }
 
@@ -281,10 +280,7 @@
       if (!this.currentVol) return false;
       const dir = this.currentVol.dir;
       const indexPath = dir + '/index.html';
-      const currentNoDocs = withoutDocs(current);
-      const dirNoDocs = withoutDocs(dir);
-      const indexNoDocs = withoutDocs(indexPath);
-      return current === dir || current === indexPath || currentNoDocs === dirNoDocs || currentNoDocs === indexNoDocs;
+      return current === dir || current === indexPath;
     }
 
     currentVolumeFile() {
@@ -361,14 +357,12 @@
 
     detectVolume() {
       const current = normalizePath(location.pathname);
-      const currentNoDocs = withoutDocs(current);
       const matchPath = path => {
         if (!path || /^https?:/i.test(path)) return null;
         const itemPath = normalizePath(path);
         if (!/\/index\.html$/i.test(itemPath)) return null;
         const dir = itemPath.replace(/\/index\.html$/i, '');
-        const dirNoDocs = withoutDocs(dir);
-        return (current === itemPath || current === dir || current.startsWith(dir + '/') || currentNoDocs === dirNoDocs || currentNoDocs.startsWith(dirNoDocs + '/')) ? dir : null;
+        return (current === itemPath || current === dir || current.startsWith(dir + '/')) ? dir : null;
       };
       let best = null;
       const consider = (col, group, item, dir) => {
@@ -572,8 +566,8 @@
 
     renderTocNodes(nodes) {
       if (!nodes.length) return '';
-      return '<ul class="theme-document-toc-desktop-list">' + nodes.map(node =>
-        `<li class="theme-document-toc-desktop-link theme-document-toc-desktop-link--lvl${node.level}"><a href="#${esc(node.id)}" class="theme-document-toc-desktop-link__a">${esc(node.text)}</a>${this.renderTocNodes(node.children || [])}</li>`
+      return '<ul class="theme-doc-toc-desktop-list">' + nodes.map(node =>
+        `<li class="theme-doc-toc-desktop-link theme-doc-toc-desktop-link--lvl${node.level}"><a href="#${esc(node.id)}" class="theme-doc-toc-desktop-link__a">${esc(node.text)}</a>${this.renderTocNodes(node.children || [])}</li>`
       ).join('') + '</ul>';
     }
 
@@ -629,19 +623,19 @@
 
     updateTocTracking(id) {
       const nav = $('#toc-desktop-nav');
-      this.activeTocLink?.classList.remove('theme-document-toc-desktop-link__a--active');
+      this.activeTocLink?.classList.remove('theme-doc-toc-desktop-link__a--active');
       this.activeTocLink = null;
       if (!nav || !id) return;
-      const match = $$('.theme-document-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id);
+      const match = $$('.theme-doc-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id);
       if (match) {
-        match.classList.add('theme-document-toc-desktop-link__a--active');
+        match.classList.add('theme-doc-toc-desktop-link__a--active');
         this.activeTocLink = match;
       }
     }
 
     syncSidebar(id) {
       if (innerWidth >= 997 || hasSelection() || !id || id === this.lastSyncedId) return;
-      if (!this.sidebar?.classList.contains('document-sidebar--open')) return;
+      if (!this.sidebar?.classList.contains('doc-sidebar--open')) return;
       const active = this.activeSidebarLink || $('.sidebar-link.sidebar-link--active', this.navTree);
       if (!active) return;
       this.lastSyncedId = id;
@@ -689,7 +683,7 @@
     }
 
     initSourceToc() {
-      const toc = $('.document-toc');
+      const toc = $('.doc-toc');
       if (!toc) return;
       toc.addEventListener('click', e => {
         const caret = e.target.closest('.toc-caret');
@@ -708,21 +702,21 @@
       const path = normalizePath(location.pathname);
       return (window.LIBRARY_CONFIG || []).find(col => {
         const base = normalizePath(col.basePath || col.basepath || '');
-        return base && (path.startsWith(base) || withoutDocs(path).startsWith(withoutDocs(base)));
+        return base && path.startsWith(base);
       }) || null;
     }
 
-    toggle() { this.sidebar?.classList.contains('document-sidebar--open') ? this.close() : this.open(); }
+    toggle() { this.sidebar?.classList.contains('doc-sidebar--open') ? this.close() : this.open(); }
     open() {
       if (innerWidth >= 997) return;
-      this.sidebar?.classList.add('document-sidebar--open');
+      this.sidebar?.classList.add('doc-sidebar--open');
       this.backdrop?.classList.add('sidebar-overlay--visible');
       this.lastSyncedId = null;
       this.syncSidebar(this.activeHeadingId);
     }
     close() {
       if (innerWidth >= 997) return;
-      this.sidebar?.classList.remove('document-sidebar--open');
+      this.sidebar?.classList.remove('doc-sidebar--open');
       this.backdrop?.classList.remove('sidebar-overlay--visible');
     }
 
