@@ -17,6 +17,16 @@
   const scrollToEl = C.scrollToEl || (el => el?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
   const findCollection = C.findCollection || window.findCollection || (() => null);
   const normalizePath = C.normalizePath || (v => String(v || '').replace(/^\/+/, '').replace(/\/+$/, ''));
+  const samePathValue = (a, b) => {
+    const left = normalizePath(a);
+    const right = normalizePath(b);
+    return left === right || left.toLowerCase() === right.toLowerCase();
+  };
+  const startsWithPathValue = (path, base) => {
+    const cleanPath = normalizePath(path);
+    const cleanBase = normalizePath(base);
+    return cleanBase && (cleanPath.startsWith(cleanBase + '/') || cleanPath.toLowerCase().startsWith(cleanBase.toLowerCase() + '/'));
+  };
 
   class PageBarManager {
     constructor() {
@@ -432,7 +442,7 @@
           for (const item of group.items || []) {
             const itemPath = normalizePath(item.path);
             const itemDir = itemPath.replace(/\/[^/]+$/, '');
-            if (norm === itemPath || dir === itemDir || norm.startsWith(itemDir + '/')) {
+            if (samePathValue(norm, itemPath) || samePathValue(dir, itemDir) || startsWithPathValue(norm, itemDir)) {
               return { ...(col.citation || {}), ...(group.citation || {}), ...(item.citation || {}), volume: item.volume || group.volume || col.volume || null };
             }
           }

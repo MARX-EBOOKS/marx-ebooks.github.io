@@ -1,5 +1,56 @@
 const C = window.ReaderCore;
 const { $, $$, esc, cssEsc, syncFill, findCollection, resolveCssHref, scrollToEl, onScrollFrame } = C;
+const normalizeDocValue = value => (C.normalizeDoc ? C.normalizeDoc(value) : String(value || '').replace(/^\/+/, '').replace(/[?#].*$/, '').replace(/\.html$/i, ''));
+const sameDocValue = (a, b) => {
+    const left = normalizeDocValue(a);
+    const right = normalizeDocValue(b);
+    return left === right || left.toLowerCase() === right.toLowerCase();
+};
+const lowerPathFallback = value => {
+    const raw = String(value || '');
+    if (!raw) return raw;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith('/')) {
+        try {
+            const url = new URL(raw, location.href);
+            if (url.origin === location.origin) {
+                const next = new URL(url.href);
+                next.pathname = next.pathname.toLowerCase();
+                return /^[a-z][a-z0-9+.-]*:/i.test(raw) ? next.href : next.pathname + next.search + next.hash;
+            }
+        } catch { }
+        return raw;
+    }
+    const queryIndex = raw.indexOf('?');
+    const hashIndex = raw.indexOf('#');
+    const splitAt = [queryIndex, hashIndex].filter(i => i >= 0).sort((a, b) => a - b)[0];
+    if (splitAt >= 0) {
+        return raw.slice(0, splitAt).toLowerCase() + raw.slice(splitAt);
+    }
+    return raw.toLowerCase();
+};
+async function fetchWithLowerFallback(path, options) {
+    const lower = lowerPathFallback(path);
+    let firstError = null;
+    try {
+        const res = await fetch(path, options);
+        if (res.ok || !lower || lower === path) return { res, path };
+        try {
+            const fallback = await fetch(lower, options);
+            return fallback.ok ? { res: fallback, path: lower } : { res, path };
+        } catch {
+            return { res, path };
+        }
+    } catch (error) {
+        firstError = error;
+    }
+    if (!lower || lower === path) throw firstError;
+    try {
+        const fallback = await fetch(lower, options);
+        return { res: fallback, path: lower };
+    } catch {
+        throw firstError;
+    }
+}
 
 const state = {
     fs: parseFloat(localStorage.fontSize) || 1,
@@ -99,11 +150,13 @@ class FootnotePopup {
                 try {
                     const controller = new AbortController();
                     const timer = setTimeout(() => controller.abort(), 3000);
-                    const res = await fetch(pageUrl, { signal: controller.signal });
+                    const loaded = await fetchWithLowerFallback(pageUrl, { signal: controller.signal });
                     clearTimeout(timer);
+                    const res = loaded.res;
                     if (!res.ok) return null;
                     parsed = new DOMParser().parseFromString(await res.text(), 'text/html');
                     this.cache.set(pageUrl, parsed);
+                    if (loaded.path !== pageUrl) this.cache.set(loaded.path, parsed);
                 } catch {
                     return null;
                 }
@@ -442,10 +495,11 @@ class ReaderApp {
         await this.loadCollectionStyles(docPath);
         this.updateBreadcrumb(docPath, null);
         try {
-            const res = await fetch(docPath);
+            const loaded = await fetchWithLowerFallback(docPath);
+            const res = loaded.res;
             if (!res.ok) throw new Error(String(res.status));
             const html = await res.text();
-            this.renderDoc(html, docPath);
+            this.renderDoc(html, this.normalizeDocPath(loaded.path));
             this.revealLoadedContent();
         } catch (error) {
             this.showError(docPath, error.message);
@@ -643,7 +697,7 @@ class ReaderApp {
             const f = item.file || item.path || item.url || item.filename || '';
             const src = item.source_file || item.filename || '';
             const candidates = [f, src, f.split('/').pop(), src.split('/').pop()].map(x => x.replace(/\.html(?:#.*)?$/i, ''));
-            return f === path || f === file || candidates.includes(cleanPath) || candidates.includes(cleanFile);
+            return sameDocValue(f, path) || sameDocValue(f, file) || candidates.some(candidate => sameDocValue(candidate, cleanPath) || sameDocValue(candidate, cleanFile));
         });
     }
 
@@ -661,8 +715,8 @@ class ReaderApp {
         const current = parseInt(number, 10);
         const tryButton = async (btn, path, kind) => {
             try {
-                const res = await fetch(path, { method: 'HEAD', mode: 'same-origin' });
-                if (res.ok) this.setupPagination(btn, path, null, kind);
+                const { res, path: loadedPath } = await fetchWithLowerFallback(path, { method: 'HEAD', mode: 'same-origin' });
+                if (res.ok) this.setupPagination(btn, loadedPath, null, kind);
             } catch { }
         };
         if (current > 1) tryButton(prev, make(current - 1), 'prev');
@@ -684,7 +738,7 @@ class ReaderApp {
         };
         setTitle(title);
         if (!title) {
-            fetch(path.split('#')[0]).then(r => r.text()).then(html => {
+            fetchWithLowerFallback(path.split('#')[0]).then(({ res }) => res.text()).then(html => {
                 setTitle(new DOMParser().parseFromString(html, 'text/html').querySelector('title')?.textContent?.trim());
             }).catch(() => {});
         }
@@ -738,7 +792,7 @@ class ReaderApp {
         const docPath = this.normalizeDocPath(new URLSearchParams(location.search).get('doc') || '');
         if (!docPath) {
             this.showHome(false);
-        } else if (docPath !== state.doc) {
+        } else if (!sameDocValue(docPath, state.doc)) {
             this.loadDoc(docPath);
         } else if (location.hash) {
             const hash = location.hash.slice(1);
@@ -787,7 +841,7 @@ class ReaderApp {
             event.preventDefault();
             const resolved = resolveDocLink(href, '');
             if (!resolved || resolved.type !== 'doc') return;
-            if (C.normalizeDoc(resolved.docPath) === C.normalizeDoc(state.doc)) {
+            if (sameDocValue(resolved.docPath, state.doc)) {
                 if (resolved.hash) this.scrollToAnchor(resolved.hash, true);
                 return;
             }

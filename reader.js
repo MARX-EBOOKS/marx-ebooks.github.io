@@ -23,6 +23,49 @@
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const resolveUrl = href => { try { return new URL(href, location.href).href; } catch { return location.pathname.replace(/[^/]*$/, '') + href; } };
+  const lowerUrlFallback = value => {
+    try {
+      const url = new URL(value, location.href);
+      if (url.origin !== location.origin) return value;
+      const lower = new URL(url.href);
+      lower.pathname = lower.pathname.toLowerCase();
+      return lower.href;
+    } catch {
+      return value;
+    }
+  };
+  const samePath = (a, b) => {
+    try {
+      const left = new URL(a, location.href).pathname.replace(/\/+$/, '');
+      const right = new URL(b, location.href).pathname.replace(/\/+$/, '');
+      return left === right || left.toLowerCase() === right.toLowerCase();
+    } catch {
+      return String(a || '') === String(b || '') || String(a || '').toLowerCase() === String(b || '').toLowerCase();
+    }
+  };
+  async function fetchWithLowerFallback(url, options) {
+    const lower = lowerUrlFallback(url);
+    let firstError = null;
+    try {
+      const res = await fetch(url, options);
+      if (res.ok || lower === url) return { res, url };
+      try {
+        const fallback = await fetch(lower, options);
+        return fallback.ok ? { res: fallback, url: lower } : { res, url };
+      } catch {
+        return { res, url };
+      }
+    } catch (error) {
+      firstError = error;
+    }
+    if (lower === url) throw firstError;
+    try {
+      const fallback = await fetch(lower, options);
+      return { res: fallback, url: lower };
+    } catch {
+      throw firstError;
+    }
+  }
 
   function setupResponsiveContent() {
     const content = $('#content');
@@ -200,10 +243,12 @@
         let parsed = this.cache.get(pageUrl);
         if (!parsed) {
           try {
-            const res = await fetch(pageUrl);
+            const loaded = await fetchWithLowerFallback(pageUrl);
+            const res = loaded.res;
             if (!res.ok) return null;
             parsed = new DOMParser().parseFromString(await res.text(), 'text/html');
             this.cache.set(pageUrl, parsed);
+            if (loaded.url !== pageUrl) this.cache.set(loaded.url, parsed);
           } catch {
             return null;
           }
@@ -370,7 +415,7 @@
       if (href.includes('#') && !/^(https?:|\/\/)/i.test(href)) {
         try {
           const resolved = new URL(href, location.href);
-          if (resolved.pathname === location.pathname && resolved.hash) {
+          if (samePath(resolved.href, location.href) && resolved.hash) {
             e.preventDefault();
             const target = document.getElementById(resolved.hash.slice(1));
             if (target) scrollToEl(target);

@@ -29,6 +29,12 @@
     .replace(/^\/+/, '')
     .replace(/\/+$/, '');
   const normalizeDoc = value => normalizePath(value).replace(/\.html$/i, '');
+  const normalizeLowerPath = value => normalizePath(value).toLowerCase();
+  const sameDocValue = (a, b) => {
+    const left = normalizeDoc(a);
+    const right = normalizeDoc(b);
+    return left === right || left.toLowerCase() === right.toLowerCase();
+  };
   const hasSelection = () => {
     const selection = document.getSelection();
     return !!(selection && !selection.isCollapsed && selection.rangeCount);
@@ -78,9 +84,15 @@
 
   function findCollection(path) {
     const norm = normalizePath(path);
-    return (window.LIBRARY_CONFIG || []).find(col => {
+    const match = (window.LIBRARY_CONFIG || []).find(col => {
       const base = normalizePath(col.basePath || col.basepath || `/${col.id}/`);
       return base && norm.startsWith(base);
+    });
+    if (match) return match;
+    const lower = norm.toLowerCase();
+    return (window.LIBRARY_CONFIG || []).find(col => {
+      const base = normalizeLowerPath(col.basePath || col.basepath || `/${col.id}/`);
+      return base && lower.startsWith(base);
     }) || null;
   }
 
@@ -128,15 +140,16 @@
     if (cache instanceof Map && cache.has(cleanDir)) return cache.get(cleanDir);
     if (!(cache instanceof Map) && cache[cleanDir]) return cache[cleanDir];
 
-    let data = null;
-    try {
-      const res = await fetch(new URL(cleanDir + '/index.json', location.href).href);
-      if (res.ok) data = await res.json();
-    } catch { }
-
-    if (!data) {
+    const load = async candidateDir => {
+      let data = null;
       try {
-        const jsUrl = new URL(cleanDir + '/index.js', location.href).href;
+        const res = await fetch(new URL(candidateDir + '/index.json', location.href).href);
+        if (res.ok) data = await res.json();
+      } catch { }
+
+      if (data) return data;
+      try {
+        const jsUrl = new URL(candidateDir + '/index.js', location.href).href;
         const res = await fetch(jsUrl);
         const type = res.headers.get('content-type') || '';
         if (!res.ok || /text\/html/i.test(type)) return null;
@@ -147,11 +160,24 @@
         URL.revokeObjectURL(blobUrl);
         data = mod?.default || null;
       } catch { }
+      return data;
+    };
+
+    const lowerDir = cleanDir.toLowerCase();
+    let data = await load(cleanDir);
+    if (!data && lowerDir !== cleanDir) {
+      if (cache instanceof Map && cache.has(lowerDir)) data = cache.get(lowerDir);
+      else if (!(cache instanceof Map) && cache[lowerDir]) data = cache[lowerDir];
+      else data = await load(lowerDir);
     }
 
     if (data) {
       if (cache instanceof Map) cache.set(cleanDir, data);
       else cache[cleanDir] = data;
+      if (lowerDir !== cleanDir) {
+        if (cache instanceof Map) cache.set(lowerDir, data);
+        else cache[lowerDir] = data;
+      }
     }
     return data;
   }
@@ -378,7 +404,7 @@
         const url = new URL(href, location.href);
         const docPath = url.searchParams.get('doc') || '';
         const hash = url.hash.slice(1);
-        if (normalizeDoc(docPath) === normalizeDoc(currentDoc()) && hash) {
+        if (sameDocValue(docPath, currentDoc()) && hash) {
           e.preventDefault();
           this.scrollToHash(hash, true);
         } else if (hash) {
@@ -433,32 +459,39 @@
       const pathNorm = normalizePath(docPath);
       const docNorm = normalizeDoc(pathNorm);
       const docDir = pathNorm.replace(/\/[^/]+$/, '');
-      const matchPath = path => {
+      const matchPath = (path, lowerFallback = false) => {
         if (!path || /^https?:/i.test(path)) return null;
-        const itemPath = normalizePath(path);
+        const itemPath = lowerFallback ? normalizeLowerPath(path) : normalizePath(path);
         if (!/\/index\.html$/i.test(itemPath)) return null;
         const dir = itemPath.replace(/\/index\.html$/i, '').replace(/\/nav\.html$/i, '');
-        return (docNorm === normalizeDoc(itemPath) || docNorm === normalizeDoc(dir) || docDir === dir || pathNorm.startsWith(dir + '/')) ? dir : null;
+        const currentPath = lowerFallback ? pathNorm.toLowerCase() : pathNorm;
+        const currentDoc = lowerFallback ? docNorm.toLowerCase() : docNorm;
+        const currentDir = lowerFallback ? docDir.toLowerCase() : docDir;
+        return (currentDoc === normalizeDoc(itemPath) || currentDoc === normalizeDoc(dir) || currentDir === dir || currentPath.startsWith(dir + '/')) ? dir : null;
       };
       let best = null;
       const consider = (col, group, item, dir) => {
         if (dir && (!best || dir.length > best.dir.length)) best = { col, group, item, dir };
       };
-      for (const col of window.LIBRARY_CONFIG || []) {
-        consider(col, null, col, matchPath(col.path));
-        for (const group of col.groups || []) {
-          consider(col, group, group, matchPath(group.path));
-          for (const item of group.items || []) {
-            consider(col, group, item, matchPath(item.path));
+      const scan = lowerFallback => {
+        for (const col of window.LIBRARY_CONFIG || []) {
+          consider(col, null, col, matchPath(col.path, lowerFallback));
+          for (const group of col.groups || []) {
+            consider(col, group, group, matchPath(group.path, lowerFallback));
+            for (const item of group.items || []) {
+              consider(col, group, item, matchPath(item.path, lowerFallback));
+            }
           }
         }
-      }
+      };
+      scan(false);
+      if (!best) scan(true);
       return best;
     }
 
     volumeDocPath(docPath = currentDoc()) {
       const path = normalizePath(docPath);
-      if (this.currentVol && path === this.currentVol.dir) return this.currentVol.dir + '/index.html';
+      if (this.currentVol && sameDocValue(path, this.currentVol.dir)) return this.currentVol.dir + '/index.html';
       return path;
     }
 
@@ -471,7 +504,7 @@
       const data = await this.fetchVolumeData(dir);
       if (!data) {
         const norpath = normalizePath(docPath);
-        this.mode = (norpath === dir || norpath === dir + '/index.html' || norpath === dir + '/nav.html') ? 'libmap' : (innerWidth < 997 ? 'page-toc' : 'libmap');
+        this.mode = (sameDocValue(norpath, dir) || sameDocValue(norpath, dir + '/index.html') || sameDocValue(norpath, dir + '/nav.html')) ? 'libmap' : (innerWidth < 997 ? 'page-toc' : 'libmap');
         this.mode === 'page-toc' ? this.renderPageTocMenu(docPath) : this.renderLibmapMenu();
         this.afterRender(docPath);
         return;
@@ -581,7 +614,7 @@
       return nodes.map(node => {
         const rawFile = node.file || '';
         const fullFile = rawFile && !isPageToc ? normalizePath((volDir + '/' + rawFile).replace(/\/+/g, '/')) : rawFile;
-        const sameFile = isPageToc || (fullFile && normalizeDoc(fullFile) === currentFull);
+        const sameFile = isPageToc || (fullFile && sameDocValue(fullFile, currentFull));
         const href = isPageToc
           ? (node.id ? `#${esc(node.id)}` : '#')
           : sameFile
@@ -639,7 +672,7 @@
         const file = this.volumeDocFile();
         const domHeadings = getDomHeadings($('#content'));
         let domIndex = 0;
-        return (this.currentVol?.data?.headings || []).filter(h => normalizeDoc(h.file || '').split('/').pop() === file).map(h => {
+        return (this.currentVol?.data?.headings || []).filter(h => sameDocValue(normalizeDoc(h.file || '').split('/').pop(), file)).map(h => {
           const id = h.id || domHeadings[domIndex++]?.id || null;
           return { level: h.level !== undefined && h.level !== null ? h.level : 2, text: h.text || '', id };
         }).filter(h => h.id);
@@ -709,7 +742,7 @@
       this.activeSidebarLink?.classList.remove('sidebar-link--active');
       this.activeSidebarLink = null;
       const file = this.volumeDocFile();
-      const sameFile = a => normalizeDoc(a.dataset.file || '').split('/').pop() === file;
+      const sameFile = a => sameDocValue(normalizeDoc(a.dataset.file || '').split('/').pop(), file);
       const match = (id && links.find(a => sameFile(a) && a.dataset.id === id))
         || links.find(a => sameFile(a) && !a.dataset.id)
         || links.find(sameFile);
@@ -758,7 +791,7 @@
         const f = normalizeDoc(a.dataset.file || '').split('/').pop();
         const id = a.dataset.id || '';
         let s = 0;
-        if (f === file) {
+        if (sameDocValue(f, file)) {
           s = 1;
           if (id && hash && id === hash) s = 3;
           else if (!id && !hash) s = 2;
@@ -790,7 +823,7 @@
       if (!hash) return;
       sessionStorage.removeItem('__reader_pending_anchor');
       sessionStorage.removeItem('__reader_pending_doc');
-      if (docPath && normalizeDoc(docPath) !== normalizeDoc(currentDoc())) return;
+      if (docPath && !sameDocValue(docPath, currentDoc())) return;
       const tryScroll = () => {
         const el = document.getElementById(hash);
         if (!el) return false;
@@ -805,6 +838,11 @@
       for (const col of window.LIBRARY_CONFIG || []) {
         const base = normalizePath(col.basePath || col.basepath || '');
         if (base && path.startsWith(base)) return col;
+      }
+      const lower = path.toLowerCase();
+      for (const col of window.LIBRARY_CONFIG || []) {
+        const base = normalizeLowerPath(col.basePath || col.basepath || '');
+        if (base && lower.startsWith(base)) return col;
       }
       return findCollection(path);
     }

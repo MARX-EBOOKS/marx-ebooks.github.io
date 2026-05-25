@@ -27,6 +27,12 @@
     .replace(/^\/+/, '')
     .replace(/\/+$/, '');
   const normalizeDoc = value => normalizePath(value).replace(/\.html$/i, '');
+  const normalizeLowerPath = value => normalizePath(value).toLowerCase();
+  const sameDocValue = (a, b) => {
+    const left = normalizeDoc(a);
+    const right = normalizeDoc(b);
+    return left === right || left.toLowerCase() === right.toLowerCase();
+  };
   const resolveUrl = href => { try { return new URL(href, location.href).href; } catch { return href; } };
   const hasSelection = () => {
     const selection = document.getSelection();
@@ -183,6 +189,7 @@
       this.waitObserver = null;
       this.fadeObserver = null;
       this.lastWidth = innerWidth;
+      this.suppressTrackingUntil = 0;
     }
 
     async init() {
@@ -351,32 +358,41 @@
     scrollToHash(hash) {
       const el = document.getElementById(hash) || document.querySelector(`[name="${cssEsc(hash)}"]`);
       if (!el) return;
-      scrollToEl(el);
+      this.suppressTrackingUntil = Date.now() + 900;
+      scrollToEl(el, 80, 'auto');
+      this.tracker?.measure?.();
+      if (this.tracker) this.tracker.activeId = hash;
+      this.updateTracking(hash);
       history.replaceState({}, '', '#' + hash);
     }
 
     detectVolume() {
       const current = normalizePath(location.pathname);
-      const matchPath = path => {
+      const matchPath = (path, lowerFallback = false) => {
         if (!path || /^https?:/i.test(path)) return null;
-        const itemPath = normalizePath(path);
+        const itemPath = lowerFallback ? normalizeLowerPath(path) : normalizePath(path);
         if (!/\/index\.html$/i.test(itemPath)) return null;
         const dir = itemPath.replace(/\/index\.html$/i, '');
-        return (current === itemPath || current === dir || current.startsWith(dir + '/')) ? dir : null;
+        const currentPath = lowerFallback ? current.toLowerCase() : current;
+        return (currentPath === itemPath || currentPath === dir || currentPath.startsWith(dir + '/')) ? dir : null;
       };
       let best = null;
       const consider = (col, group, item, dir) => {
         if (dir && (!best || dir.length > best.dir.length)) best = { col, group, item, dir };
       };
-      for (const col of window.LIBRARY_CONFIG || []) {
-        consider(col, null, col, matchPath(col.path));
-        for (const group of col.groups || []) {
-          consider(col, group, group, matchPath(group.path));
-          for (const item of group.items || []) {
-            consider(col, group, item, matchPath(item.path));
+      const scan = lowerFallback => {
+        for (const col of window.LIBRARY_CONFIG || []) {
+          consider(col, null, col, matchPath(col.path, lowerFallback));
+          for (const group of col.groups || []) {
+            consider(col, group, group, matchPath(group.path, lowerFallback));
+            for (const item of group.items || []) {
+              consider(col, group, item, matchPath(item.path, lowerFallback));
+            }
           }
         }
-      }
+      };
+      scan(false);
+      if (!best) scan(true);
       return best;
     }
 
@@ -431,9 +447,14 @@
     async fetchVolumeData(dir) {
       const cleanDir = normalizePath(dir);
       if (this.volCache.has(cleanDir)) return this.volCache.get(cleanDir);
+      const lowerDir = cleanDir.toLowerCase();
+      if (lowerDir !== cleanDir && this.volCache.has(lowerDir)) return this.volCache.get(lowerDir);
       const raw = await this.importVolumeData(cleanDir);
       const data = this.normalizeVolumeData(raw, cleanDir);
-      if (data) this.volCache.set(cleanDir, data);
+      if (data) {
+        this.volCache.set(cleanDir, data);
+        if (lowerDir !== cleanDir) this.volCache.set(lowerDir, data);
+      }
       return data;
     }
 
@@ -441,11 +462,16 @@
       const urls = [];
       const meta = window.__PAGE_META__ || {};
       if (meta.indexJsPath) urls.push(new URL(meta.indexJsPath, location.href).href);
-      try {
-        const res = await fetch(new URL(this.sitePath(cleanDir + '/index.json'), location.href).href);
-        if (res.ok) return await res.json();
-      } catch { }
-      urls.push(new URL(this.sitePath(cleanDir + '/index.js'), location.href).href);
+      const dirs = [cleanDir];
+      const lowerDir = cleanDir.toLowerCase();
+      if (lowerDir !== cleanDir) dirs.push(lowerDir);
+      for (const dir of dirs) {
+        try {
+          const res = await fetch(new URL(this.sitePath(dir + '/index.json'), location.href).href);
+          if (res.ok) return await res.json();
+        } catch { }
+      }
+      dirs.forEach(dir => urls.push(new URL(this.sitePath(dir + '/index.js'), location.href).href));
       for (const url of [...new Set(urls)]) {
         try {
           const mod = await import(url);
@@ -487,7 +513,7 @@
         const rawFile = node.file || '';
         const fullFile = rawFile && this.mode !== 'page-toc' ? normalizePath((this.currentVol.dir + '/' + rawFile).replace(/\/+/g, '/')) : rawFile;
         const file = rawFile.replace(/\.html$/i, '');
-        const sameFile = this.mode === 'page-toc' || file === currentFile || !rawFile;
+        const sameFile = this.mode === 'page-toc' || !rawFile || sameDocValue(file, currentFile);
         const href = this.mode === 'page-toc'
           ? (node.id ? '#' + esc(node.id) : '#')
           : sameFile
@@ -548,7 +574,7 @@
         const currentFile = this.currentVolumeFile();
         const domHeadings = getDomHeadings($('#content'));
         let domIndex = 0;
-        return (this.currentVol?.data?.headings || []).filter(h => (h.file || '').replace(/\.html$/i, '') === currentFile).map(h => {
+        return (this.currentVol?.data?.headings || []).filter(h => sameDocValue((h.file || '').replace(/\.html$/i, ''), currentFile)).map(h => {
           const id = h.id || domHeadings[domIndex++]?.id || null;
           return { level: h.level || 2, text: h.text || '', id };
         }).filter(h => h.id);
@@ -588,6 +614,7 @@
     }
 
     updateTracking(id) {
+      if (Date.now() < this.suppressTrackingUntil && id !== this.tracker?.activeId) return;
       this.activeHeadingId = id;
       // 滚动追踪只负责“当前标题”，再分别同步左侧目录和桌面右侧 TOC。
       this.updateSidebarTracking(id);
@@ -610,7 +637,7 @@
       this.activeSidebarLink?.classList.remove('sidebar-link--active');
       this.activeSidebarLink = null;
       const currentFile = this.currentVolumeFile();
-      const sameFile = link => (link.dataset.file || '').replace(/\.html$/i, '') === currentFile;
+      const sameFile = link => sameDocValue((link.dataset.file || '').replace(/\.html$/i, ''), currentFile);
       const match = (id && links.find(link => sameFile(link) && link.dataset.id === id))
         || links.find(link => sameFile(link) && !link.dataset.id)
         || links.find(sameFile);
@@ -657,7 +684,7 @@
         const linkFile = (link.dataset.file || '').replace(/\.html$/i, '');
         const id = link.dataset.id || '';
         let s = 0;
-        if (linkFile === file) {
+        if (sameDocValue(linkFile, file)) {
           s = 1;
           if (id && hash && id === hash) s = 3;
           else if (!id && !hash) s = 2;
@@ -700,9 +727,15 @@
 
     findCollectionByPath() {
       const path = normalizePath(location.pathname);
-      return (window.LIBRARY_CONFIG || []).find(col => {
+      const match = (window.LIBRARY_CONFIG || []).find(col => {
         const base = normalizePath(col.basePath || col.basepath || '');
         return base && path.startsWith(base);
+      });
+      if (match) return match;
+      const lower = path.toLowerCase();
+      return (window.LIBRARY_CONFIG || []).find(col => {
+        const base = normalizeLowerPath(col.basePath || col.basepath || '');
+        return base && lower.startsWith(base);
       }) || null;
     }
 
