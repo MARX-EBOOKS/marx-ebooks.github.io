@@ -41,7 +41,6 @@ function resolveDocLink(href, basePath = '') {
         if (part === '..') stack.pop();
         else stack.push(part);
     });
-    if (stack[0] === 'docs') stack.shift();
     const docPath = stack.join('/');
     return { type: 'doc', href: '?doc=' + docPath + hash, docPath, hash: hash.slice(1) };
 }

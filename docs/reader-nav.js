@@ -1,9 +1,6 @@
 (function () {
   'use strict';
 
-  const doc = document;
-  const win = window;
-
   class EventBag {
     constructor() { this._off = []; }
     on(target, type, handler, options) {
@@ -18,14 +15,14 @@
     }
   }
 
-  const $ = (selector, root = doc) => root.querySelector(selector);
-  const $$ = (selector, root = doc) => Array.from(root.querySelectorAll(selector));
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
   const esc = value => String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-  const cssEsc = value => (win.CSS?.escape ? CSS.escape(String(value)) : String(value).replace(/["\\]/g, '\\$&'));
+  const cssEsc = value => (window.CSS?.escape ? CSS.escape(String(value)) : String(value).replace(/["\\]/g, '\\$&'));
   const normalizePath = value => String(value || '')
     .replace(/^https?:\/\/[^/]+/i, '')
     .replace(/[?#].*$/, '')
@@ -33,7 +30,7 @@
     .replace(/\/+$/, '');
   const normalizeDoc = value => normalizePath(value).replace(/\.html$/i, '');
   const hasSelection = () => {
-    const selection = doc.getSelection();
+    const selection = document.getSelection();
     return !!(selection && !selection.isCollapsed && selection.rangeCount);
   };
   const resolveUrl = href => {
@@ -42,7 +39,7 @@
   };
   const scrollToEl = (el, offset = 80, behavior = 'smooth') => {
     if (!el) return;
-    win.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + scrollY - offset), behavior });
+    window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + scrollY - offset), behavior });
   };
   const syncFill = el => {
     if (!el) return;
@@ -58,7 +55,7 @@
     scrollFrame = 0;
     scrollCallbacks.forEach(fn => fn());
   };
-  win.addEventListener('scroll', () => {
+  window.addEventListener('scroll', () => {
     if (!scrollFrame) scrollFrame = requestAnimationFrame(runScrollCallbacks);
   }, { passive: true });
   const onScrollFrame = fn => {
@@ -80,7 +77,7 @@
 
   function findCollection(path) {
     const norm = normalizePath(path);
-    return (win.LIBRARY_CONFIG || []).find(col => {
+    return (window.LIBRARY_CONFIG || []).find(col => {
       const base = normalizePath(col.basePath || col.basepath || `/${col.id}/`);
       return base && norm.startsWith(base);
     }) || null;
@@ -167,6 +164,7 @@
       this.headings = this.getHeadings();
       if (!this.headings.length) return false;
       this.measure();
+      // 阅读器内容可能异步注入，图片和字体也会改变高度，所以启动后需要重新测量标题位置。
       const queueMeasure = () => {
         if (!this.frame) this.frame = requestAnimationFrame(() => {
           this.frame = 0;
@@ -174,8 +172,8 @@
           this.track(true);
         });
       };
-      this.bag.on(win, 'resize', queueMeasure, { passive: true });
-      this.bag.on(win, 'load', queueMeasure, { once: true });
+      this.bag.on(window, 'resize', queueMeasure, { passive: true });
+      this.bag.on(window, 'load', queueMeasure, { once: true });
       setTimeout(queueMeasure, 500);
       this.offScroll = onScrollFrame(() => this.track(false));
       this.track(true);
@@ -205,6 +203,7 @@
     pick() {
       if (!this.tops.length) return this.headings[0]?.id || null;
       const y = scrollY + this.threshold;
+      // 滚动时用二分查找定位当前标题，保证长文档里追踪仍然轻量。
       let lo = 0;
       let hi = this.tops.length - 1;
       let best = 0;
@@ -228,7 +227,7 @@
     getDomHeadings, getActiveHeadingId, buildHeadingTree, expandTo, fetchVolData
   };
 
-  Object.assign(win, {
+  Object.assign(window, {
     ReaderCore: Core,
     $, $$,
     on: (target, type, handler, options) => target && target.addEventListener(type, handler, options || false),
@@ -247,7 +246,7 @@
     onScrollFrame
   });
 
-  const currentDoc = () => (win.ReaderState?.doc || (typeof state !== 'undefined' ? state.doc : null) || '');
+  const currentDoc = () => (window.ReaderState?.document || (typeof state !== 'undefined' ? state.document : null) || '');
 
   class MenuManager {
     constructor() {
@@ -281,6 +280,7 @@
       this.cleanupRender();
       this.navTree.innerHTML = '';
       this.currentVol = docPath ? this.detectVolume(docPath) : null;
+      // reader 用 ?document= 表示当前文档：有卷册数据时显示卷册目录，否则按本页/总目录降级。
       if (!docPath) {
         this.mode = 'libmap';
         this.renderLibmapMenu();
@@ -328,7 +328,7 @@
     observeSidebar() {
       if (this.sidebarObserver) return;
       this.sidebarObserver = new MutationObserver(() => {
-        if (innerWidth < 997 && this.sidebar.classList.contains('doc-sidebar--open')) {
+        if (innerWidth < 997 && this.sidebar.classList.contains('document-sidebar--open')) {
           this.lastSyncedId = null;
           this.syncSidebar(this.activeHeadingId);
         }
@@ -365,9 +365,9 @@
         this.scrollToHash(href.slice(1), true);
         return;
       }
-      if (href.startsWith('?doc=')) {
+      if (href.startsWith('?document=')) {
         const url = new URL(href, location.href);
-        const docPath = url.searchParams.get('doc') || '';
+        const docPath = url.searchParams.get('document') || '';
         const hash = url.hash.slice(1);
         if (normalizeDoc(docPath) === normalizeDoc(currentDoc()) && hash) {
           e.preventDefault();
@@ -391,11 +391,11 @@
     }
 
     loadSection(item) {
-      const col = (win.LIBRARY_CONFIG || []).find(c => c.id === item.dataset.section);
+      const col = (window.LIBRARY_CONFIG || []).find(c => c.id === item.dataset.section);
       if (!col) return;
       const html = (col.groups || []).map(group => this.renderGroup(group)).join('');
       if (html) {
-        const ul = doc.createElement('ul');
+        const ul = document.createElement('ul');
         ul.className = 'sidebar-menu sidebar-menu--nested';
         ul.innerHTML = html;
         item.appendChild(ul);
@@ -412,7 +412,7 @@
 
     scrollToHash(hash, push) {
       if (!hash) return;
-      const el = doc.getElementById(hash) || doc.querySelector(`[name="${cssEsc(hash)}"]`);
+      const el = document.getElementById(hash) || document.querySelector(`[name="${cssEsc(hash)}"]`);
       if (!el) return;
       scrollToEl(el);
       const url = new URL(location.href);
@@ -421,27 +421,47 @@
     }
 
     detectVolume(docPath) {
-      const docNorm = normalizeDoc(docPath);
-      const docDir = normalizePath(docPath).replace(/\/[^/]+$/, '');
-      for (const col of win.LIBRARY_CONFIG || []) {
+      const pathNorm = normalizePath(docPath);
+      const docNorm = normalizeDoc(pathNorm);
+      const docDir = pathNorm.replace(/\/[^/]+$/, '');
+      const matchPath = path => {
+        if (!path || /^https?:/i.test(path)) return null;
+        const itemPath = normalizePath(path);
+        if (!/\/index\.html$/i.test(itemPath)) return null;
+        const dir = itemPath.replace(/\/index\.html$/i, '').replace(/\/nav\.html$/i, '');
+        return (docNorm === normalizeDoc(itemPath) || docNorm === normalizeDoc(dir) || docDir === dir || pathNorm.startsWith(dir + '/')) ? dir : null;
+      };
+      let best = null;
+      const consider = (col, group, item, dir) => {
+        if (dir && (!best || dir.length > best.dir.length)) best = { col, group, item, dir };
+      };
+      for (const col of window.LIBRARY_CONFIG || []) {
+        consider(col, null, col, matchPath(col.path));
         for (const group of col.groups || []) {
+          consider(col, group, group, matchPath(group.path));
           for (const item of group.items || []) {
-            const itemPath = normalizePath(item.path);
-            if (!/\/index\.html$/i.test(itemPath)) continue;
-            const dir = itemPath.replace(/\/index\.html$/i, '');
-            if (docNorm === normalizeDoc(itemPath) || docDir === dir || normalizePath(docPath).startsWith(dir + '/')) {
-              return { col, group, item, dir };
-            }
+            consider(col, group, item, matchPath(item.path));
           }
         }
       }
-      return null;
+      return best;
+    }
+
+    volumeDocPath(docPath = currentDoc()) {
+      const path = normalizePath(docPath);
+      if (this.currentVol && path === this.currentVol.dir) return this.currentVol.dir + '/index.html';
+      return path;
+    }
+
+    volumeDocFile(docPath = currentDoc()) {
+      return normalizeDoc(this.volumeDocPath(docPath)).split('/').pop() || 'index';
     }
 
     async renderEpubMenu(docPath) {
       const data = await this.fetchVolumeData(this.currentVol.dir);
       if (!data) {
-        this.mode = innerWidth < 997 ? 'page-toc' : 'libmap';
+        const norpath = normalizePath(docPath);
+        this.mode = (norpath === dir || norpath === dir + '/index.html' || norpath === dir + '/nav.html') ? 'libmap' : (innerWidth < 997 ? 'page-toc' : 'libmap');
         this.mode === 'page-toc' ? this.renderPageTocMenu(docPath) : this.renderLibmapMenu();
         this.afterRender(docPath);
         return;
@@ -450,12 +470,12 @@
       this.currentVol.data = data;
       const { col, item } = this.currentVol;
       const colPath = normalizePath(col.path);
-      const volPath = normalizePath(item.path || (this.currentVol.dir + '/index.html'));
-      const parts = [
-        colPath ? { text: col.label, href: '?doc=' + esc(colPath), expand: col.id } : { text: col.label, expand: col.id },
-        { text: item.label || item.title || data.title || 'Contents', href: '?doc=' + esc(volPath) },
-        { id: 'page-breadcrumb-link', isPageBadge: win.__PAGE_BAR__?.hasPageAnchors }
-      ];
+      const parts = [colPath ? { text: col.label, href: '?document=' + esc(colPath), expand: col.id } : { text: col.label, expand: col.id }];
+      if (item !== col) {
+        const volPath = normalizePath(item.path || (this.currentVol.dir + '/index.html'));
+        parts.push({ text: item.label || item.title || data.title || 'Contents', href: '?document=' + esc(volPath) });
+      }
+      parts.push({ id: 'page-breadcrumb-link', isPageBadge: window.__PAGE_BAR__?.hasPageAnchors });
       const tree = buildHeadingTree(data.headings || []);
       this.navTree.innerHTML =
         this.renderBreadcrumb(parts) +
@@ -482,8 +502,8 @@
         file: currentFile
       }));
       const parts = [
-        col?.path ? { text: col.label || 'Library', href: '?doc=' + esc(normalizePath(col.path)), expand: col.id } : { text: col?.label || 'Library', expand: col?.id },
-        { text: nodes[0]?.text || doc.title }
+        col?.path ? { text: col.label || 'Library', href: '?document=' + esc(normalizePath(col.path)), expand: col.id } : { text: col?.label || 'Library', expand: col?.id },
+        { text: nodes[0]?.text || document.title }
       ];
       this.navTree.innerHTML =
         this.renderBreadcrumb(parts) +
@@ -504,7 +524,7 @@
       this.startTracking();
       this.initBreadcrumbFade();
       this.scrollToPendingAnchor();
-      if (win.__PAGE_BAR__?.currentPage != null) win.__PAGE_BAR__._updateBadge(win.__PAGE_BAR__.currentPage);
+      if (window.__PAGE_BAR__?.currentPage != null) window.__PAGE_BAR__._updateBadge(window.__PAGE_BAR__.currentPage);
     }
 
     async fetchVolumeData(dir) {
@@ -515,7 +535,7 @@
       const headings = [];
       raw.forEach(file => (file.headings || []).forEach(h => {
         headings.push({
-          level: h.level || 2,
+          level: h.level !== undefined && h.level !== null ? h.level : 2,
           text: h.text || '',
           id: h.id || null,
           file: h.filename || file.file || file.path || ''
@@ -532,14 +552,16 @@
     renderBreadcrumb(parts) {
       return '<div class="breadcrumb" aria-label="Breadcrumb">' + parts.map((part, i) => {
         const sep = i > 0 || part.id === 'page-breadcrumb-link' ? '<span class="breadcrumb__sep">/</span>' : '';
+        if (part.id === 'page-breadcrumb-link' && !part.isPageBadge) return ''
         if (part.id === 'page-breadcrumb-link') return sep + `<a href="#" id="${esc(part.id)}" style="display:none"></a>`;
         if (part.href) return sep + `<a href="${esc(part.href)}"${part.expand ? ` data-expand-section="${esc(part.expand)}"` : ''}>${esc(part.text)}</a>`;
+
         return sep + `<span>${esc(part.text || '')}</span>`;
       }).join('') + '</div>';
     }
 
     renderSidebarTree(nodes, className, docPath) {
-      const currentFull = normalizeDoc(docPath || currentDoc());
+      const currentFull = normalizeDoc(this.volumeDocPath(docPath || currentDoc()));
       return `<ul class="sidebar-menu ${esc(className)}">${this.renderSidebarNodes(nodes, currentFull)}</ul>`;
     }
 
@@ -554,7 +576,7 @@
           ? (node.id ? `#${esc(node.id)}` : '#')
           : sameFile
             ? (node.id ? `#${esc(node.id)}` : '#')
-            : (node.id ? `?doc=${esc(fullFile)}#${esc(node.id)}` : `?doc=${esc(fullFile)}`);
+            : (node.id ? `?document=${esc(fullFile)}#${esc(node.id)}` : `?document=${esc(fullFile)}`);
         const children = node.children?.length ? `<ul class="sidebar-menu sidebar-menu--nested">${this.renderSidebarNodes(node.children, currentFull)}</ul>` : '';
         const caret = children ? '<button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button>' : '';
         const link = `<a href="${href}" data-file="${esc(rawFile)}" data-id="${esc(node.id || '')}" class="sidebar-link">${esc(node.text)}</a>`;
@@ -565,8 +587,8 @@
     }
 
     buildLibmapHtml() {
-      if (!win.LIBRARY_CONFIG?.length) return '<div class="sidebar-menu" style="padding:20px">Navigation unavailable</div>';
-      return '<ul class="sidebar-menu">' + (win.LIBRARY_CONFIG || []).map(col => this.renderSection(col)).join('') + '</ul>';
+      if (!window.LIBRARY_CONFIG?.length) return '<div class="sidebar-menu" style="padding:20px">Navigation unavailable</div>';
+      return '<ul class="sidebar-menu">' + (window.LIBRARY_CONFIG || []).map(col => this.renderSection(col)).join('') + '</ul>';
     }
 
     renderSection(col) {
@@ -576,7 +598,7 @@
       if (!groups.length && col.path) {
         const ext = /^https?:/i.test(col.path);
         const path = normalizePath(col.path);
-        const href = ext ? col.path : '?doc=' + esc(path);
+        const href = ext ? col.path : '?document=' + esc(path);
         return `<li class="sidebar-item"><a href="${esc(href)}"${ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + path)}"`} class="sidebar-link">${label}${badge}</a></li>`;
       }
       if (groups.length) {
@@ -592,24 +614,24 @@
       if (!items.length) {
         if (!groupPath) return `<li class="sidebar-item"><span class="sidebar-category-label">${label}</span></li>`;
         const ext = /^https?:/i.test(group.path);
-        return `<li class="sidebar-item"><a href="${ext ? esc(group.path) : '?doc=' + esc(groupPath)}"${ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + groupPath)}"`} class="sidebar-link">${label}</a></li>`;
+        return `<li class="sidebar-item"><a href="${ext ? esc(group.path) : '?document=' + esc(groupPath)}"${ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + groupPath)}"`} class="sidebar-link">${label}</a></li>`;
       }
       return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-group-path="${esc(groupPath)}" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}</span><button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(item => {
         const raw = item.path || '';
         const ext = /^https?:/i.test(raw);
         const path = normalizePath(raw);
-        return `<li class="sidebar-item"><a href="${ext ? esc(raw) : '?doc=' + esc(path)}"${ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + path)}"`} class="sidebar-link">${esc(item.label || item.title || '')}</a></li>`;
+        return `<li class="sidebar-item"><a href="${ext ? esc(raw) : '?document=' + esc(path)}"${ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + path)}"`} class="sidebar-link">${esc(item.label || item.title || '')}</a></li>`;
       }).join('')}</ul></li>`;
     }
 
     getPageHeadings() {
       if (this.mode === 'epub') {
-        const file = normalizeDoc(currentDoc()).split('/').pop();
+        const file = this.volumeDocFile();
         const domHeadings = getDomHeadings($('#content'));
         let domIndex = 0;
         return (this.currentVol?.data?.headings || []).filter(h => normalizeDoc(h.file || '').split('/').pop() === file).map(h => {
           const id = h.id || domHeadings[domIndex++]?.id || null;
-          return { level: h.level || 2, text: h.text || '', id };
+          return { level: h.level !== undefined && h.level !== null ? h.level : 2, text: h.text || '', id };
         }).filter(h => h.id);
       }
       return getDomHeadings($('#content')).map(h => ({
@@ -629,8 +651,8 @@
 
     renderTocNodes(nodes) {
       if (!nodes.length) return '';
-      return '<ul class="theme-doc-toc-desktop-list">' + nodes.map(node =>
-        `<li class="theme-doc-toc-desktop-link theme-doc-toc-desktop-link--lvl${node.level}"><a href="#${esc(node.id)}" class="theme-doc-toc-desktop-link__a">${esc(node.text)}</a>${this.renderTocNodes(node.children || [])}</li>`
+      return '<ul class="theme-document-toc-desktop-list">' + nodes.map(node =>
+        `<li class="theme-document-toc-desktop-link theme-document-toc-desktop-link--lvl${node.level}"><a href="#${esc(node.id)}" class="theme-document-toc-desktop-link__a">${esc(node.text)}</a>${this.renderTocNodes(node.children || [])}</li>`
       ).join('') + '</ul>';
     }
 
@@ -654,6 +676,7 @@
 
     updateTracking(id) {
       this.activeHeadingId = id;
+      // 当前标题变化后，同时驱动侧栏、桌面 TOC 和移动端自动滚动。
       this.updateSidebarTracking(id);
       this.updateTocTracking(id);
       this.syncSidebar(id);
@@ -669,16 +692,19 @@
     }
 
     updateSidebarTracking(id) {
+      // 纯 libmap 是总目录，不对应 reader 当前正文，保持无高亮。
+      if (this.mode === 'libmap') return;
       const links = this.getSidebarLinks();
       if (!links.length) return;
       this.activeSidebarLink?.classList.remove('sidebar-link--active');
       this.activeSidebarLink = null;
-      const file = normalizeDoc(currentDoc()).split('/').pop() || 'index';
+      const file = this.volumeDocFile();
       const sameFile = a => normalizeDoc(a.dataset.file || '').split('/').pop() === file;
       const match = (id && links.find(a => sameFile(a) && a.dataset.id === id))
         || links.find(a => sameFile(a) && !a.dataset.id)
         || links.find(sameFile);
       if (!match) return;
+      // 先限定同一文件，再匹配锚点，避免不同文档里的同名标题互相误亮。
       match.classList.add('sidebar-link--active');
       this.activeSidebarLink = match;
       expandTo(match, this.navTree.querySelector('.sidebar-menu'));
@@ -687,19 +713,19 @@
     updateTocTracking(id) {
       const nav = $('#toc-desktop-nav');
       if (!nav) return;
-      this.activeTocLink?.classList.remove('theme-doc-toc-desktop-link__a--active');
+      this.activeTocLink?.classList.remove('theme-document-toc-desktop-link__a--active');
       this.activeTocLink = null;
       if (!id) return;
-      const match = $$('.theme-doc-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id);
+      const match = $$('.theme-document-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id);
       if (match) {
-        match.classList.add('theme-doc-toc-desktop-link__a--active');
+        match.classList.add('theme-document-toc-desktop-link__a--active');
         this.activeTocLink = match;
       }
     }
 
     syncSidebar(id) {
       if (innerWidth >= 997 || hasSelection() || !id || id === this.lastSyncedId) return;
-      if (!this.sidebar?.classList.contains('doc-sidebar--open')) return;
+      if (!this.sidebar?.classList.contains('document-sidebar--open')) return;
       const active = this.activeSidebarLink || $('.sidebar-link.sidebar-link--active', this.navTree);
       if (!active) return;
       this.lastSyncedId = id;
@@ -710,16 +736,10 @@
       const tree = this.navTree.querySelector('.sidebar-menu');
       if (!tree) return;
       if (this.mode === 'libmap') {
-        const docNorm = normalizePath(docPath || currentDoc());
-        const match = $$('a[data-path]', tree).find(a => normalizePath(a.dataset.path) === docNorm || normalizePath(a.getAttribute('href')?.replace(/^\?doc=/, '')) === docNorm);
-        if (match) {
-          match.classList.add('sidebar-link--active');
-          this.activeSidebarLink = match;
-          expandTo(match, tree);
-        }
+        // 总目录模式只负责导航入口，不表达阅读进度，因此不加 active 样式。
         return;
       }
-      const file = normalizeDoc(docPath || currentDoc()).split('/').pop();
+      const file = this.volumeDocFile(docPath || currentDoc());
       const hash = location.hash.slice(1);
       const links = $$('.sidebar-link', tree);
       let best = null;
@@ -762,7 +782,7 @@
       sessionStorage.removeItem('__reader_pending_doc');
       if (docPath && normalizeDoc(docPath) !== normalizeDoc(currentDoc())) return;
       const tryScroll = () => {
-        const el = doc.getElementById(hash);
+        const el = document.getElementById(hash);
         if (!el) return false;
         scrollToEl(el);
         return true;
@@ -772,7 +792,7 @@
 
     findCollectionByCurrentPath() {
       const path = normalizePath(currentDoc());
-      for (const col of win.LIBRARY_CONFIG || []) {
+      for (const col of window.LIBRARY_CONFIG || []) {
         const base = normalizePath(col.basePath || col.basepath || '');
         if (base && path.startsWith(base)) return col;
       }
@@ -780,5 +800,5 @@
     }
   }
 
-  win.MenuManager = MenuManager;
+  window.MenuManager = MenuManager;
 })();
