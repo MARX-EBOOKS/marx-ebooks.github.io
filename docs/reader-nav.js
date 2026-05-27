@@ -23,26 +23,169 @@
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
   const cssEsc = value => (window.CSS?.escape ? CSS.escape(String(value)) : String(value).replace(/["\\]/g, '\\$&'));
-  const normalizePath = value => String(value || '')
-    .replace(/^https?:\/\/[^/]+/i, '')
-    .replace(/[?#].*$/, '')
-    .replace(/^\/+/, '')
-    .replace(/\/+$/, '');
-  const normalizeDoc = value => normalizePath(value).replace(/\.html$/i, '');
-  const normalizeLowerPath = value => normalizePath(value).toLowerCase();
-  const sameDocValue = (a, b) => {
-    const left = normalizeDoc(a);
-    const right = normalizeDoc(b);
-    return left === right || left.toLowerCase() === right.toLowerCase();
-  };
   const hasSelection = () => {
     const selection = document.getSelection();
     return !!(selection && !selection.isCollapsed && selection.rangeCount);
   };
-  const resolveUrl = href => {
-    try { return new URL(href, location.href).href; }
-    catch { return location.pathname.replace(/[^/]*$/, '') + href; }
-  };
+
+  class ReaderPaths {
+    static specialSchemeRe = /^(?:mailto|tel|javascript|data|blob):/i;
+    static httpRe = /^https?:$/i;
+
+    static normalizePath(value) {
+      return String(value || '')
+        .replace(/^https?:\/\/[^/]+/i, '')
+        .replace(/[?#].*$/, '')
+        .replace(/^\/+/, '')
+        .replace(/\/+$/, '');
+    }
+
+    static normalizeDoc(value) {
+      return this.normalizePath(value).replace(/\.html$/i, '');
+    }
+
+    static sameDoc(a, b) {
+      const left = this.normalizeDoc(a);
+      const right = this.normalizeDoc(b);
+      return left === right || left.toLowerCase() === right.toLowerCase();
+    }
+
+    static samePath(a, b) {
+      const left = this.normalizePath(a);
+      const right = this.normalizePath(b);
+      return left === right || left.toLowerCase() === right.toLowerCase();
+    }
+
+    static startsWithPath(path, base) {
+      const cleanPath = this.normalizePath(path);
+      const cleanBase = this.normalizePath(base);
+      if (!cleanBase) return false;
+      return cleanPath.startsWith(cleanBase + '/') || cleanPath.toLowerCase().startsWith(cleanBase.toLowerCase() + '/');
+    }
+
+    static safeDecode(value) {
+      try { return decodeURIComponent(value); }
+      catch { return value; }
+    }
+
+    static resolveUrl(href) {
+      try { return new URL(href, location.href).href; }
+      catch { return location.pathname.replace(/[^/]*$/, '') + href; }
+    }
+
+    static docBaseUrl(basePath = '') {
+      const clean = this.normalizePath(basePath);
+      if (!clean) return new URL(location.href);
+      return new URL('/' + clean.replace(/\/?$/, '/'), location.origin);
+    }
+
+    static docPathFromUrl(url) {
+      const readerPath = this.normalizePath(location.pathname);
+      const path = this.safeDecode(url.pathname);
+      if (this.samePath(path, readerPath) && url.searchParams.has('doc')) {
+        return url.searchParams.get('doc') || '';
+      }
+      return path + url.search;
+    }
+
+    static resolveDocHref(href, basePath = '') {
+      const raw = String(href || '').trim();
+      if (!raw) return null;
+      if (raw.startsWith('#')) return { type: 'anchor', href: raw, hash: raw.slice(1) };
+      if (this.specialSchemeRe.test(raw)) return { type: 'external', href: raw };
+
+      let url;
+      try {
+        url = new URL(raw, raw.startsWith('?') ? location.href : this.docBaseUrl(basePath));
+      } catch {
+        return { type: 'external', href: raw };
+      }
+
+      if (!this.httpRe.test(url.protocol) || url.origin !== location.origin) return { type: 'external', href: url.href };
+      const docPath = this.docPathFromUrl(url);
+      if (!docPath) return { type: 'external', href: url.href };
+      const hash = url.hash.slice(1);
+      const target = this.readerHref(docPath);
+      return {
+        type: 'doc',
+        href: target + (hash ? '#' + hash : ''),
+        docPath,
+        hash
+      };
+    }
+
+    static readerHref(docPath, hash = '') {
+      const raw = String(docPath || '');
+      const i = raw.indexOf('#');
+      const path = i >= 0 ? raw.slice(0, i) : raw;
+      const anchor = hash || (i >= 0 ? raw.slice(i + 1) : '');
+      return location.pathname + '?doc=' + path + (anchor ? '#' + anchor : '');
+    }
+
+    static resolveCssHref(href, base) {
+      if (!href) return '';
+      if (/^(https?:|\/\/)/i.test(href)) return href;
+      try {
+        const dir = String(base || '').replace(/\/?$/, '/');
+        const baseUrl = dir.startsWith('/') ? new URL(dir, location.origin) : new URL(dir, location.href);
+        const url = new URL(href, baseUrl);
+        return url.pathname + url.search + url.hash;
+      } catch {
+        return [String(base || '').replace(/^\/+|\/+$/g, ''), href.replace(/^\.+\//, '')].filter(Boolean).join('/');
+      }
+    }
+
+    static lowerPathFallback(value) {
+      const raw = String(value || '');
+      if (!raw) return raw;
+      if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith('/')) {
+        try {
+          const url = new URL(raw, location.href);
+          if (url.origin === location.origin) {
+            const next = new URL(url.href);
+            next.pathname = next.pathname.toLowerCase();
+            return /^[a-z][a-z0-9+.-]*:/i.test(raw) ? next.href : next.pathname + next.search + next.hash;
+          }
+        } catch { }
+        return raw;
+      }
+      const queryIndex = raw.indexOf('?');
+      const hashIndex = raw.indexOf('#');
+      const splitAt = [queryIndex, hashIndex].filter(i => i >= 0).sort((a, b) => a - b)[0];
+      if (splitAt >= 0) return raw.slice(0, splitAt).toLowerCase() + raw.slice(splitAt);
+      return raw.toLowerCase();
+    }
+  }
+
+  const normalizePath = value => ReaderPaths.normalizePath(value);
+  const normalizeDoc = value => ReaderPaths.normalizeDoc(value);
+  const sameDocValue = (a, b) => ReaderPaths.sameDoc(a, b);
+  const samePathValue = (a, b) => ReaderPaths.samePath(a, b);
+  const startsWithPathValue = (path, base) => ReaderPaths.startsWithPath(path, base);
+  const resolveUrl = href => ReaderPaths.resolveUrl(href);
+  const resolveDocHref = (href, basePath = '') => ReaderPaths.resolveDocHref(href, basePath);
+  const readerHref = (docPath, hash = '') => ReaderPaths.readerHref(docPath, hash);
+  const resolveCssHref = (href, base) => ReaderPaths.resolveCssHref(href, base);
+  async function fetchWithLowerFallback(path, options) {
+    const lower = ReaderPaths.lowerPathFallback(path);
+    try {
+      const res = await fetch(path, options);
+      if (res.ok || !lower || lower === path) return { res, path, url: path };
+      try {
+        const fallback = await fetch(lower, options);
+        if (fallback.ok) return { res: fallback, path: lower, url: lower };
+      } catch { }
+      return { res, path, url: path };
+    } catch (error) {
+      if (!lower || lower === path) throw error;
+      try {
+        return { res: await fetch(lower, options), path: lower, url: lower };
+      } catch {
+        throw error;
+      }
+    }
+  }
+
   const scrollToEl = (el, offset = 80, behavior = 'smooth') => {
     if (!el) return;
     window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + scrollY - offset), behavior });
@@ -69,31 +212,9 @@
     return () => scrollCallbacks.delete(fn);
   };
 
-  function resolveCssHref(href, base) {
-    if (!href) return '';
-    if (/^(https?:|\/\/)/i.test(href)) return href;
-    if (href.startsWith('/')) return href;
-    try {
-      const dir = String(base || '').replace(/^\/+/, '').replace(/\/?$/, '/');
-      const url = new URL(href, new URL(dir, location.href));
-      return url.pathname + url.search + url.hash;
-    } catch {
-      return [String(base || '').replace(/^\/+|\/+$/g, ''), href.replace(/^\.+\//, '')].filter(Boolean).join('/');
-    }
-  }
-
   function findCollection(path) {
     const norm = normalizePath(path);
-    const match = (window.LIBRARY_CONFIG || []).find(col => {
-      const base = normalizePath(col.basePath || col.basepath || `/${col.id}/`);
-      return base && norm.startsWith(base);
-    });
-    if (match) return match;
-    const lower = norm.toLowerCase();
-    return (window.LIBRARY_CONFIG || []).find(col => {
-      const base = normalizeLowerPath(col.basePath || col.basepath || `/${col.id}/`);
-      return base && lower.startsWith(base);
-    }) || null;
+    return (window.LIBRARY_CONFIG || []).find(col => startsWithPathValue(norm, col?.basePath || col?.basepath || `/${col?.id || ''}/`)) || null;
   }
 
   function getDomHeadings(container) {
@@ -256,8 +377,10 @@
   }
 
   const Core = {
-    $, $$, esc, cssEsc, EventBag, HeadingTracker,
-    normalizePath, normalizeDoc, hasSelection, resolveUrl, resolveCssHref,
+    $, $$, esc, cssEsc, EventBag, ReaderPaths, HeadingTracker,
+    normalizePath, normalizeDoc, sameDocValue, samePathValue, startsWithPathValue,
+    fetchWithLowerFallback,
+    hasSelection, resolveUrl, resolveDocHref, readerHref, resolveCssHref,
     findCollection, scrollToEl, syncFill, onScrollFrame,
     getDomHeadings, getActiveHeadingId, buildHeadingTree, expandTo, fetchVolData
   };
@@ -270,6 +393,7 @@
     syncFill,
     resolveUrl,
     resolveCssHref,
+    fetchWithLowerFallback,
     findCollection,
     scrollToEl,
     getDomHeadings,
@@ -400,8 +524,8 @@
         this.scrollToHash(href.slice(1), true);
         return;
       }
-      if (href.startsWith('?doc=')) {
-        const url = new URL(href, location.href);
+      const url = new URL(href, location.href);
+      if (ReaderPaths.samePath(url.pathname, location.pathname) && url.searchParams.has('doc')) {
         const docPath = url.searchParams.get('doc') || '';
         const hash = url.hash.slice(1);
         if (sameDocValue(docPath, currentDoc()) && hash) {
@@ -509,11 +633,11 @@
 
       this.currentVol.data = data;
       const { col, item } = this.currentVol;
-      const colPath = normalizePath(col.path);
-      const parts = [colPath ? { text: col.label, href: '?doc=' + esc(colPath), expand: col.id } : { text: col.label, expand: col.id }];
+      const colPath = col.path || '';
+      const parts = [colPath ? { text: col.label, href: readerHref(colPath), expand: col.id } : { text: col.label, expand: col.id }];
       if (item !== col) {
-        const volPath = normalizePath(item.path || (this.currentVol.dir + '/index.html'));
-        parts.push({ text: item.label || item.title || data.title || 'Contents', href: '?doc=' + esc(volPath) });
+        const volPath = item.path || (this.currentVol.dir + '/index.html');
+        parts.push({ text: item.label || item.title || data.title || 'Contents', href: readerHref(volPath) });
       }
       parts.push({ id: 'page-breadcrumb-link', isPageBadge: window.__PAGE_BAR__?.hasPageAnchors });
       const tree = buildHeadingTree(data.headings || []);
@@ -542,7 +666,7 @@
         file: currentFile
       }));
       const parts = [
-        col?.path ? { text: col.label || 'Library', href: '?doc=' + esc(normalizePath(col.path)), expand: col.id } : { text: col?.label || 'Library', expand: col?.id },
+        col?.path ? { text: col.label || 'Library', href: readerHref(col.path), expand: col.id } : { text: col?.label || 'Library', expand: col?.id },
         { text: nodes[0]?.text || document.title }
       ];
       this.navTree.innerHTML =
@@ -600,6 +724,23 @@
       }).join('') + '</div>';
     }
 
+    renderNavLink({ href, path, text, badge = '', className = 'sidebar-link', dataFile = '', dataId = '', extraAttrs = '' }) {
+      const raw = href || path || '';
+      const resolved = !href && /^https?:/i.test(raw) ? resolveDocHref(raw) : null;
+      const external = resolved?.type === 'external';
+      const cleanPath = external ? '' : normalizePath(resolved?.docPath || raw);
+      const finalHref = href || (resolved?.type === 'doc' ? resolved.href : readerHref(raw));
+      const attrs = [
+        `href="${esc(finalHref)}"`,
+        external ? 'target="_blank" rel="noopener"' : (!href && cleanPath ? `data-path="${esc('/' + cleanPath)}"` : ''),
+        dataFile ? `data-file="${esc(dataFile)}"` : '',
+        dataId ? `data-id="${esc(dataId)}"` : '',
+        extraAttrs,
+        `class="${esc(className)}"`
+      ].filter(Boolean).join(' ');
+      return `<a ${attrs}>${esc(text || '')}${badge}</a>`;
+    }
+
     renderSidebarTree(nodes, className, docPath) {
       const currentFull = normalizeDoc(this.volumeDocPath(docPath || currentDoc()));
       return `<ul class="sidebar-menu ${esc(className)}">${this.renderSidebarNodes(nodes, currentFull)}</ul>`;
@@ -616,10 +757,10 @@
           ? (node.id ? `#${esc(node.id)}` : '#')
           : sameFile
             ? (node.id ? `#${esc(node.id)}` : '#')
-            : (node.id ? `?doc=${esc(fullFile)}#${esc(node.id)}` : `?doc=${esc(fullFile)}`);
+            : readerHref(fullFile, node.id || '');
         const children = node.children?.length ? `<ul class="sidebar-menu sidebar-menu--nested">${this.renderSidebarNodes(node.children, currentFull)}</ul>` : '';
         const caret = children ? '<button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button>' : '';
-        const link = `<a href="${href}" data-file="${esc(rawFile)}" data-id="${esc(node.id || '')}" class="sidebar-link">${esc(node.text)}</a>`;
+        const link = this.renderNavLink({ href, text: node.text, dataFile: rawFile, dataId: node.id || '' });
         return children
           ? `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-collapsed="true"><div class="sidebar-item-row">${link}${caret}</div>${children}</li>`
           : `<li class="sidebar-item">${link}</li>`;
@@ -636,10 +777,7 @@
       const badge = col.badge ? ` <span class="sidebar-badge">${esc(col.badge)}</span>` : '';
       const groups = col.groups || [];
       if (!groups.length && col.path) {
-        const ext = /^https?:/i.test(col.path);
-        const path = normalizePath(col.path);
-        const href = ext ? col.path : '?doc=' + esc(path);
-        return `<li class="sidebar-item"><a href="${esc(href)}"${ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + path)}"`} class="sidebar-link">${label}${badge}</a></li>`;
+        return `<li class="sidebar-item">${this.renderNavLink({ path: col.path, text: col.label || col.title || col.id || '', badge })}</li>`;
       }
       if (groups.length) {
         return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-section="${esc(col.id)}" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}${badge}</span><button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div></li>`;
@@ -653,14 +791,10 @@
       const groupPath = normalizePath(group.path);
       if (!items.length) {
         if (!groupPath) return `<li class="sidebar-item"><span class="sidebar-category-label">${label}</span></li>`;
-        const ext = /^https?:/i.test(group.path);
-        return `<li class="sidebar-item"><a href="${ext ? esc(group.path) : '?doc=' + esc(groupPath)}"${ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + groupPath)}"`} class="sidebar-link">${label}</a></li>`;
+        return `<li class="sidebar-item">${this.renderNavLink({ path: group.path, text: group.label || '' })}</li>`;
       }
       return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-group-path="${esc(groupPath)}" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}</span><button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(item => {
-        const raw = item.path || '';
-        const ext = /^https?:/i.test(raw);
-        const path = normalizePath(raw);
-        return `<li class="sidebar-item"><a href="${ext ? esc(raw) : '?doc=' + esc(path)}"${ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + path)}"`} class="sidebar-link">${esc(item.label || item.title || '')}</a></li>`;
+        return `<li class="sidebar-item">${this.renderNavLink({ path: item.path || '', text: item.label || item.title || '' })}</li>`;
       }).join('')}</ul></li>`;
     }
 
@@ -831,17 +965,7 @@
     }
 
     findCollectionByCurrentPath() {
-      const path = normalizePath(currentDoc());
-      for (const col of window.LIBRARY_CONFIG || []) {
-        const base = normalizePath(col.basePath || col.basepath || '');
-        if (base && path.startsWith(base)) return col;
-      }
-      const lower = path.toLowerCase();
-      for (const col of window.LIBRARY_CONFIG || []) {
-        const base = normalizeLowerPath(col.basePath || col.basepath || '');
-        if (base && lower.startsWith(base)) return col;
-      }
-      return findCollection(path);
+      return findCollection(currentDoc());
     }
   }
 

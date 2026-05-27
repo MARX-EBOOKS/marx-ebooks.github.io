@@ -2,33 +2,7 @@
   'use strict';
 
   const C = window.ReaderCore || {};
-  const $ = C.$ || (s => document.querySelector(s));
-  const $$ = C.$$ || ((s, r = document) => Array.from(r.querySelectorAll(s)));
-  const esc = C.esc || (v => String(v ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])));
-  const cssEsc = C.cssEsc || (v => (window.CSS?.escape ? CSS.escape(String(v)) : String(v).replace(/["\\]/g, '\\$&')));
-  const onScrollFrame = C.onScrollFrame || (fn => {
-    window.addEventListener('scroll', fn, { passive: true });
-    return () => window.removeEventListener('scroll', fn);
-  });
-  const hasSelection = C.hasSelection || (() => {
-    const selection = document.getSelection();
-    return !!(selection && !selection.isCollapsed && selection.rangeCount);
-  });
-  const scrollToEl = C.scrollToEl || (el => el?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
-  const findCollection = C.findCollection || window.findCollection || (() => null);
-  const normalizePath = C.normalizePath || (v => String(v || '').replace(/^\/+/, '').replace(/\/+$/, ''));
-  const samePathValue = (a, b) => {
-    const left = normalizePath(a);
-    const right = normalizePath(b);
-    return left === right || left.toLowerCase() === right.toLowerCase();
-  };
-  const startsWithPathValue = (path, base) => {
-    const cleanPath = normalizePath(path);
-    const cleanBase = normalizePath(base);
-    if (!cleanBase) return false;
-    if (cleanPath.startsWith(cleanBase + '/')) return true;
-    return cleanPath.toLowerCase().startsWith(cleanBase.toLowerCase() + '/');
-  };
+  const { $, $$, onScrollFrame, hasSelection, scrollToEl, findCollection, normalizePath, samePathValue, startsWithPathValue } = C;
 
   class PageBarManager {
     constructor() {
@@ -46,11 +20,7 @@
       this.markerTimer = null;
       this.noticeTimer = null;
       this.quietUntil = 0;
-      this.bag = new (C.EventBag || class {
-        constructor() { this.off = []; }
-        on(t, e, f, o) { if (!t) return; t.addEventListener(e, f, o || false); this.off.push(() => t.removeEventListener(e, f, o || false)); }
-        clear() { while (this.off.length) this.off.pop()(); }
-      })();
+      this.bag = new C.EventBag();
     }
 
     init() {}
