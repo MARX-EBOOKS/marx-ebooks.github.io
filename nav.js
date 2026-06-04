@@ -321,6 +321,9 @@
           if (url.pathname === location.pathname && url.hash) {
             e.preventDefault();
             this.scrollToHash(url.hash.slice(1));
+          } else if (url.pathname === location.pathname && url.search === location.search && !url.hash) {
+            e.preventDefault();
+            if (!this.rememberScrollEnabled()) this.scrollToTop(url);
           }
         } catch { }
       }
@@ -364,6 +367,17 @@
       if (this.tracker) this.tracker.activeId = hash;
       this.updateTracking(hash);
       history.replaceState({}, '', '#' + hash);
+    }
+
+    scrollToTop(url = location) {
+      this.suppressTrackingUntil = Date.now() + 900;
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      this.tracker?.measure?.();
+      history.replaceState({}, '', url.pathname + url.search);
+    }
+
+    rememberScrollEnabled() {
+      return localStorage.rememberScroll !== 'false';
     }
 
     detectVolume() {
@@ -502,15 +516,16 @@
 
     renderSidebarNodes(nodes) {
       const currentFile = this.currentVolumeFile();
+      const currentPath = this.sitePath(this.currentVolumePath());
       return nodes.map(node => {
         const rawFile = node.file || '';
         const fullFile = rawFile && this.mode !== 'page-toc' ? normalizePath((this.currentVol.dir + '/' + rawFile).replace(/\/+/g, '/')) : rawFile;
         const file = rawFile.replace(/\.html$/i, '');
         const sameFile = this.mode === 'page-toc' || !rawFile || sameDocValue(file, currentFile);
         const href = this.mode === 'page-toc'
-          ? (node.id ? '#' + esc(node.id) : '#')
+          ? (node.id ? '#' + esc(node.id) : currentPath)
           : sameFile
-            ? (node.id ? '#' + esc(node.id) : this.sitePath(fullFile || rawFile))
+            ? (node.id ? '#' + esc(node.id) : (fullFile || rawFile ? this.sitePath(fullFile || rawFile) : currentPath))
             : (node.id ? this.sitePath(fullFile) + '#' + esc(node.id) : this.sitePath(fullFile));
         const children = node.children?.length ? `<ul class="sidebar-menu sidebar-menu--nested">${this.renderSidebarNodes(node.children)}</ul>` : '';
         const caret = children ? '<button class="sidebar-caret" tabindex="0" aria-label="Expand">\u25b8</button>' : '';
@@ -615,6 +630,15 @@
       this.syncSidebar(id);
     }
 
+    setActiveTrackedLink(slot, link, activeClass) {
+      this[slot]?.classList.remove(activeClass);
+      this[slot] = null;
+      if (!link) return false;
+      link.classList.add(activeClass);
+      this[slot] = link;
+      return true;
+    }
+
     getSidebarLinks() {
       const tree = this.navTree.querySelector('.sidebar-menu');
       if (!tree) return [];
@@ -627,30 +651,21 @@
       if (this.mode === 'libmap') return;
       const links = this.getSidebarLinks();
       if (!links.length) return;
-      this.activeSidebarLink?.classList.remove('sidebar-link--active');
-      this.activeSidebarLink = null;
       const currentFile = this.currentVolumeFile();
       const sameFile = link => sameDocValue((link.dataset.file || '').replace(/\.html$/i, ''), currentFile);
       const match = (id && links.find(link => sameFile(link) && link.dataset.id === id))
         || links.find(link => sameFile(link) && !link.dataset.id)
         || links.find(sameFile);
-      if (!match) return;
+      if (!this.setActiveTrackedLink('activeSidebarLink', match, 'sidebar-link--active')) return;
       // 只高亮同一文件里的目录项，避免跨卷册的同名锚点误亮。
-      match.classList.add('sidebar-link--active');
-      this.activeSidebarLink = match;
       expandTo(match, this.navTree.querySelector('.sidebar-menu'));
     }
 
     updateTocTracking(id) {
       const nav = $('#toc-desktop-nav');
-      this.activeTocLink?.classList.remove('theme-doc-toc-desktop-link__a--active');
-      this.activeTocLink = null;
-      if (!nav || !id) return;
-      const match = $$('.theme-doc-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id);
-      if (match) {
-        match.classList.add('theme-doc-toc-desktop-link__a--active');
-        this.activeTocLink = match;
-      }
+      if (!nav) return;
+      const match = id ? $$('.theme-doc-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id) : null;
+      this.setActiveTrackedLink('activeTocLink', match, 'theme-doc-toc-desktop-link__a--active');
     }
 
     syncSidebar(id) {

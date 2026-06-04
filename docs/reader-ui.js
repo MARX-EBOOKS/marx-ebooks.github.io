@@ -793,11 +793,22 @@ class ReaderApp {
             event.preventDefault();
             if (sameDocValue(resolvedDoc.docPath, state.doc)) {
                 if (resolvedDoc.hash) this.scrollToAnchor(resolvedDoc.hash, true);
+                else if (!this.rememberScrollEnabled()) this.scrollToTop(resolvedDoc.href, true);
                 return;
             }
             history.pushState({}, '', resolvedDoc.href);
             this.loadDoc(resolvedDoc.docPath);
         }
+    }
+
+    rememberScrollEnabled() {
+        return state.rs !== false;
+    }
+
+    scrollToTop(href, push) {
+        window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+        if (!href) return;
+        history[push ? 'pushState' : 'replaceState']({}, '', href);
     }
 
     scrollToAnchor(hash, push) {

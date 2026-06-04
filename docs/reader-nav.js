@@ -725,14 +725,13 @@
     }
 
     renderNavLink({ href, path, text, badge = '', className = 'sidebar-link', dataFile = '', dataId = '', extraAttrs = '' }) {
-      const raw = href || path || '';
-      const resolved = !href && /^https?:/i.test(raw) ? resolveDocHref(raw) : null;
-      const external = resolved?.type === 'external';
-      const cleanPath = external ? '' : normalizePath(resolved?.docPath || raw);
-      const finalHref = href || (resolved?.type === 'doc' ? resolved.href : readerHref(raw));
+      const raw = String(href || path || '').trim();
+      const external = /^(?:http|https):/i.test(raw);
+      const cleanPath = !href && !external ? normalizePath(raw) : '';
+      const finalHref = external || href ? raw : readerHref(raw);
       const attrs = [
         `href="${esc(finalHref)}"`,
-        external ? 'target="_blank" rel="noopener"' : (!href && cleanPath ? `data-path="${esc('/' + cleanPath)}"` : ''),
+        !href && cleanPath ? `data-path="${esc('/' + cleanPath)}"` : '',
         dataFile ? `data-file="${esc(dataFile)}"` : '',
         dataId ? `data-id="${esc(dataId)}"` : '',
         extraAttrs,
@@ -749,14 +748,15 @@
     renderSidebarNodes(nodes, currentFull) {
       const volDir = this.currentVol?.dir || '';
       const isPageToc = this.mode === 'page-toc';
+      const currentHref = readerHref(this.volumeDocPath(currentDoc()));
       return nodes.map(node => {
         const rawFile = node.file || '';
         const fullFile = rawFile && !isPageToc ? normalizePath((volDir + '/' + rawFile).replace(/\/+/g, '/')) : rawFile;
         const sameFile = isPageToc || (fullFile && sameDocValue(fullFile, currentFull));
         const href = isPageToc
-          ? (node.id ? `#${esc(node.id)}` : '#')
+          ? (node.id ? `#${esc(node.id)}` : currentHref)
           : sameFile
-            ? (node.id ? `#${esc(node.id)}` : '#')
+            ? (node.id ? `#${esc(node.id)}` : readerHref(fullFile || currentFull))
             : readerHref(fullFile, node.id || '');
         const children = node.children?.length ? `<ul class="sidebar-menu sidebar-menu--nested">${this.renderSidebarNodes(node.children, currentFull)}</ul>` : '';
         const caret = children ? '<button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button>' : '';
@@ -780,7 +780,9 @@
         return `<li class="sidebar-item">${this.renderNavLink({ path: col.path, text: col.label || col.title || col.id || '', badge })}</li>`;
       }
       if (groups.length) {
-        return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-section="${esc(col.id)}" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}${badge}</span><button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div></li>`;
+        const directLinks = groups.every(group => group.path && !(group.items || []).length);
+        const nested = directLinks ? `<ul class="sidebar-menu sidebar-menu--nested">${groups.map(group => this.renderGroup(group)).join('')}</ul>` : '';
+        return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-section="${esc(col.id)}" data-collapsed="true"${directLinks ? ' data-loaded="true"' : ''}><div class="sidebar-item-row"><span class="sidebar-category-label">${label}${badge}</span><button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div>${nested}</li>`;
       }
       return `<li class="sidebar-item"><span class="sidebar-category-label">${label}${badge}</span></li>`;
     }
@@ -788,9 +790,10 @@
     renderGroup(group) {
       const label = esc(group.label || '');
       const items = group.items || [];
+      const rawPath = String(group.path || '').trim();
       const groupPath = normalizePath(group.path);
       if (!items.length) {
-        if (!groupPath) return `<li class="sidebar-item"><span class="sidebar-category-label">${label}</span></li>`;
+        if (!rawPath) return `<li class="sidebar-item"><span class="sidebar-category-label">${label}</span></li>`;
         return `<li class="sidebar-item">${this.renderNavLink({ path: group.path, text: group.label || '' })}</li>`;
       }
       return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-group-path="${esc(groupPath)}" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}</span><button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(item => {
@@ -856,6 +859,15 @@
       this.syncSidebar(id);
     }
 
+    setActiveTrackedLink(slot, link, activeClass) {
+      this[slot]?.classList.remove(activeClass);
+      this[slot] = null;
+      if (!link) return false;
+      link.classList.add(activeClass);
+      this[slot] = link;
+      return true;
+    }
+
     getSidebarLinks() {
       const tree = this.navTree.querySelector('.sidebar-menu');
       if (!tree) return [];
@@ -870,31 +882,21 @@
       if (this.mode === 'libmap') return;
       const links = this.getSidebarLinks();
       if (!links.length) return;
-      this.activeSidebarLink?.classList.remove('sidebar-link--active');
-      this.activeSidebarLink = null;
       const file = this.volumeDocFile();
       const sameFile = a => sameDocValue(normalizeDoc(a.dataset.file || '').split('/').pop(), file);
       const match = (id && links.find(a => sameFile(a) && a.dataset.id === id))
         || links.find(a => sameFile(a) && !a.dataset.id)
         || links.find(sameFile);
-      if (!match) return;
+      if (!this.setActiveTrackedLink('activeSidebarLink', match, 'sidebar-link--active')) return;
       // 先限定同一文件，再匹配锚点，避免不同文档里的同名标题互相误亮。
-      match.classList.add('sidebar-link--active');
-      this.activeSidebarLink = match;
       expandTo(match, this.navTree.querySelector('.sidebar-menu'));
     }
 
     updateTocTracking(id) {
       const nav = $('#toc-desktop-nav');
       if (!nav) return;
-      this.activeTocLink?.classList.remove('theme-doc-toc-desktop-link__a--active');
-      this.activeTocLink = null;
-      if (!id) return;
-      const match = $$('.theme-doc-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id);
-      if (match) {
-        match.classList.add('theme-doc-toc-desktop-link__a--active');
-        this.activeTocLink = match;
-      }
+      const match = id ? $$('.theme-doc-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id) : null;
+      this.setActiveTrackedLink('activeTocLink', match, 'theme-doc-toc-desktop-link__a--active');
     }
 
     syncSidebar(id) {
