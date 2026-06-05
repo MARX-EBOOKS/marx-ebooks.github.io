@@ -591,12 +591,10 @@
     getPageHeadings() {
       if (this.mode === 'epub') {
         const file = this.volumeDocFile();
-        const dom = getDomHeadings($('#content'));
-        let idx = 0;
-        return (this.currentVol?.data?.headings || []).filter(h => sameDoc(nDoc(h.file || '').split('/').pop(), file)).map(h => {
-          const id = h.id || dom[idx++]?.id || null;
-          return { level: h.level != null ? h.level : 2, text: h.text || '', id };
-        }).filter(h => h.id);
+        return (this.currentVol?.data?.headings || [])
+          .filter(h => sameDoc(nDoc(h.file || '').split('/').pop(), file))
+          .map(h => ({ level: h.level != null ? h.level : 2, text: h.text || '', id: h.id || null }))
+          .filter(h => h.id && document.getElementById(h.id));
       }
       return getDomHeadings($('#content')).map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id }));
     }
@@ -618,9 +616,20 @@
 
     startTracking() {
       const content = $('#content');
+      const getHeadings = () => {
+        if (this.mode === 'epub') {
+          const file = this.volumeDocFile();
+          const fromData = (this.currentVol?.data?.headings || [])
+            .filter(h => sameDoc(nDoc(h.file || '').split('/').pop(), file))
+            .map(h => document.getElementById(h.id))
+            .filter(Boolean);
+          if (fromData.length) return fromData;
+        }
+        return getDomHeadings(content);
+      };
       const start = () => {
         if (this.tracker) this.tracker.stop();
-        this.tracker = new HeadingTracker({ getHeadings: () => getDomHeadings(content), onChange: id => this.updateTracking(id) });
+        this.tracker = new HeadingTracker({ getHeadings, onChange: id => this.updateTracking(id) });
         return this.tracker.start();
       };
       if (!content || start()) return;
@@ -653,20 +662,12 @@
     }
 
     updateSidebarTracking(id) {
-      if (this.mode === 'libmap') return;
+      if (this.mode === 'libmap' || !id) return;
       const links = this.getSidebarLinks();
       if (!links.length) return;
       const file = this.volumeDocFile();
       const sameFile = a => sameDoc(nDoc(a.dataset.file || '').split('/').pop(), file);
-      const exact = id && links.find(a => sameFile(a) && a.dataset.id === id);
-      if (exact) {
-        if (!this.setActive('activeSidebarLink', exact, 'sidebar-link--active')) return;
-        expandTo(exact, this.navTree.querySelector('.sidebar-menu'));
-        return;
-      }
-      // 正文锚点存在但 sidebar 中无对应链接（index 数据未收录），保持之前的高亮
-      if (id && this.activeSidebarLink && sameFile(this.activeSidebarLink)) return;
-      const match = links.find(a => sameFile(a) && !a.dataset.id) || links.find(sameFile);
+      const match = links.find(a => sameFile(a) && a.dataset.id === id);
       if (!match) return;
       if (!this.setActive('activeSidebarLink', match, 'sidebar-link--active')) return;
       expandTo(match, this.navTree.querySelector('.sidebar-menu'));
@@ -674,14 +675,9 @@
 
     updateTocTracking(id) {
       const nav = $('#toc-desktop-nav');
-      if (!nav) return;
-      const match = id ? $$('.theme-doc-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id) : null;
-      if (match) {
-        this.setActive('activeTocLink', match, 'theme-doc-toc-desktop-link__a--active');
-      } else if (!id) {
-        this.setActive('activeTocLink', null, 'theme-doc-toc-desktop-link__a--active');
-      }
-      // 正文锚点存在但 TOC 中无对应链接时，保持之前的高亮
+      if (!nav || !id) return;
+      const match = $$('.theme-doc-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id);
+      this.setActive('activeTocLink', match, 'theme-doc-toc-desktop-link__a--active');
     }
 
     syncSidebar(id) {
