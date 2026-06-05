@@ -189,6 +189,7 @@ class ReaderApp {
         this.popup = new FootnotePopup();
         this.manifestCache = {};
         this.resizeTimer = null;
+        this.siteTitle = document.title;
     }
 
     init() {
@@ -433,7 +434,7 @@ class ReaderApp {
         this.prepareAnchors(content);
         state.doc = docPath;
         const title = parsed.querySelector('title')?.textContent?.trim();
-        document.title = title ? title + ' - MLCLASSIC' : 'MLCLASSIC';
+        document.title = title ? title + ' - ' + this.siteTitle : this.siteTitle; 
         this.updateBreadcrumb(docPath, title);
         this.fixOverflow(content);
         this.updatePrevNext(docPath);
@@ -646,7 +647,7 @@ class ReaderApp {
         $('#welcome-view').style.display = 'block';
         $('#toc-desktop').style.display = 'none';
         $('#toc-desktop-nav').innerHTML = '';
-        document.title = 'MLCLASSIC';
+        document.title = this.siteTitle;;
         state.doc = null;
         if (push) history.pushState({}, '', location.pathname);
         window.__NAV__?.reinit(null);

@@ -4,7 +4,7 @@ h1 {font-family: "黑体"; text-align:center;margin-top:0.5em;margin-bottom:1em;
 h2 {font-family: "黑体"; text-align:center;margin:1.5em auto;line-height:200%;}
 h3,h4,h5,h6 {font-family: "黑体"; text-align:center;margin:1em auto;line-height:200%;}
 table {margin:1.5em auto;max-width:100%;}
-hr {margin:1em auto;text-align:center;}
+hr {margin:1em auto;text-align:center;max-width:80%;}
 .quote,blockquote,.footnote,p.footnote div,.src {font-size: 0.75em;line-height:150%;}
 
 blockquote p {line-height:150%;}
