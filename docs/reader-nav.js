@@ -658,7 +658,16 @@
       if (!links.length) return;
       const file = this.volumeDocFile();
       const sameFile = a => sameDoc(nDoc(a.dataset.file || '').split('/').pop(), file);
-      const match = (id && links.find(a => sameFile(a) && a.dataset.id === id)) || links.find(a => sameFile(a) && !a.dataset.id) || links.find(sameFile);
+      const exact = id && links.find(a => sameFile(a) && a.dataset.id === id);
+      if (exact) {
+        if (!this.setActive('activeSidebarLink', exact, 'sidebar-link--active')) return;
+        expandTo(exact, this.navTree.querySelector('.sidebar-menu'));
+        return;
+      }
+      // 正文锚点存在但 sidebar 中无对应链接（index 数据未收录），保持之前的高亮
+      if (id && this.activeSidebarLink && sameFile(this.activeSidebarLink)) return;
+      const match = links.find(a => sameFile(a) && !a.dataset.id) || links.find(sameFile);
+      if (!match) return;
       if (!this.setActive('activeSidebarLink', match, 'sidebar-link--active')) return;
       expandTo(match, this.navTree.querySelector('.sidebar-menu'));
     }
@@ -667,7 +676,12 @@
       const nav = $('#toc-desktop-nav');
       if (!nav) return;
       const match = id ? $$('.theme-doc-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id) : null;
-      this.setActive('activeTocLink', match, 'theme-doc-toc-desktop-link__a--active');
+      if (match) {
+        this.setActive('activeTocLink', match, 'theme-doc-toc-desktop-link__a--active');
+      } else if (!id) {
+        this.setActive('activeTocLink', null, 'theme-doc-toc-desktop-link__a--active');
+      }
+      // 正文锚点存在但 TOC 中无对应链接时，保持之前的高亮
     }
 
     syncSidebar(id) {

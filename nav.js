@@ -13,7 +13,7 @@
 
   const cssEsc = v => window.CSS?.escape
     ? CSS.escape(String(v))
-    : String(v).replace('/["\]/g','\\$&');
+    : String(v).replace('/["\]/g', '\\$&');
 
   const normPath = v => String(v || '')  // 统一路径格式：去协议、去参数、去前后斜杠
     .replace(/^https?:\/\/[^/]+/i, '')
@@ -626,9 +626,16 @@
       if (!links.length) return;
       const curFile = this.volFile();
       const same = l => sameDoc((l.dataset.file || '').replace(/\.html$/i, ''), curFile);
-      const match = (id && links.find(l => same(l) && l.dataset.id === id))
-        || links.find(l => same(l) && !l.dataset.id)
-        || links.find(same);
+      const exact = id && links.find(l => same(l) && l.dataset.id === id);
+      if (exact) {
+        if (!this.setActive('activeSidebarLink', exact, 'sidebar-link--active')) return;
+        expandTo(exact, this.navTree.querySelector('.sidebar-menu'));
+        return;
+      }
+      // 正文锚点存在但 sidebar 中无对应链接（index 数据未收录），保持之前的高亮
+      if (id && this.activeSidebarLink && same(this.activeSidebarLink)) return;
+      const match = links.find(l => same(l) && !l.dataset.id) || links.find(same);
+      if (!match) return;
       if (!this.setActive('activeSidebarLink', match, 'sidebar-link--active')) return;
       expandTo(match, this.navTree.querySelector('.sidebar-menu'));
     }
@@ -637,7 +644,12 @@
       const nav = $('#toc-desktop-nav');
       if (!nav) return;
       const match = id ? $$('.theme-doc-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id) : null;
-      this.setActive('activeTocLink', match, 'theme-doc-toc-desktop-link__a--active');
+      if (match) {
+        this.setActive('activeTocLink', match, 'theme-doc-toc-desktop-link__a--active');
+      } else if (!id) {
+        this.setActive('activeTocLink', null, 'theme-doc-toc-desktop-link__a--active');
+      }
+      // 正文锚点存在但 TOC 中无对应链接时，保持之前的高亮
     }
 
     syncSidebar(id) {  // 移动端：打开 sidebar 时自动滚动到高亮项
