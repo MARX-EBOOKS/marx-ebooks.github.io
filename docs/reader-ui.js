@@ -1,6 +1,6 @@
 const C = window.ReaderCore;
 const { $, $$, esc, cssEsc, syncFill, findCollection, resolveCssHref, scrollToEl, onScrollFrame, readerHref } = C;
-const sameDocValue = C.sameDocValue;
+const sameDoc = C.sameDocValue;
 const fetchWithLowerFallback = C.fetchWithLowerFallback;
 
 const state = {
@@ -15,23 +15,22 @@ const state = {
 };
 window.ReaderState = state;
 
-function resolveDocLink(href, basePath = '') {
-    return C.resolveDocHref ? C.resolveDocHref(href, basePath) : null;
-}
+const resolveDocLink = (href, base = '') => C.resolveDocHref ? C.resolveDocHref(href, base) : null;
 
-function isFootnoteLink(a) {
+const isFootnoteLink = a => {
     const href = a.getAttribute('href') || '';
     if (!href.includes('#') || /^(https?:|\/\/)/i.test(href)) return false;
     return !!(a.closest('sup') || a.querySelector('sup'));
-}
+};
 
-function injectContentLanguage(parsed, content) {
+const injectContentLang = (parsed, content) => {
     if (!content) return;
     const lang = parsed?.documentElement?.getAttribute('lang')?.trim();
     if (lang) content.setAttribute('lang', lang);
     else content.removeAttribute('lang');
-}
+};
 
+/* ===== 脚注弹窗 ===== */
 class FootnotePopup {
     constructor() {
         this.tip = $('#fn-tooltip');
@@ -48,7 +47,6 @@ class FootnotePopup {
         const href = a.getAttribute('href') || '';
         const parsed = this.parseHref(href);
         if (!parsed) return;
-
         this.trigger = a;
         this.renderState(parsed.cross ? 'loading-cross' : 'loading');
         this.position();
@@ -67,10 +65,10 @@ class FootnotePopup {
         if (href.startsWith('#')) return { targetId: href.slice(1), pageUrl: null, cross: false };
         const i = href.indexOf('#');
         if (i < 0) return null;
-        const beforeHash = href.slice(0, i);
+        const before = href.slice(0, i);
         const targetId = href.slice(i + 1);
-        const resolved = resolveDocLink(beforeHash, state.doc ? state.doc.replace(/\/[^/]*$/, '/') : '');
-        const pageUrl = resolved?.type === 'doc' ? resolved.docPath : C.resolveUrl(beforeHash);
+        const resolved = resolveDocLink(before, state.doc ? state.doc.replace(/\/[^/]*$/, '/') : '');
+        const pageUrl = resolved?.type === 'doc' ? resolved.docPath : C.resolveUrl(before);
         return { targetId, pageUrl, cross: true };
     }
 
@@ -79,18 +77,16 @@ class FootnotePopup {
             let parsed = this.cache.get(pageUrl);
             if (!parsed) {
                 try {
-                    const controller = new AbortController();
-                    const timer = setTimeout(() => controller.abort(), 3000);
-                    const loaded = await fetchWithLowerFallback(pageUrl, { signal: controller.signal });
-                    clearTimeout(timer);
+                    const ctrl = new AbortController();
+                    const t = setTimeout(() => ctrl.abort(), 3000);
+                    const loaded = await fetchWithLowerFallback(pageUrl, { signal: ctrl.signal });
+                    clearTimeout(t);
                     const res = loaded.res;
                     if (!res.ok) return null;
                     parsed = new DOMParser().parseFromString(await res.text(), 'text/html');
                     this.cache.set(pageUrl, parsed);
                     if (loaded.path !== pageUrl) this.cache.set(loaded.path, parsed);
-                } catch {
-                    return null;
-                }
+                } catch { return null; }
             }
             const target = parsed.getElementById(targetId) || parsed.querySelector(`a[name="${cssEsc(targetId)}"]`);
             return target ? { target, block: this.toBlock(target) } : null;
@@ -103,12 +99,7 @@ class FootnotePopup {
         const notes = '.fni, .footnote, .endnote, .fn, .note';
         const blocks = 'li,dd,dt,p,blockquote,pre,figure,figcaption,table,thead,tbody,tfoot,tr,td,th,section,article,aside,div,h1,h2,h3,h4,h5,h6';
         const doc = target.ownerDocument || document;
-        const isContainer = el => {
-            if (!el || el === doc.body || el === doc.documentElement) return true;
-            return el.id === 'content' || el.id === 'main' || el.classList?.contains('prose') ||
-                el.classList?.contains('doc-content') || el.classList?.contains('doc-main') ||
-                el.classList?.contains('doc-main-inner');
-        };
+        const isContainer = el => !el || el === doc.body || el === doc.documentElement || el.id === 'content' || el.id === 'main' || /^(prose|doc-content|doc-main|doc-main-inner)$/.test(el.className);
         const usable = el => el && !isContainer(el) && (el.textContent || '').trim();
         if (target.matches?.(notes) || (target.matches?.(blocks) && usable(target))) return target;
         const block = target.closest(`${notes},${blocks}`);
@@ -121,18 +112,11 @@ class FootnotePopup {
         if (!parent) return null;
         const doc = target.ownerDocument || document;
         const frag = doc.createDocumentFragment();
-        const boundary = n => n.nodeType === 1 && (n.tagName === 'BR' ||
-            n.matches?.('li,dd,dt,p,blockquote,pre,figure,figcaption,table,thead,tbody,tfoot,tr,td,th,section,article,aside,div,h1,h2,h3,h4,h5,h6'));
-        const before = [];
-        for (let n = target.previousSibling; n; n = n.previousSibling) {
-            if (boundary(n)) break;
-            before.unshift(n);
-        }
-        const nodes = before.concat(target);
-        for (let n = target.nextSibling; n; n = n.nextSibling) {
-            if (boundary(n)) break;
-            nodes.push(n);
-        }
+        const boundary = n => n.nodeType === 1 && (n.tagName === 'BR' || n.matches?.('li,dd,dt,p,blockquote,pre,figure,figcaption,table,thead,tbody,tfoot,tr,td,th,section,article,aside,div,h1,h2,h3,h4,h5,h6'));
+        const nodes = [];
+        for (let n = target.previousSibling; n; n = n.previousSibling) { if (boundary(n)) break; nodes.unshift(n); }
+        nodes.push(target);
+        for (let n = target.nextSibling; n; n = n.nextSibling) { if (boundary(n)) break; nodes.push(n); }
         nodes.forEach(n => frag.appendChild(n.cloneNode(true)));
         return (frag.textContent || '').trim() ? frag : null;
     }
@@ -162,33 +146,26 @@ class FootnotePopup {
     renderState(type) {
         const viewer = $('.popover__body', this.tip);
         if (!viewer) return;
-        const messages = {
-            loading: '\u52a0\u8f7d\u4e2d...',
-            'loading-cross': '\u52a0\u8f7d\u8de8\u9875\u6ce8\u91ca\u4e2d...',
-            error: '\u672a\u627e\u5230\u5bf9\u5e94\u6ce8\u91ca',
-            'error-cross': '\u8de8\u9875\u6ce8\u91ca\u52a0\u8f7d\u5931\u8d25'
-        };
-        viewer.innerHTML = `<div style="color:${type.startsWith('error') ? 'var(--accent)' : 'var(--text-3)'};font-size:13px;padding:4px 0;">${messages[type]}</div>`;
+        const msgs = { loading: '\u52a0\u8f7d\u4e2d...', 'loading-cross': '\u52a0\u8f7d\u8de8\u9875\u6ce8\u91ca\u4e2d...', error: '\u672a\u627e\u5230\u5bf9\u5e94\u6ce8\u91ca', 'error-cross': '\u8de8\u9875\u6ce8\u91ca\u52a0\u8f7d\u5931\u8d25' };
+        viewer.innerHTML = `<div style="color:${type.startsWith('error') ? 'var(--accent)' : 'var(--text-3)'};font-size:13px;padding:4px 0;">${msgs[type]}</div>`;
     }
 
     position() {
         if (!this.trigger || !this.tip) return;
         const rect = this.trigger.getBoundingClientRect();
-        const tipW = 340;
-        const maxH = Math.min(320, innerHeight * 0.45);
+        const tipW = 340, maxH = Math.min(320, innerHeight * 0.45);
         let left = rect.right + 8;
         if (left + tipW > innerWidth - 12) left = Math.max(12, rect.left - tipW - 8);
-        const minTop = scrollY + 4;
-        const maxTop = scrollY + innerHeight - maxH - 4;
+        const minTop = scrollY + 4, maxTop = scrollY + innerHeight - maxH - 4;
         const rawTop = rect.top + scrollY - 10;
         this.tip.style.top = Math.min(Math.max(rawTop, minTop), Math.max(minTop, maxTop)) + 'px';
         this.tip.style.left = left + 'px';
         this.tip.style.maxHeight = maxH + 'px';
     }
 
-    dismiss(event) {
-        if (event?.type === 'keydown' && event.key !== 'Escape') return;
-        if (event?.type === 'click' && this.tip?.contains(event.target)) return;
+    dismiss(e) {
+        if (e?.type === 'keydown' && e.key !== 'Escape') return;
+        if (e?.type === 'click' && this.tip?.contains(e.target)) return;
         this.forceClose();
     }
 
@@ -206,6 +183,7 @@ class FootnotePopup {
     }
 }
 
+/* ===== 主应用 ===== */
 class ReaderApp {
     constructor() {
         this.popup = new FootnotePopup();
@@ -229,27 +207,7 @@ class ReaderApp {
         initialDoc ? this.loadDoc(initialDoc) : this.showHome(false);
     }
 
-    normalizeDocPath(path) {
-        const clean = String(path || '').replace(/#.*$/, '');
-        return clean;
-    }
-
-    docFetchPath(path) {
-        try {
-            const url = new URL(path, location.href);
-            return url.origin === location.origin ? url.pathname + url.search : url.href;
-        } catch {
-            return path;
-        }
-    }
-
-    docPathFromResponse(res, fallback) {
-        try {
-            const url = new URL(res?.url || '', location.href);
-            if (url.origin === location.origin) return url.pathname + url.search;
-        } catch { }
-        return fallback;
-    }
+    normalizeDocPath(path) { return String(path || '').replace(/#.*$/, ''); }
 
     applyTheme(theme) {
         document.documentElement.dataset.theme = theme;
@@ -280,8 +238,8 @@ class ReaderApp {
         });
     }
 
-    setIndicator(selector, active) {
-        const el = $(selector);
+    setIndicator(sel, active) {
+        const el = $(sel);
         if (!el) return;
         el.textContent = active ? '\u25cf' : '\u25cb';
         el.style.color = active ? 'var(--accent)' : 'var(--text-3)';
@@ -297,9 +255,7 @@ class ReaderApp {
             card.href = '#';
             card.dataset.section = col.id || '';
             card.dataset.path = col.path || '';
-            card.innerHTML = `<div class="card__tag">${esc(col.label)}${col.badge ? ' &middot; ' + esc(col.badge) : ''}</div>
-<div class="card__heading">${esc(col.title || col.label)}</div>
-<div class="card__body">${esc(col.desc || '\u70b9\u51fb\u67e5\u770b\u76ee\u5f55')}</div>`;
+            card.innerHTML = `<div class="card__tag">${esc(col.label)}${col.badge ? ' &middot; ' + esc(col.badge) : ''}</div><div class="card__heading">${esc(col.title || col.label)}</div><div class="card__body">${esc(col.desc || '\u70b9\u51fb\u67e5\u770b\u76ee\u5f55')}</div>`;
             grid.appendChild(card);
         });
     }
@@ -310,9 +266,8 @@ class ReaderApp {
         $('#sidebar-close-btn')?.addEventListener('click', () => this.closeSidebar());
 
         const mobileToggle = $('#mobile-menu-toggle');
-        const toggleMenu = event => {
-            event.preventDefault();
-            event.stopPropagation();
+        const toggleMenu = e => {
+            e.preventDefault(); e.stopPropagation();
             const menu = $('#mobile-menu');
             if (!menu) return;
             menu.style.position = 'fixed';
@@ -358,10 +313,7 @@ class ReaderApp {
     updateMobileMenuIndicators() {
         this.setIndicator('#mobile-remember-indicator', state.rs);
         this.setIndicator('#mobile-theme-indicator', document.documentElement.dataset.theme === 'dark');
-        ['#mobile-font-slider', '#mobile-lh-slider'].forEach(sel => {
-            const el = $(sel);
-            if (el) syncFill(el);
-        });
+        ['#mobile-font-slider', '#mobile-lh-slider'].forEach(sel => { const el = $(sel); if (el) syncFill(el); });
     }
 
     handleResize() {
@@ -381,24 +333,12 @@ class ReaderApp {
         }, 300);
     }
 
-    toggleSidebar() {
-        state.sb = !state.sb;
-        this.applySidebar();
-    }
-
-    openSidebar() {
-        state.sb = true;
-        this.applySidebar();
-    }
-
-    closeSidebar() {
-        state.sb = false;
-        this.applySidebar();
-    }
+    toggleSidebar() { state.sb = !state.sb; this.applySidebar(); }
+    openSidebar() { state.sb = true; this.applySidebar(); }
+    closeSidebar() { state.sb = false; this.applySidebar(); }
 
     applySidebar() {
-        const sidebar = $('#lsidebar');
-        const backdrop = $('#sidebar-backdrop');
+        const sidebar = $('#lsidebar'), backdrop = $('#sidebar-backdrop');
         if (!sidebar) return;
         const mobile = innerWidth < 997;
         if (mobile) {
@@ -414,25 +354,15 @@ class ReaderApp {
         }
     }
 
-    clearDynamicStyles() {
-        $$('.dynamic-doc-css, .dynamic-doc-style, .dynamic-doc-base').forEach(el => el.remove());
-    }
+    clearDynamicStyles() { $$('.dynamic-doc-css, .dynamic-doc-style, .dynamic-doc-base').forEach(el => el.remove()); }
 
     async loadCollectionStyles(docPath) {
         const col = findCollection(docPath);
         for (const css of col?.stylesheets || []) {
             const base = (col.basePath || col.basepath || `/${col.id}/`).replace(/^\/+/, '');
-            const link = Object.assign(document.createElement('link'), {
-                rel: 'stylesheet',
-                type: 'text/css',
-                className: 'dynamic-doc-css',
-                href: resolveCssHref(css, base)
-            });
+            const link = Object.assign(document.createElement('link'), { rel: 'stylesheet', type: 'text/css', className: 'dynamic-doc-css', href: resolveCssHref(css, base) });
             document.head.insertBefore(link, document.head.firstChild);
-            await new Promise(resolve => {
-                link.onload = link.onerror = resolve;
-                setTimeout(resolve, 800);
-            });
+            await new Promise(resolve => { link.onload = link.onerror = resolve; setTimeout(resolve, 800); });
         }
     }
 
@@ -443,11 +373,12 @@ class ReaderApp {
         await this.loadCollectionStyles(docPath);
         this.updateBreadcrumb(docPath, null);
         try {
-            const loaded = await fetchWithLowerFallback(this.docFetchPath(docPath));
+            const loaded = await fetchWithLowerFallback(docPath);
             const res = loaded.res;
             if (!res.ok) throw new Error(String(res.status));
             const html = await res.text();
-            this.renderDoc(html, this.normalizeDocPath(this.docPathFromResponse(res, loaded.path || docPath)));
+            const actualPath = this.normalizeDocPath(loaded.path || docPath);
+            this.renderDoc(html, actualPath);
             this.revealLoadedContent();
         } catch (error) {
             this.showError(docPath, error.message);
@@ -497,7 +428,7 @@ class ReaderApp {
         this.injectDocStyles(parsed, base);
         this.rewriteDocUrls(parsed, base);
         const content = $('#content');
-        injectContentLanguage(parsed, content);
+        injectContentLang(parsed, content);
         content.innerHTML = (parsed.body.querySelector('div.prose#content') || parsed.body).innerHTML;
         this.prepareAnchors(content);
         state.doc = docPath;
@@ -524,8 +455,7 @@ class ReaderApp {
         $$('.dynamic-doc-style').forEach(el => el.remove());
         parsed.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
             const href = link.getAttribute('href');
-            if (!href) return;
-            if (/\/?reader\.css(?:[?#].*)?$/i.test(href)) return;
+            if (!href || /\/?reader\.css(?:[?#].*)?$/i.test(href)) return;
             const el = link.cloneNode(false);
             el.classList.add('dynamic-doc-style');
             document.head.appendChild(el);
@@ -607,8 +537,7 @@ class ReaderApp {
     }
 
     async updatePrevNext(path) {
-        const prev = $('#prev-btn');
-        const next = $('#next-btn');
+        const prev = $('#prev-btn'), next = $('#next-btn');
         [prev, next].forEach(btn => { if (btn) btn.style.display = 'none'; });
         const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
         const file = path.split('/').pop();
@@ -626,16 +555,12 @@ class ReaderApp {
 
     async findManifest(path, dir) {
         const col = findCollection(path);
-        const candidates = [...new Set([
-            dir,
-            (col?.path || col?.basePath || '').replace(/^\/+|\/+$/g, ''),
-            location.pathname.split('/').slice(1, -1).join('/')
-        ].filter(Boolean))];
-        for (const candidate of candidates) {
+        const candidates = [...new Set([dir, (col?.path || col?.basePath || '').replace(/^\/+|\/+$/g, ''), location.pathname.split('/').slice(1, -1).join('/')].filter(Boolean))];
+        for (const c of candidates) {
             try {
-                const raw = await C.fetchVolData(candidate, this.manifestCache);
+                const raw = await C.fetchVolData(c, this.manifestCache);
                 const items = Array.isArray(raw) ? raw : raw?.files;
-                if (items?.length) return { items, dir: candidate };
+                if (items?.length) return { items, dir: c };
             } catch { }
         }
         return null;
@@ -648,7 +573,7 @@ class ReaderApp {
             const f = item.file || item.path || item.url || item.filename || '';
             const src = item.source_file || item.filename || '';
             const candidates = [f, src, f.split('/').pop(), src.split('/').pop()].map(x => x.replace(/\.html(?:#.*)?$/i, ''));
-            return sameDocValue(f, path) || sameDocValue(f, file) || candidates.some(candidate => sameDocValue(candidate, cleanPath) || sameDocValue(candidate, cleanFile));
+            return sameDoc(f, path) || sameDoc(f, file) || candidates.some(c => sameDoc(c, cleanPath) || sameDoc(c, cleanFile));
         });
     }
 
@@ -664,14 +589,14 @@ class ReaderApp {
         const [, prefix, number, ext] = match;
         const make = n => [dir, prefix + String(n).padStart(number.length, '0') + ext].filter(Boolean).join('/');
         const current = parseInt(number, 10);
-        const tryButton = async (btn, path, kind) => {
+        const tryBtn = async (btn, p, kind) => {
             try {
-                const { res, path: loadedPath } = await fetchWithLowerFallback(path, { method: 'HEAD', mode: 'same-origin' });
-                if (res.ok) this.setupPagination(btn, loadedPath, null, kind);
+                const { res, path: lp } = await fetchWithLowerFallback(p, { method: 'HEAD', mode: 'same-origin' });
+                if (res.ok) this.setupPagination(btn, lp, null, kind);
             } catch { }
         };
-        if (current > 1) tryButton(prev, make(current - 1), 'prev');
-        tryButton(next, make(current + 1), 'next');
+        if (current > 1) tryBtn(prev, make(current - 1), 'prev');
+        tryBtn(next, make(current + 1), 'next');
     }
 
     setupPagination(btn, path, title, kind) {
@@ -680,18 +605,15 @@ class ReaderApp {
         const dir = $('.pagination-link__dir', btn);
         btn.style.display = 'flex';
         if (dir) dir.textContent = kind === 'prev' ? '\u2190 Previous' : 'Next \u2192';
-        const setTitle = value => {
-            const text = value && value.length > 40 ? value.slice(0, 39) + '\u2026' : (value || '');
-            if (label) {
-                label.textContent = text;
-                label.title = value || '';
-            }
+        const setTitle = v => {
+            const text = v && v.length > 40 ? v.slice(0, 39) + '\u2026' : (v || '');
+            if (label) { label.textContent = text; label.title = v || ''; }
         };
         setTitle(title);
         if (!title) {
             fetchWithLowerFallback(path.split('#')[0]).then(({ res }) => res.text()).then(html => {
                 setTitle(new DOMParser().parseFromString(html, 'text/html').querySelector('title')?.textContent?.trim());
-            }).catch(() => {});
+            }).catch(() => { });
         }
         btn.onclick = e => {
             e.preventDefault();
@@ -716,17 +638,9 @@ class ReaderApp {
         this.popup.forceClose();
         window.__PAGE_BAR__?.reset?.();
         const skeleton = $('#doc-skeleton');
-        if (skeleton) {
-            skeleton.classList.remove('active');
-            skeleton.style.display = 'none';
-            skeleton.style.opacity = '1';
-        }
+        if (skeleton) { skeleton.classList.remove('active'); skeleton.style.display = 'none'; skeleton.style.opacity = '1'; }
         const content = $('#content');
-        if (content) {
-            content.innerHTML = '';
-            content.style.display = 'block';
-            content.style.opacity = '1';
-        }
+        if (content) { content.innerHTML = ''; content.style.display = 'block'; content.style.opacity = '1'; }
         $('#doc-footer').style.display = 'none';
         $('#article-view').style.display = 'none';
         $('#welcome-view').style.display = 'block';
@@ -741,11 +655,9 @@ class ReaderApp {
 
     handlePopState() {
         const docPath = this.normalizeDocPath(new URLSearchParams(location.search).get('doc') || '');
-        if (!docPath) {
-            this.showHome(false);
-        } else if (!sameDocValue(docPath, state.doc)) {
-            this.loadDoc(docPath);
-        } else if (location.hash) {
+        if (!docPath) this.showHome(false);
+        else if (!sameDoc(docPath, state.doc)) this.loadDoc(docPath);
+        else if (location.hash) {
             const hash = location.hash.slice(1);
             const el = document.getElementById(hash) || document.querySelector(`[name="${cssEsc(hash)}"]`);
             if (!window.__PAGE_BAR__?.highlightPageAnchor(hash) && el) scrollToEl(el);
@@ -754,8 +666,7 @@ class ReaderApp {
 
     handleDocumentClick(event) {
         const target = event.target.nodeType === 1 ? event.target : event.target.parentElement;
-        const menu = $('#mobile-menu');
-        const toggle = $('#mobile-menu-toggle');
+        const menu = $('#mobile-menu'), toggle = $('#mobile-menu-toggle');
         const a = target?.closest('a');
         if (!a) {
             if (menu && !menu.contains(target) && !toggle?.contains(target)) menu.classList.remove('dropdown--open');
@@ -788,21 +699,17 @@ class ReaderApp {
             this.scrollToAnchor(href.slice(1), false);
             return;
         }
-        const resolvedDoc = resolveDocLink(href, state.doc ? state.doc.replace(/\/[^/]*$/, '/') : '');
-        if (resolvedDoc?.type === 'doc') {
+        const resolved = resolveDocLink(href, state.doc ? state.doc.replace(/\/[^/]*$/, '/') : '');
+        if (resolved?.type === 'doc') {
             event.preventDefault();
-            if (sameDocValue(resolvedDoc.docPath, state.doc)) {
-                if (resolvedDoc.hash) this.scrollToAnchor(resolvedDoc.hash, true);
-                else if (!this.rememberScrollEnabled()) this.scrollToTop(resolvedDoc.href, true);
+            if (sameDoc(resolved.docPath, state.doc)) {
+                if (resolved.hash) this.scrollToAnchor(resolved.hash, true);
+                else this.scrollToTop(resolved.href, true);
                 return;
             }
-            history.pushState({}, '', resolvedDoc.href);
-            this.loadDoc(resolvedDoc.docPath);
+            history.pushState({}, '', resolved.href);
+            this.loadDoc(resolved.docPath);
         }
-    }
-
-    rememberScrollEnabled() {
-        return state.rs !== false;
     }
 
     scrollToTop(href, push) {
@@ -843,8 +750,7 @@ class ReaderApp {
         }
         clearTimeout(this.noticeTimer);
         notice.textContent = message;
-        notice.style.cssText = `
-position:fixed!important;left:50%!important;bottom:24px!important;transform:translateX(-50%) translateY(12px)!important;max-width:min(420px,calc(100vw - 32px))!important;padding:10px 14px!important;border:1px solid var(--border)!important;border-radius:10px!important;background:var(--bg-card)!important;color:${options.type === 'error' ? 'var(--accent)' : 'var(--text)'}!important;box-shadow:var(--shadow-md)!important;font:13px/1.5 var(--font-ui)!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;opacity:0!important;pointer-events:none!important;z-index:900!important;transition:opacity 160ms ease,transform 160ms ease!important;`;
+        notice.style.cssText = `position:fixed!important;left:50%!important;bottom:24px!important;transform:translateX(-50%) translateY(12px)!important;max-width:min(420px,calc(100vw - 32px))!important;padding:10px 14px!important;border:1px solid var(--border)!important;border-radius:10px!important;background:var(--bg-card)!important;color:${options.type === 'error' ? 'var(--accent)' : 'var(--text)'}!important;box-shadow:var(--shadow-md)!important;font:13px/1.5 var(--font-ui)!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;opacity:0!important;pointer-events:none!important;z-index:900!important;transition:opacity 160ms ease,transform 160ms ease!important;`;
         requestAnimationFrame(() => {
             notice.style.setProperty('opacity', '1', 'important');
             notice.style.setProperty('transform', 'translateX(-50%) translateY(0)', 'important');

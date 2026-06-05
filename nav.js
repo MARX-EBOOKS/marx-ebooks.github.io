@@ -1,47 +1,45 @@
 (function () {
   'use strict';
 
-  class EventBag {
-    constructor() { this.off = []; }
-    on(target, type, handler, options) {
-      if (!target) return () => {};
-      target.addEventListener(type, handler, options || false);
-      const cleanup = () => target.removeEventListener(type, handler, options || false);
-      this.off.push(cleanup);
-      return cleanup;
-    }
-    clear() { while (this.off.length) this.off.pop()(); }
-  }
+  /* 工具函数 */
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-  const $ = (selector, root = document) => root.querySelector(selector);
-  const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
-  const esc = value => String(value ?? '')
+  const esc = v => String(v ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-  const cssEsc = value => (window.CSS?.escape ? CSS.escape(String(value)) : String(value).replace(/["\\]/g, '\\$&'));
-  const normalizePath = value => String(value || '')
+
+  const cssEsc = v => window.CSS?.escape
+    ? CSS.escape(String(v))
+    : String(v).replace('/["\]/g','\\$&');
+
+  const normPath = v => String(v || '')  // 统一路径格式：去协议、去参数、去前后斜杠
     .replace(/^https?:\/\/[^/]+/i, '')
     .replace(/[?#].*$/, '')
     .replace(/^\/+/, '')
     .replace(/\/+$/, '');
-  const normalizeDoc = value => normalizePath(value).replace(/\.html$/i, '');
-  const normalizeLowerPath = value => normalizePath(value).toLowerCase();
-  const sameDocValue = (a, b) => {
-    const left = normalizeDoc(a);
-    const right = normalizeDoc(b);
-    return left === right || left.toLowerCase() === right.toLowerCase();
+
+  const normDoc = v => normPath(v).replace(/\.html$/i, '');
+
+  const sameDoc = (a, b) => {  // 比较两路径是否指向同一文档（忽略大小写和 .html）
+    const l = normDoc(a), r = normDoc(b);
+    return l === r || l.toLowerCase() === r.toLowerCase();
   };
-  const resolveUrl = href => { try { return new URL(href, location.href).href; } catch { return href; } };
-  const hasSelection = () => {
-    const selection = document.getSelection();
-    return !!(selection && !selection.isCollapsed && selection.rangeCount);
+
+  const resolveUrl = h => { try { return new URL(h, location.href).href; } catch { return h; } };
+
+  const hasSel = () => {
+    const s = document.getSelection();
+    return !!(s && !s.isCollapsed && s.rangeCount);
   };
-  const scrollToEl = (el, offset = 80, behavior = 'smooth') => {
+
+  const scrollToEl = (el, off = 80, beh = 'smooth') => {
     if (!el) return;
-    window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + scrollY - offset), behavior });
+    window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + scrollY - off), behavior: beh });
   };
+
   const syncFill = el => {
     if (!el) return;
     const min = parseFloat(el.min) || 0;
@@ -50,48 +48,56 @@
     el.style.setProperty('--_fill', (((val - min) / (max - min)) * 100).toFixed(2) + '%');
   };
 
-  const scrollCallbacks = new Set();
+  /* 滚动帧回调 */
+  const scrollCbs = new Set();
   let scrollFrame = 0;
   window.addEventListener('scroll', () => {
     if (!scrollFrame) scrollFrame = requestAnimationFrame(() => {
       scrollFrame = 0;
-      scrollCallbacks.forEach(fn => fn());
+      scrollCbs.forEach(fn => fn());
     });
   }, { passive: true });
-  const onScrollFrame = fn => {
-    scrollCallbacks.add(fn);
-    return () => scrollCallbacks.delete(fn);
-  };
+  const onScrollFrame = fn => { scrollCbs.add(fn); return () => scrollCbs.delete(fn); };  // 注册/注销滚动帧回调
 
-  function getDomHeadings(container) {
-    return container ? $$('h1,h2,h3,h4,h5,h6', container).filter(h => h.id) : [];
-  }
+  /* DOM 辅助 */
+  const getHeadings = c => c ? $$('h1,h2,h3,h4,h5,h6', c).filter(h => h.id) : [];  // 提取带 id 的标题
 
-  function buildHeadingTree(headings) {
+  function buildTree(items) {  // 按 heading level 构建嵌套树
     const root = { level: 0, children: [] };
     const stack = [root];
-    headings.forEach(item => {
-      const node = { ...item, children: [] };
-      while (stack.length > 1 && stack[stack.length - 1].level >= item.level) stack.pop();
-      stack[stack.length - 1].children.push(node);
-      stack.push(node);
+    items.forEach(it => {
+      const n = { ...it, children: [] };
+      while (stack.length > 1 && stack[stack.length - 1].level >= it.level) stack.pop();
+      stack[stack.length - 1].children.push(n);
+      stack.push(n);
     });
     return root.children;
   }
 
-  function expandTo(el, container) {
-    if (!el || !container) return;
-    let parent = el.closest('li');
-    while (parent && container.contains(parent)) {
-      if (parent.classList.contains('sidebar-item--collapsible')) {
-        parent.setAttribute('data-collapsed', 'false');
-        const caret = $('.sidebar-caret', parent);
-        if (caret) caret.textContent = '\u25be';
+  function expandTo(el, container) {  // 沿 DOM 向上展开所有折叠的 sidebar 父项
+    for (let li = el?.closest('li'); li && container.contains(li); li = li.parentElement?.closest('.sidebar-item')) {
+      if (li.classList.contains('sidebar-item--collapsible')) {
+        li.setAttribute('data-collapsed', 'false');
+        const c = $('.sidebar-caret', li);
+        if (c) c.textContent = '\u25be';
       }
-      parent = parent.parentElement?.closest('.sidebar-item');
     }
   }
 
+  /* EventBag */
+  class EventBag {
+    constructor() { this.off = []; }
+    on(target, type, handler, options) {  // 绑定事件并自动收集清理函数
+      if (!target) return () => { };
+      target.addEventListener(type, handler, options || false);
+      const cleanup = () => target.removeEventListener(type, handler, options || false);
+      this.off.push(cleanup);
+      return cleanup;
+    }
+    clear() { while (this.off.length) this.off.pop()(); }
+  }
+
+  /* HeadingTracker */
   class HeadingTracker {
     constructor({ getHeadings, onChange, threshold = 200 }) {
       this.getHeadings = getHeadings;
@@ -104,26 +110,27 @@
       this.frame = 0;
       this.offScroll = null;
     }
+
     start() {
       this.stop();
       this.headings = this.getHeadings();
       if (!this.headings.length) return false;
       this.measure();
-      // 标题位置会受图片、字体和窗口尺寸影响，所以启动后仍要延迟重测一次。
-      const queueMeasure = () => {
+      const queue = () => {
         if (!this.frame) this.frame = requestAnimationFrame(() => {
           this.frame = 0;
           this.measure();
           this.track(true);
         });
       };
-      this.bag.on(window, 'resize', queueMeasure, { passive: true });
-      this.bag.on(window, 'load', queueMeasure, { once: true });
-      setTimeout(queueMeasure, 500);
+      this.bag.on(window, 'resize', queue, { passive: true });
+      this.bag.on(window, 'load', queue, { once: true });
+      setTimeout(queue, 500);
       this.offScroll = onScrollFrame(() => this.track(false));
       this.track(true);
       return true;
     }
+
     stop() {
       this.bag.clear();
       if (this.offScroll) this.offScroll();
@@ -134,44 +141,37 @@
       this.tops = [];
       this.activeId = null;
     }
-    measure() {
-      this.tops = this.headings.map(h => h.getBoundingClientRect().top + scrollY);
-    }
+
+    measure() { this.tops = this.headings.map(h => h.getBoundingClientRect().top + scrollY); }
+
     track(force) {
-      if (hasSelection()) return;
+      if (hasSel()) return;
       const id = this.pick();
-      if (force || id !== this.activeId) {
-        this.activeId = id;
-        this.onChange(id);
-      }
+      if (force || id !== this.activeId) { this.activeId = id; this.onChange(id); }
     }
-    pick() {
+
+    pick() {  // 二分查找当前视口对应的最近标题
       if (!this.tops.length) return this.headings[0]?.id || null;
       const y = scrollY + this.threshold;
-      // 用二分查找找到当前阅读位置之前的最后一个标题，避免滚动时反复线性扫描。
-      let lo = 0;
-      let hi = this.tops.length - 1;
-      let best = 0;
+      let lo = 0, hi = this.tops.length - 1, best = 0;
       while (lo <= hi) {
         const mid = (lo + hi) >> 1;
-        if (this.tops[mid] <= y) {
-          best = mid;
-          lo = mid + 1;
-        } else {
-          hi = mid - 1;
-        }
+        if (this.tops[mid] <= y) { best = mid; lo = mid + 1; }
+        else { hi = mid - 1; }
       }
       return this.headings[best]?.id || null;
     }
   }
 
+  /* ReaderCore 暴露 */
   const ReaderCore = window.ReaderCore || {
     $, $$, esc, cssEsc, EventBag, HeadingTracker,
-    normalizePath, normalizeDoc, resolveUrl, hasSelection,
-    scrollToEl, syncFill, onScrollFrame, getDomHeadings, buildHeadingTree, expandTo
+    normalizePath: normPath, normalizeDoc: normDoc, resolveUrl, hasSelection: hasSel,
+    scrollToEl, syncFill, onScrollFrame, getDomHeadings: getHeadings, buildHeadingTree: buildTree, expandTo
   };
   Object.assign(window, { ReaderCore, $, $$, esc, syncFill, onScrollFrame });
 
+  /* MenuManager */
   class MenuManager {
     constructor() {
       this.sidebar = null;
@@ -189,68 +189,59 @@
       this.waitObserver = null;
       this.fadeObserver = null;
       this.lastWidth = innerWidth;
-      this.suppressTrackingUntil = 0;
+      this.suppressUntil = 0;
     }
 
-    async init() {
+    async init() {  // 初始化：绑定事件 → 加载 libmap → 构建菜单 → 初始化源目录
       this.sidebar = $('#lsidebar');
       this.backdrop = $('#sidebar-backdrop');
       this.navTree = $('#nav-tree');
       if (!this.sidebar || !this.navTree) return;
-      this.bindChrome();
-      this.bindDelegatedEvents();
+      this.bindEvents();
       if (!window.LIBRARY_CONFIG?.length) await this.loadLibmap();
       await this.buildMenu();
       this.initSourceToc();
     }
 
-    bindChrome() {
+    bindEvents() {
       $('#sidebar-toggle')?.addEventListener('click', () => this.toggle());
       this.backdrop?.addEventListener('click', () => this.close());
       $('#sidebar-close-btn')?.addEventListener('click', () => this.close());
       window.addEventListener('resize', () => this.handleResize(), { passive: true });
-    }
-
-    bindDelegatedEvents() {
-      this.navTree.addEventListener('click', e => this.handleClick(e));
+      this.navTree.addEventListener('click', e => this.onTreeClick(e));
       this.navTree.addEventListener('keydown', e => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
-        const target = e.target.closest('.sidebar-caret, .sidebar-category-label');
-        if (!target || target.closest('a')) return;
+        const t = e.target.closest('.sidebar-caret, .sidebar-category-label');
+        if (!t || t.closest('a')) return;
         e.preventDefault();
-        this.toggleItem(target.closest('.sidebar-item--collapsible'));
+        this.toggleItem(t.closest('.sidebar-item--collapsible'));
       });
     }
 
     async handleResize() {
-      const width = innerWidth;
-      if ((this.lastWidth < 997 && width >= 997) || (this.lastWidth >= 997 && width < 997)) {
-        this.lastWidth = width;
-        await this.buildMenu();
-        this.syncSidebar(this.activeHeadingId);
-      } else {
-        this.lastWidth = width;
-      }
+      const w = innerWidth;
+      const crossed = (this.lastWidth < 997 && w >= 997) || (this.lastWidth >= 997 && w < 997);
+      this.lastWidth = w;
+      if (crossed) { await this.buildMenu(); this.syncSidebar(this.activeHeadingId); }
     }
 
-    async buildMenu() {
-      this.cleanupRender();
+    async buildMenu() {  // 检测当前卷册 → 按场景渲染 epub/page-toc/libmap 菜单
+      this.cleanup();
       this.currentVol = this.detectVolume();
-      // 先判断是否在某个卷册内；否则移动端优先显示本页目录，桌面/首页显示总目录。
       if (this.currentVol) {
         this.mode = 'epub';
-        await this.renderEpubMenu();
-      } else if (innerWidth < 997 && getDomHeadings($('#content')).length > 1 && !this.isHomePage()) {
+        await this.renderEpub();
+      } else if (innerWidth < 997 && getHeadings($('#content')).length > 1 && !this.isHome()) {
         this.mode = 'page-toc';
-        this.renderPageTocMenu();
+        this.renderPageToc();
       } else {
         this.mode = 'libmap';
-        this.renderLibmapMenu();
+        this.renderLibmap();
       }
-      this.afterRender();
+      this.afterBuild();
     }
 
-    cleanupRender() {
+    cleanup() {  // 清理 tracker、observer、缓存等状态，防止内存泄漏
       if (this.tracker) this.tracker.stop();
       this.tracker = null;
       if (this.waitObserver) this.waitObserver.disconnect();
@@ -264,69 +255,61 @@
       this.linkCache = null;
     }
 
-    afterRender() {
-      this.highlightCurrent();
-      this.renderTocRail();
-      this.startTracking();
-      this.initBreadcrumbFade();
+    afterBuild() {
+      this.highlight();
+      this.renderToc();
+      this.startTrack();
+      this.initFade();
     }
 
-    isHomePage() {
-      const page = location.pathname.split('/').pop().toLowerCase();
-      return !page || page === 'index.html' || page === 'nav.html';
+    isHome() {
+      const p = location.pathname.split('/').pop().toLowerCase();
+      return !p || p === 'index.html' || p === 'nav.html';
     }
 
-    currentVolumePath() {
-      const current = normalizePath(location.pathname);
-      if (this.currentVol && current === this.currentVol.dir) return this.currentVol.dir + '/index.html';
-      return current;
+    volPath() {
+      const c = normPath(location.pathname);
+      if (this.currentVol && c === this.currentVol.dir) return this.currentVol.dir + '/index.html';
+      return c;
     }
 
-    isCurrentVolumeDir() {
-      const current = normalizePath(location.pathname);
+    volDir() {
+      const c = normPath(location.pathname);
       if (!this.currentVol) return false;
-      const dir = this.currentVol.dir;
-      const indexPath = dir + '/index.html';
-      return current === dir || current === indexPath;
+      const d = this.currentVol.dir, i = d + '/index.html';
+      return c === d || c === i;
     }
 
-    currentVolumeFile() {
-      return this.currentVolumePath().split('/').pop().replace(/\.html$/i, '') || 'index';
+    volFile() {
+      return this.volPath().split('/').pop().replace(/\.html$/i, '') || 'index';
     }
 
-    handleClick(e) {
-      const target = e.target.nodeType === 1 ? e.target : e.target.parentElement;
-      const expand = target?.closest('a[data-expand-section]');
-      if (expand) {
-        e.preventDefault();
-        this.expandSection(expand.dataset.expandSection);
-        return;
-      }
-      const toggle = target?.closest('.sidebar-caret, .sidebar-category-label');
+    /* 点击处理 */
+    onTreeClick(e) {
+      const t = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+      const ex = t?.closest('a[data-expand-section]');
+      if (ex) { e.preventDefault(); this.expandSection(ex.dataset.expandSection); return; }
+      const toggle = t?.closest('.sidebar-caret, .sidebar-category-label');
       if (toggle && !toggle.closest('a')) {
         e.preventDefault();
         e.stopPropagation();
         this.toggleItem(toggle.closest('.sidebar-item--collapsible'));
         return;
       }
-      const link = target?.closest('.sidebar-link');
+      const link = t?.closest('.sidebar-link');
       if (!link) return;
       const href = link.getAttribute('href') || '';
-      if (href.startsWith('#')) {
-        e.preventDefault();
-        this.scrollToHash(href.slice(1));
-      } else {
-        try {
-          const url = new URL(href, location.href);
-          if (url.pathname === location.pathname && url.hash) {
-            e.preventDefault();
-            this.scrollToHash(url.hash.slice(1));
-          } else if (url.pathname === location.pathname && url.search === location.search && !url.hash) {
-            e.preventDefault();
-            if (!this.rememberScrollEnabled()) this.scrollToTop(url);
-          }
-        } catch { }
-      }
+      if (href.startsWith('#')) { e.preventDefault(); this.scrollToHash(href.slice(1)); return; }
+      try {
+        const url = new URL(href, location.href);
+        if (url.pathname === location.pathname && url.hash) {
+          e.preventDefault();
+          this.scrollToHash(url.hash.slice(1));
+        } else if (sameDoc(url.pathname, location.pathname) && url.search === location.search && !url.hash) {
+          e.preventDefault();
+          this.scrollToTop(url);
+        }
+      } catch { }
     }
 
     toggleItem(item) {
@@ -334,20 +317,19 @@
       if (item.dataset.section && !item.dataset.loaded) this.loadSection(item);
       const collapsed = item.getAttribute('data-collapsed') !== 'false';
       item.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
-      const caret = $('.sidebar-caret', item);
-      if (caret) caret.textContent = collapsed ? '\u25be' : '\u25b8';
+      const c = $('.sidebar-caret', item);
+      if (c) c.textContent = collapsed ? '\u25be' : '\u25b8';
     }
 
     loadSection(item) {
       const col = (window.LIBRARY_CONFIG || []).find(c => c.id === item.dataset.section);
       if (!col) return;
-      const html = (col.groups || []).map(group => this.renderGroup(group)).join('');
-      if (html) {
-        const ul = document.createElement('ul');
-        ul.className = 'sidebar-menu sidebar-menu--nested';
-        ul.innerHTML = html;
-        item.appendChild(ul);
-      }
+      const html = (col.groups || []).map(g => this.renderGroup(g)).join('');
+      if (!html) return;
+      const ul = document.createElement('ul');
+      ul.className = 'sidebar-menu sidebar-menu--nested';
+      ul.innerHTML = html;
+      item.appendChild(ul);
       item.dataset.loaded = 'true';
     }
 
@@ -361,192 +343,179 @@
     scrollToHash(hash) {
       const el = document.getElementById(hash) || document.querySelector(`[name="${cssEsc(hash)}"]`);
       if (!el) return;
-      this.suppressTrackingUntil = Date.now() + 900;
+      this.suppressUntil = Date.now() + 900;
       scrollToEl(el, 80, 'auto');
       this.tracker?.measure?.();
       if (this.tracker) this.tracker.activeId = hash;
-      this.updateTracking(hash);
+      this.updateTrack(hash);
       history.replaceState({}, '', '#' + hash);
     }
 
     scrollToTop(url = location) {
-      this.suppressTrackingUntil = Date.now() + 900;
+      this.suppressUntil = Date.now() + 900;
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
       this.tracker?.measure?.();
-      history.replaceState({}, '', url.pathname + url.search);
+      history.replaceState({}, '', location.pathname + location.search);
     }
 
-    rememberScrollEnabled() {
-      return localStorage.rememberScroll !== 'false';
-    }
-
-    detectVolume() {
-      const current = normalizePath(location.pathname);
-      const currentLower = current.toLowerCase();
-      const matchPath = path => {
+    /* 卷册检测 */
+    detectVolume() {  // 遍历 LIBRARY_CONFIG 找到当前路径所属的最深层卷册
+      const cur = normPath(location.pathname), curL = cur.toLowerCase();
+      const match = path => {
         if (!path || /^https?:/i.test(path)) return null;
-        const itemPath = normalizePath(path);
-        if (!/\/index\.html$/i.test(itemPath)) return null;
-        const dir = itemPath.replace(/\/index\.html$/i, '');
-        const dirLower = dir.toLowerCase();
-        return (currentLower === itemPath.toLowerCase() || currentLower === dirLower || currentLower.startsWith(dirLower + '/')) ? dir : null;
+        const p = normPath(path);
+        if (!/\/index\.html$/i.test(p)) return null;
+        const d = p.replace(/\/index\.html$/i, '');
+        const dl = d.toLowerCase();
+        return (curL === p.toLowerCase() || curL === dl || curL.startsWith(dl + '/')) ? d : null;
       };
       let best = null;
       const consider = (col, group, item, dir) => {
         if (dir && (!best || dir.length > best.dir.length)) best = { col, group, item, dir };
       };
       for (const col of window.LIBRARY_CONFIG || []) {
-        consider(col, null, col, matchPath(col.path));
-        for (const group of col.groups || []) {
-          consider(col, group, group, matchPath(group.path));
-          for (const item of group.items || []) {
-            consider(col, group, item, matchPath(item.path));
-          }
+        consider(col, null, col, match(col.path));
+        for (const g of col.groups || []) {
+          consider(col, g, g, match(g.path));
+          for (const it of g.items || []) consider(col, g, it, match(it.path));
         }
       }
       return best;
     }
 
-    async renderEpubMenu() {
-      const data = await this.fetchVolumeData(this.currentVol.dir);
+    /* 菜单渲染 */
+    async renderEpub() {  // 加载卷册数据并渲染面包屑 + 章节树 + 总目录
+      const data = await this.fetchVolData(this.currentVol.dir);
       if (!data) {
-        if (this.isCurrentVolumeDir()) {
-          this.mode = 'libmap';
-          this.renderLibmapMenu();
-          return;
-        }
+        if (this.volDir()) { this.mode = 'libmap'; this.renderLibmap(); return; }
         this.mode = innerWidth < 997 ? 'page-toc' : 'libmap';
-        this.mode === 'page-toc' ? this.renderPageTocMenu() : this.renderLibmapMenu();
+        this.mode === 'page-toc' ? this.renderPageToc() : this.renderLibmap();
         return;
       }
       this.currentVol.data = data;
       const { col, item } = this.currentVol;
       const parts = [{ text: col.label, href: this.sitePath(col.path), expand: col.id }];
       if (item !== col) {
-        parts.push({ text: item.label || item.title || data.title || 'Contents', href: this.sitePath(item.path || (this.currentVol.dir + '/index.html')) });
+        parts.push({
+          text: item.label || item.title || data.title || 'Contents',
+          href: this.sitePath(item.path || (this.currentVol.dir + '/index.html'))
+        });
       }
       this.navTree.innerHTML =
         this.renderBreadcrumb(parts) +
-        this.renderSidebarTree(buildHeadingTree(data.headings || []), 'epub-toc') +
+        this.renderTree(buildTree(data.headings || []), 'epub-toc') +
         '<div class="section-divider"><span>All works</span></div>' +
-        this.buildLibmapHtml();
+        this.buildLibmap();
     }
 
-    renderPageTocMenu() {
-      const headings = getDomHeadings($('#content'));
-      if (headings.length <= 1) {
-        this.mode = 'libmap';
-        this.renderLibmapMenu();
-        return;
-      }
-      const col = this.findCollectionByPath();
-      const nodes = headings.map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id, file: location.pathname.split('/').pop() }));
+    renderPageToc() {
+      const headings = getHeadings($('#content'));
+      if (headings.length <= 1) { this.mode = 'libmap'; this.renderLibmap(); return; }
+      const col = this.findCollection();
+      const nodes = headings.map(h => ({
+        level: Number(h.tagName[1]) || 2,
+        text: h.textContent.trim(),
+        id: h.id,
+        file: location.pathname.split('/').pop()
+      }));
       this.navTree.innerHTML =
         this.renderBreadcrumb([
           { text: col?.label || 'Library', href: col?.path ? this.sitePath(col.path) : '#', expand: col?.id },
           { text: nodes[0]?.text || document.title }
         ]) +
-        this.renderSidebarTree(buildHeadingTree(nodes), 'page-toc') +
+        this.renderTree(buildTree(nodes), 'page-toc') +
         '<div class="section-divider"><span>All works</span></div>' +
-        this.buildLibmapHtml();
+        this.buildLibmap();
     }
 
-    renderLibmapMenu() {
-      this.navTree.innerHTML = this.buildLibmapHtml();
-    }
+    renderLibmap() { this.navTree.innerHTML = this.buildLibmap(); }
 
-    async fetchVolumeData(dir) {
-      const cleanDir = normalizePath(dir);
-      if (this.volCache.has(cleanDir)) return this.volCache.get(cleanDir);
-      const lowerDir = cleanDir.toLowerCase();
-      if (lowerDir !== cleanDir && this.volCache.has(lowerDir)) return this.volCache.get(lowerDir);
-      const raw = await this.importVolumeData(cleanDir);
-      const data = this.normalizeVolumeData(raw, cleanDir);
-      if (data) {
-        this.volCache.set(cleanDir, data);
-        if (lowerDir !== cleanDir) this.volCache.set(lowerDir, data);
-      }
+    /* 数据加载 */
+    async fetchVolData(dir) {  // 带缓存的卷册数据获取
+      const d = normPath(dir);
+      if (this.volCache.has(d)) return this.volCache.get(d);
+      const dl = d.toLowerCase();
+      if (dl !== d && this.volCache.has(dl)) return this.volCache.get(dl);
+      const raw = await this.importVolData(d);
+      const data = this.normalizeVolData(raw, d);
+      if (data) { this.volCache.set(d, data); if (dl !== d) this.volCache.set(dl, data); }
       return data;
     }
 
-    async importVolumeData(cleanDir) {
-      const urls = [];
-      const meta = window.__PAGE_META__ || {};
+    async importVolData(d) {  // 尝试从 index.js 或 __PAGE_META__ 路径导入卷册数据
+      const urls = [], meta = window.__PAGE_META__ || {};
       if (meta.indexJsPath) urls.push(new URL(meta.indexJsPath, location.href).href);
-      const dirs = [cleanDir];
-      const lowerDir = cleanDir.toLowerCase();
-      if (lowerDir !== cleanDir) dirs.push(lowerDir);
-      for (const dir of dirs) {
-        dirs.forEach(dir => urls.push(new URL(this.sitePath(dir + '/index.js'), location.href).href));
-      }
+      const dirs = [d]; const dl = d.toLowerCase(); if (dl !== d) dirs.push(dl);
+      dirs.forEach(dir => urls.push(new URL(this.sitePath(dir + '/index.js'), location.href).href));
       for (const url of [...new Set(urls)]) {
-        try {
-          const mod = await import(url);
-          if (mod?.default) return mod.default;
-        } catch { }
+        try { const m = await import(url); if (m?.default) return m.default; }
+        catch { }
       }
       return null;
     }
 
-    normalizeVolumeData(raw, dir) {
+    normalizeVolData(raw, dir) {  // 兼容旧版数组格式与新版 {version:1} 格式
       if (!raw) return null;
       if (!Array.isArray(raw) && raw.version === 1) return raw;
       if (!Array.isArray(raw)) return null;
       const headings = [];
-      raw.forEach(file => (file.headings || []).forEach(h => headings.push({
-        level: h.level || 2,
-        text: h.text || '',
-        id: h.id || null,
-        file: h.filename || file.file || file.path || ''
+      raw.forEach(f => (f.headings || []).forEach(h => headings.push({
+        level: h.level || 2, text: h.text || '', id: h.id || null,
+        file: h.filename || f.file || f.path || ''
       })));
       return { version: 1, title: this.currentVol?.item?.label || dir, files: raw, headings };
     }
 
+    /* 渲染辅助 */
     renderBreadcrumb(parts) {
-      return '<div class="breadcrumb" aria-label="Breadcrumb">' + parts.map((part, i) => {
+      return '<div class="breadcrumb" aria-label="Breadcrumb">' + parts.map((p, i) => {
         const sep = i ? '<span class="breadcrumb__sep">/</span>' : '';
-        if (part.href) return sep + `<a href="${esc(part.href)}"${part.expand ? ` data-expand-section="${esc(part.expand)}"` : ''}>${esc(part.text)}</a>`;
-        return sep + `<span>${esc(part.text || '')}</span>`;
+        if (p.href) return sep + `<a href="${esc(p.href)}"${p.expand ? ` data-expand-section="${esc(p.expand)}"` : ''}>${esc(p.text)}</a>`;
+        return sep + `<span>${esc(p.text || '')}</span>`;
       }).join('') + '</div>';
     }
 
-    renderSidebarTree(nodes, className) {
-      return `<ul class="sidebar-menu ${esc(className)}">${this.renderSidebarNodes(nodes)}</ul>`;
+    renderTree(nodes, cls) {
+      return `<ul class="sidebar-menu ${esc(cls)}">${this.renderNodes(nodes)}</ul>`;
     }
 
-    renderSidebarNodes(nodes) {
-      const currentFile = this.currentVolumeFile();
-      const currentPath = this.sitePath(this.currentVolumePath());
-      return nodes.map(node => {
-        const rawFile = node.file || '';
-        const fullFile = rawFile && this.mode !== 'page-toc' ? normalizePath((this.currentVol.dir + '/' + rawFile).replace(/\/+/g, '/')) : rawFile;
-        const file = rawFile.replace(/\.html$/i, '');
-        const sameFile = this.mode === 'page-toc' || !rawFile || sameDocValue(file, currentFile);
+    renderNodes(nodes) {  // 生成 sidebar 节点 HTML，处理同页锚点与跨文件链接
+      const curFile = this.volFile();
+      const curPath = this.sitePath(this.volPath());
+      return nodes.map(n => {
+        const raw = n.file || '';
+        const full = raw && this.mode !== 'page-toc'
+          ? normPath((this.currentVol.dir + '/' + raw).replace(/\/+/g, '/'))
+          : raw;
+        const file = raw.replace(/\.html$/i, '');
+        const same = this.mode === 'page-toc' || !raw || sameDoc(file, curFile);
         const href = this.mode === 'page-toc'
-          ? (node.id ? '#' + esc(node.id) : currentPath)
-          : sameFile
-            ? (node.id ? '#' + esc(node.id) : (fullFile || rawFile ? this.sitePath(fullFile || rawFile) : currentPath))
-            : (node.id ? this.sitePath(fullFile) + '#' + esc(node.id) : this.sitePath(fullFile));
-        const children = node.children?.length ? `<ul class="sidebar-menu sidebar-menu--nested">${this.renderSidebarNodes(node.children)}</ul>` : '';
+          ? (n.id ? '#' + esc(n.id) : curPath)
+          : same
+            ? (n.id ? '#' + esc(n.id) : (full || raw ? this.sitePath(full || raw) : curPath))
+            : (n.id ? this.sitePath(full) + '#' + esc(n.id) : this.sitePath(full));
+        const children = n.children?.length ? `<ul class="sidebar-menu sidebar-menu--nested">${this.renderNodes(n.children)}</ul>` : '';
         const caret = children ? '<button class="sidebar-caret" tabindex="0" aria-label="Expand">\u25b8</button>' : '';
-        const link = `<a href="${href}" data-file="${esc(rawFile)}" data-id="${esc(node.id || '')}" class="sidebar-link">${esc(node.text)}</a>`;
+        const link = `<a href="${href}" data-file="${esc(raw)}" data-id="${esc(n.id || '')}" class="sidebar-link">${esc(n.text)}</a>`;
         return children
           ? `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-collapsed="true"><div class="sidebar-item-row">${link}${caret}</div>${children}</li>`
           : `<li class="sidebar-item">${link}</li>`;
       }).join('');
     }
 
-    buildLibmapHtml() {
+    buildLibmap() {
       if (!window.LIBRARY_CONFIG?.length) return '<div class="sidebar-menu" style="padding:20px">Navigation unavailable</div>';
-      return '<ul class="sidebar-menu">' + window.LIBRARY_CONFIG.map(col => this.renderSection(col)).join('') + '</ul>';
+      return '<ul class="sidebar-menu">' + window.LIBRARY_CONFIG.map(c => this.renderCol(c)).join('') + '</ul>';
     }
 
-    renderSection(col) {
+    renderCol(col) {
       const label = esc(col.label || col.title || col.id || '');
       const badge = col.badge ? ` <span class="sidebar-badge">${esc(col.badge)}</span>` : '';
+      const ext = p => /^https?:/i.test(p);
+      const path = p => ext(p) ? esc(p) : this.sitePath(normPath(p));
+      const attrs = p => ext(p) ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + normPath(p))}"`;
       if (!col.groups?.length && col.path) {
-        const external = /^https?:/i.test(col.path);
-        return `<li class="sidebar-item"><a href="${external ? esc(col.path) : this.sitePath(col.path)}" class="sidebar-link"${external ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + normalizePath(col.path))}"`}>${label}${badge}</a></li>`;
+        return `<li class="sidebar-item"><a href="${path(col.path)}" class="sidebar-link"${attrs(col.path)}>${label}${badge}</a></li>`;
       }
       if (col.groups?.length) {
         return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-section="${esc(col.id)}" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}${badge}</span><button class="sidebar-caret" tabindex="0">\u25b8</button></div></li>`;
@@ -554,122 +523,125 @@
       return `<li class="sidebar-item"><span class="sidebar-category-label">${label}${badge}</span></li>`;
     }
 
-    renderGroup(group) {
-      const label = esc(group.label || '');
-      const items = group.items || [];
+    renderGroup(g) {
+      const label = esc(g.label || '');
+      const items = g.items || [];
       if (!items.length) {
-        const external = /^https?:/i.test(group.path || '');
-        const path = normalizePath(group.path);
-        return `<li class="sidebar-item"><a href="${external ? esc(group.path) : this.sitePath(path)}" class="sidebar-link"${external ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + path)}"`}>${label}</a></li>`;
+        const ext = /^https?:/i.test(g.path || '');
+        const p = normPath(g.path);
+        return `<li class="sidebar-item"><a href="${ext ? esc(g.path) : this.sitePath(p)}" class="sidebar-link"${ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + p)}"`}>${label}</a></li>`;
       }
-      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}</span><button class="sidebar-caret" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(item => {
-        const external = /^https?:/i.test(item.path || '');
-        const path = normalizePath(item.path);
-        return `<li class="sidebar-item"><a href="${external ? esc(item.path) : this.sitePath(path)}" class="sidebar-link"${external ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + path)}"`}>${esc(item.label || item.title || '')}</a></li>`;
+      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}</span><button class="sidebar-caret" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(it => {
+        const ext = /^https?:/i.test(it.path || '');
+        const p = normPath(it.path);
+        return `<li class="sidebar-item"><a href="${ext ? esc(it.path) : this.sitePath(p)}" class="sidebar-link"${ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + p)}"`}>${esc(it.label || it.title || '')}</a></li>`;
       }).join('')}</ul></li>`;
     }
 
-    sitePath(path) {
-      if (!path) return '#';
-      if (/^https?:/i.test(path)) return path;
+    sitePath(p) {  // 拼接站点根路径与相对路径
+      if (!p) return '#';
+      if (/^https?:/i.test(p)) return p;
       const site = (document.body.dataset.site || '').replace(/\/$/, '');
-      const clean = normalizePath(path);
-      return site ? `${site}/${clean}` : '/' + clean;
+      const c = normPath(p);
+      return site ? `${site}/${c}` : '/' + c;
     }
 
-    getPageHeadings() {
+    /* TOC 与跟踪 */
+    pageHeadings() {  // 获取当前页标题：epub 模式从数据过滤，否则从 DOM 提取
       if (this.mode === 'epub') {
-        const currentFile = this.currentVolumeFile();
-        const domHeadings = getDomHeadings($('#content'));
-        let domIndex = 0;
-        return (this.currentVol?.data?.headings || []).filter(h => sameDocValue((h.file || '').replace(/\.html$/i, ''), currentFile)).map(h => {
-          const id = h.id || domHeadings[domIndex++]?.id || null;
-          return { level: h.level || 2, text: h.text || '', id };
-        }).filter(h => h.id);
+        const curFile = this.volFile();
+        const dom = getHeadings($('#content'));
+        let di = 0;
+        return (this.currentVol?.data?.headings || [])
+          .filter(h => sameDoc((h.file || '').replace(/\.html$/i, ''), curFile))
+          .map(h => {
+            const id = h.id || dom[di++]?.id || null;
+            return { level: h.level || 2, text: h.text || '', id };
+          })
+          .filter(h => h.id);
       }
-      return getDomHeadings($('#content')).map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id }));
+      return getHeadings($('#content')).map(h => ({
+        level: Number(h.tagName[1]) || 2,
+        text: h.textContent.trim(),
+        id: h.id
+      }));
     }
 
-    renderTocRail() {
+    renderToc() {
       const nav = $('#toc-desktop-nav');
       if (!nav) return;
-      const headings = this.getPageHeadings();
-      nav.innerHTML = headings.length ? this.renderTocNodes(buildHeadingTree(headings)) : '';
+      const h = this.pageHeadings();
+      nav.innerHTML = h.length ? this.renderTocNodes(buildTree(h)) : '';
       this.activeTocLink = null;
     }
 
     renderTocNodes(nodes) {
       if (!nodes.length) return '';
-      return '<ul class="theme-doc-toc-desktop-list">' + nodes.map(node =>
-        `<li class="theme-doc-toc-desktop-link theme-doc-toc-desktop-link--lvl${node.level}"><a href="#${esc(node.id)}" class="theme-doc-toc-desktop-link__a">${esc(node.text)}</a>${this.renderTocNodes(node.children || [])}</li>`
+      return '<ul class="theme-doc-toc-desktop-list">' + nodes.map(n =>
+        `<li class="theme-doc-toc-desktop-link theme-doc-toc-desktop-link--lvl${n.level}"><a href="#${esc(n.id)}" class="theme-doc-toc-desktop-link__a">${esc(n.text)}</a>${this.renderTocNodes(n.children || [])}</li>`
       ).join('') + '</ul>';
     }
 
-    startTracking() {
+    startTrack() {  // 启动标题跟踪，正文未就绪时通过 MutationObserver 等待
       const content = $('#content');
       const start = () => {
         this.tracker = new HeadingTracker({
-          getHeadings: () => getDomHeadings(content),
-          onChange: id => this.updateTracking(id)
+          getHeadings: () => getHeadings(content),
+          onChange: id => this.updateTrack(id)
         });
         return this.tracker.start();
       };
       if (!content || start()) return;
-      this.waitObserver = new MutationObserver((_, observer) => {
-        if (start()) observer.disconnect();
-      });
+      this.waitObserver = new MutationObserver((_, o) => { if (start()) o.disconnect(); });
       this.waitObserver.observe(content, { subtree: true, attributes: true, attributeFilter: ['id'] });
     }
 
-    updateTracking(id) {
-      if (Date.now() < this.suppressTrackingUntil && id !== this.tracker?.activeId) return;
+    updateTrack(id) {  // 同步更新 sidebar 高亮、TOC 高亮、移动端滚动同步
+      if (Date.now() < this.suppressUntil && id !== this.tracker?.activeId) return;
       this.activeHeadingId = id;
-      // 滚动追踪只负责“当前标题”，再分别同步左侧目录和桌面右侧 TOC。
-      this.updateSidebarTracking(id);
-      this.updateTocTracking(id);
+      this.updateSidebar(id);
+      this.updateToc(id);
       this.syncSidebar(id);
     }
 
-    setActiveTrackedLink(slot, link, activeClass) {
-      this[slot]?.classList.remove(activeClass);
+    setActive(slot, link, cls) {
+      this[slot]?.classList.remove(cls);
       this[slot] = null;
       if (!link) return false;
-      link.classList.add(activeClass);
+      link.classList.add(cls);
       this[slot] = link;
       return true;
     }
 
-    getSidebarLinks() {
+    sidebarLinks() {
       const tree = this.navTree.querySelector('.sidebar-menu');
       if (!tree) return [];
       if (!this.linkCache || this.linkCache.tree !== tree) this.linkCache = { tree, links: $$('.sidebar-link', tree) };
       return this.linkCache.links;
     }
 
-    updateSidebarTracking(id) {
-      // 纯 libmap 是总目录视图，不对应正文标题，因此不做任何高亮。
+    updateSidebar(id) {  // 在 sidebar 中定位当前文件/锚点并高亮
       if (this.mode === 'libmap') return;
-      const links = this.getSidebarLinks();
+      const links = this.sidebarLinks();
       if (!links.length) return;
-      const currentFile = this.currentVolumeFile();
-      const sameFile = link => sameDocValue((link.dataset.file || '').replace(/\.html$/i, ''), currentFile);
-      const match = (id && links.find(link => sameFile(link) && link.dataset.id === id))
-        || links.find(link => sameFile(link) && !link.dataset.id)
-        || links.find(sameFile);
-      if (!this.setActiveTrackedLink('activeSidebarLink', match, 'sidebar-link--active')) return;
-      // 只高亮同一文件里的目录项，避免跨卷册的同名锚点误亮。
+      const curFile = this.volFile();
+      const same = l => sameDoc((l.dataset.file || '').replace(/\.html$/i, ''), curFile);
+      const match = (id && links.find(l => same(l) && l.dataset.id === id))
+        || links.find(l => same(l) && !l.dataset.id)
+        || links.find(same);
+      if (!this.setActive('activeSidebarLink', match, 'sidebar-link--active')) return;
       expandTo(match, this.navTree.querySelector('.sidebar-menu'));
     }
 
-    updateTocTracking(id) {
+    updateToc(id) {  // 在桌面 TOC 中高亮当前阅读位置
       const nav = $('#toc-desktop-nav');
       if (!nav) return;
       const match = id ? $$('.theme-doc-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id) : null;
-      this.setActiveTrackedLink('activeTocLink', match, 'theme-doc-toc-desktop-link__a--active');
+      this.setActive('activeTocLink', match, 'theme-doc-toc-desktop-link__a--active');
     }
 
-    syncSidebar(id) {
-      if (innerWidth >= 997 || hasSelection() || !id || id === this.lastSyncedId) return;
+    syncSidebar(id) {  // 移动端：打开 sidebar 时自动滚动到高亮项
+      if (innerWidth >= 997 || hasSel() || !id || id === this.lastSyncedId) return;
       if (!this.sidebar?.classList.contains('doc-sidebar--open')) return;
       const active = this.activeSidebarLink || $('.sidebar-link.sidebar-link--active', this.navTree);
       if (!active) return;
@@ -677,27 +649,21 @@
       requestAnimationFrame(() => active.scrollIntoView({ block: 'center', behavior: 'auto' }));
     }
 
-    highlightCurrent() {
+    highlight() {  // 初始加载时根据 URL hash 匹配最佳 sidebar 项并高亮
+      if (this.mode === 'libmap') return;
       const tree = this.navTree.querySelector('.sidebar-menu');
       if (!tree) return;
-      if (this.mode === 'libmap') {
-        // 总目录模式不表示“正在阅读哪一章”，所以保持无高亮状态。
-        return;
-      }
-      const file = this.currentVolumeFile();
-      const hash = location.hash.slice(1);
-      let best = null;
-      let score = 0;
-      $$('.sidebar-link', tree).forEach(link => {
-        const linkFile = (link.dataset.file || '').replace(/\.html$/i, '');
-        const id = link.dataset.id || '';
+      const file = this.volFile(), hash = location.hash.slice(1);
+      let best = null, score = 0;
+      $$('.sidebar-link', tree).forEach(l => {
+        const lf = (l.dataset.file || '').replace(/\.html$/i, ''), id = l.dataset.id || '';
         let s = 0;
-        if (sameDocValue(linkFile, file)) {
+        if (sameDoc(lf, file)) {
           s = 1;
           if (id && hash && id === hash) s = 3;
           else if (!id && !hash) s = 2;
         }
-        if (s > score) { score = s; best = link; }
+        if (s > score) { score = s; best = l; }
       });
       if (best) {
         best.classList.add('sidebar-link--active');
@@ -706,13 +672,12 @@
       }
     }
 
-    initBreadcrumbFade() {
+    initFade() {  // 面包屑呼吸效果：滚动时自动淡化
       if (this.mode !== 'epub' && this.mode !== 'page-toc') return;
-      const bc = $('.breadcrumb', this.navTree);
-      const menu = $('.sidebar-menu', this.navTree);
+      const bc = $('.breadcrumb', this.navTree), menu = $('.sidebar-menu', this.navTree);
       if (!bc || !menu) return;
-      this.fadeObserver = new IntersectionObserver(entries => {
-        entries.forEach(entry => bc.classList.toggle('breadcrumb--faded', entry.boundingClientRect.bottom < entry.rootBounds.top));
+      this.fadeObserver = new IntersectionObserver(e => {
+        e.forEach(en => bc.classList.toggle('breadcrumb--faded', en.boundingClientRect.bottom < en.rootBounds.top));
       }, { root: this.navTree, threshold: 0 });
       this.fadeObserver.observe(menu);
     }
@@ -733,21 +698,20 @@
       });
     }
 
-    findCollectionByPath() {
-      const path = normalizePath(location.pathname);
-      const match = (window.LIBRARY_CONFIG || []).find(col => {
-        const base = normalizePath(col.basePath || col.basepath || '');
-        return base && path.startsWith(base);
+    findCollection() {  // 根据当前路径反向查找所属合集
+      const path = normPath(location.pathname);
+      const find = fn => (window.LIBRARY_CONFIG || []).find(c => {
+        const b = fn(c.basePath || c.basepath || '');
+        return b && path.startsWith(b);
       });
-      if (match) return match;
-      const lower = path.toLowerCase();
-      return (window.LIBRARY_CONFIG || []).find(col => {
-        const base = normalizeLowerPath(col.basePath || col.basepath || '');
-        return base && lower.startsWith(base);
-      }) || null;
+      const r = find(normPath);
+      if (r) return r;
+      const l = normPath(location.pathname).toLowerCase();
+      return find(p => normPath(p).toLowerCase()) || null;
     }
 
     toggle() { this.sidebar?.classList.contains('doc-sidebar--open') ? this.close() : this.open(); }
+
     open() {
       if (innerWidth >= 997) return;
       this.sidebar?.classList.add('doc-sidebar--open');
@@ -755,29 +719,27 @@
       this.lastSyncedId = null;
       this.syncSidebar(this.activeHeadingId);
     }
+
     close() {
       if (innerWidth >= 997) return;
       this.sidebar?.classList.remove('doc-sidebar--open');
       this.backdrop?.classList.remove('sidebar-overlay--visible');
     }
 
-    async loadLibmap() {
-      const script = document.querySelector('script[src*="/assets/libmap.js"]');
-      if (script) {
-        await new Promise(resolve => setTimeout(resolve, 50));
-        if (window.LIBRARY_CONFIG) return;
-      }
+    async loadLibmap() {  // 动态加载 libmap.js 配置
+      const s = document.querySelector('script[src*="/assets/libmap.js"]');
+      if (s) { await new Promise(r => setTimeout(r, 50)); if (window.LIBRARY_CONFIG) return; }
       const res = await fetch(`${document.body.dataset.site || ''}/assets/libmap.js`);
       if (res.ok) new Function(await res.text())();
     }
   }
 
+  /* NavigationManager */
   class NavigationManager {
-    init() {
+    init() {  // 根据 __PAGE_META__ 设置上一页/下一页导航按钮
       const meta = window.__PAGE_META__ || {};
-      ['prev', 'next'].forEach(kind => {
-        const btn = $('#' + kind + '-btn');
-        const data = meta[kind];
+      ['prev', 'next'].forEach(k => {
+        const btn = $('#' + k + '-btn'), data = meta[k];
         if (!btn || !data) return;
         const label = $('.pagination-link__label', btn);
         if (label && data.title) label.textContent = data.title;
@@ -786,8 +748,8 @@
     }
   }
 
-  const menu = new MenuManager();
-  const nav = new NavigationManager();
+  /* 初始化 */
+  const menu = new MenuManager(), nav = new NavigationManager();
   window.__NAV__ = { menu, nav };
   const init = () => { menu.init(); nav.init(); };
   document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
