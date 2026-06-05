@@ -146,12 +146,15 @@
 
     track(force) {
       if (hasSel()) return;
-      const id = this.pick();
-      if (force || id !== this.activeId) { this.activeId = id; this.onChange(id); }
+      const { id, top } = this.pick();
+      if (force || id !== this.activeId) { this.activeId = id; this.onChange(id, top); }
     }
 
     pick() {  // 二分查找当前视口对应的最近标题
-      if (!this.tops.length) return this.headings[0]?.id || null;
+      if (!this.tops.length) {
+        const h = this.headings[0];
+        return { id: h?.id || null, top: h ? h.getBoundingClientRect().top + scrollY : 0 };
+      }
       const y = scrollY + this.threshold;
       let lo = 0, hi = this.tops.length - 1, best = 0;
       while (lo <= hi) {
@@ -159,7 +162,8 @@
         if (this.tops[mid] <= y) { best = mid; lo = mid + 1; }
         else { hi = mid - 1; }
       }
-      return this.headings[best]?.id || null;
+      const h = this.headings[best];
+      return { id: h?.id || null, top: this.tops[best] || 0 };
     }
   }
 
@@ -550,12 +554,17 @@
     pageHeadings() {  // 获取当前页标题：epub 模式从数据过滤，否则从 DOM 提取
       if (this.mode === 'epub') {
         const curFile = this.volFile();
+        const dom = getHeadings($('#content'));
+        let di = 0;
         return (this.currentVol?.data?.headings || [])
           .filter(h => sameDoc((h.file || '').replace(/\.html$/i, ''), curFile))
-          .map(h => ({ level: h.level || 2, text: h.text || '', id: h.id || null }))
-          .filter(h => h.id && document.getElementById(h.id));
+          .map(h => {
+            const id = h.id || dom[di++]?.id || null;
+            return { level: h.level || 2, text: h.text || '', id };
+          })
+          .filter(h => h.id);
       }
-      return getDomHeadings($('#content')).map(h => ({
+      return getHeadings($('#content')).map(h => ({
         level: Number(h.tagName[1]) || 2,
         text: h.textContent.trim(),
         id: h.id
@@ -579,21 +588,10 @@
 
     startTrack() {  // 启动标题跟踪，正文未就绪时通过 MutationObserver 等待
       const content = $('#content');
-      const getHeadings = () => {
-        if (this.mode === 'epub') {
-          const curFile = this.volFile();
-          const fromData = (this.currentVol?.data?.headings || [])
-            .filter(h => sameDoc((h.file || '').replace(/\.html$/i, ''), curFile))
-            .map(h => document.getElementById(h.id))
-            .filter(Boolean);
-          if (fromData.length) return fromData;
-        }
-        return getDomHeadings(content);
-      };
       const start = () => {
         this.tracker = new HeadingTracker({
-          getHeadings,
-          onChange: id => this.updateTrack(id)
+          getHeadings: () => getHeadings(content),
+          onChange: (id, top) => this.updateTrack(id, top)
         });
         return this.tracker.start();
       };
@@ -602,11 +600,11 @@
       this.waitObserver.observe(content, { subtree: true, attributes: true, attributeFilter: ['id'] });
     }
 
-    updateTrack(id) {  // 同步更新 sidebar 高亮、TOC 高亮、移动端滚动同步
+    updateTrack(id, top) {  // 同步更新 sidebar 高亮、TOC 高亮、移动端滚动同步
       if (Date.now() < this.suppressUntil && id !== this.tracker?.activeId) return;
       this.activeHeadingId = id;
-      this.updateSidebar(id);
-      this.updateToc(id);
+      this.updateSidebar(id, top);
+      this.updateToc(id, top);
       this.syncSidebar(id);
     }
 
@@ -626,23 +624,48 @@
       return this.linkCache.links;
     }
 
-    updateSidebar(id) {  // 在 sidebar 中定位当前文件/锚点并高亮
-      if (this.mode === 'libmap' || !id) return;
+    updateSidebar(id, top) {  // 在 sidebar 中定位当前文件/锚点并高亮
+      if (this.mode === 'libmap') return;
       const links = this.sidebarLinks();
       if (!links.length) return;
       const curFile = this.volFile();
       const same = l => sameDoc((l.dataset.file || '').replace(/\.html$/i, ''), curFile);
-      const match = links.find(l => same(l) && l.dataset.id === id);
-      if (!match) return;
-      if (!this.setActive('activeSidebarLink', match, 'sidebar-link--active')) return;
-      expandTo(match, this.navTree.querySelector('.sidebar-menu'));
+      const targetTop = top ?? (id ? document.getElementById(id)?.getBoundingClientRect().top + scrollY : 0);
+      let best = null, bestTop = -Infinity;
+      for (const link of links) {
+        if (!same(link)) continue;
+        const lid = link.dataset.id;
+        let t = 0;
+        if (lid) {
+          const el = document.getElementById(lid);
+          if (el) t = el.getBoundingClientRect().top + scrollY;
+        }
+        if (t <= targetTop && t > bestTop) { bestTop = t; best = link; }
+      }
+      if (best && this.setActive('activeSidebarLink', best, 'sidebar-link--active')) {
+        expandTo(best, this.navTree.querySelector('.sidebar-menu'));
+      }
     }
 
-    updateToc(id) {  // 在桌面 TOC 中高亮当前阅读位置
+    updateToc(id, top) {  // 在桌面 TOC 中高亮当前阅读位置
       const nav = $('#toc-desktop-nav');
-      if (!nav || !id) return;
-      const match = $$('.theme-doc-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id);
-      this.setActive('activeTocLink', match, 'theme-doc-toc-desktop-link__a--active');
+      if (!nav) return;
+      const targetTop = top ?? (id ? document.getElementById(id)?.getBoundingClientRect().top + scrollY : 0);
+      let best = null, bestTop = -Infinity;
+      for (const a of $$('.theme-doc-toc-desktop-link__a', nav)) {
+        const hash = a.getAttribute('href')?.slice(1);
+        let t = 0;
+        if (hash) {
+          const el = document.getElementById(hash);
+          if (el) t = el.getBoundingClientRect().top + scrollY;
+        }
+        if (t <= targetTop && t > bestTop) { bestTop = t; best = a; }
+      }
+      if (best) {
+        this.setActive('activeTocLink', best, 'theme-doc-toc-desktop-link__a--active');
+      } else if (!id) {
+        this.setActive('activeTocLink', null, 'theme-doc-toc-desktop-link__a--active');
+      }
     }
 
     syncSidebar(id) {  // 移动端：打开 sidebar 时自动滚动到高亮项

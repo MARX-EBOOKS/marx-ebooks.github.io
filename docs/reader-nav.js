@@ -253,18 +253,22 @@
     measure() { this.tops = this.headings.map(h => h.getBoundingClientRect().top + scrollY); }
     track(force) {
       if (hasSel()) return;
-      const id = this.pick();
-      if (force || id !== this.activeId) { this.activeId = id; this.onChange(id); }
+      const { id, top } = this.pick();
+      if (force || id !== this.activeId) { this.activeId = id; this.onChange(id, top); }
     }
     pick() {
-      if (!this.tops.length) return this.headings[0]?.id || null;
+      if (!this.tops.length) {
+        const h = this.headings[0];
+        return { id: h?.id || null, top: h ? h.getBoundingClientRect().top + scrollY : 0 };
+      }
       const y = scrollY + this.threshold;
       let lo = 0, hi = this.tops.length - 1, best = 0;
       while (lo <= hi) {
         const mid = (lo + hi) >> 1;
         if (this.tops[mid] <= y) { best = mid; lo = mid + 1; } else { hi = mid - 1; }
       }
-      return this.headings[best]?.id || null;
+      const h = this.headings[best];
+      return { id: h?.id || null, top: this.tops[best] || 0 };
     }
   }
 
@@ -591,10 +595,12 @@
     getPageHeadings() {
       if (this.mode === 'epub') {
         const file = this.volumeDocFile();
-        return (this.currentVol?.data?.headings || [])
-          .filter(h => sameDoc(nDoc(h.file || '').split('/').pop(), file))
-          .map(h => ({ level: h.level != null ? h.level : 2, text: h.text || '', id: h.id || null }))
-          .filter(h => h.id && document.getElementById(h.id));
+        const dom = getDomHeadings($('#content'));
+        let idx = 0;
+        return (this.currentVol?.data?.headings || []).filter(h => sameDoc(nDoc(h.file || '').split('/').pop(), file)).map(h => {
+          const id = h.id || dom[idx++]?.id || null;
+          return { level: h.level != null ? h.level : 2, text: h.text || '', id };
+        }).filter(h => h.id);
       }
       return getDomHeadings($('#content')).map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id }));
     }
@@ -616,20 +622,9 @@
 
     startTracking() {
       const content = $('#content');
-      const getHeadings = () => {
-        if (this.mode === 'epub') {
-          const file = this.volumeDocFile();
-          const fromData = (this.currentVol?.data?.headings || [])
-            .filter(h => sameDoc(nDoc(h.file || '').split('/').pop(), file))
-            .map(h => document.getElementById(h.id))
-            .filter(Boolean);
-          if (fromData.length) return fromData;
-        }
-        return getDomHeadings(content);
-      };
       const start = () => {
         if (this.tracker) this.tracker.stop();
-        this.tracker = new HeadingTracker({ getHeadings, onChange: id => this.updateTracking(id) });
+        this.tracker = new HeadingTracker({ getHeadings: () => getDomHeadings(content), onChange: (id, top) => this.updateTracking(id, top) });
         return this.tracker.start();
       };
       if (!content || start()) return;
@@ -638,10 +633,10 @@
       this.waitObserver = mo;
     }
 
-    updateTracking(id) {
+    updateTracking(id, top) {
       this.activeHeadingId = id;
-      this.updateSidebarTracking(id);
-      this.updateTocTracking(id);
+      this.updateSidebarTracking(id, top);
+      this.updateTocTracking(id, top);
       this.syncSidebar(id);
     }
 
@@ -661,23 +656,48 @@
       return this.linkCache.links;
     }
 
-    updateSidebarTracking(id) {
-      if (this.mode === 'libmap' || !id) return;
+    updateSidebarTracking(id, top) {
+      if (this.mode === 'libmap') return;
       const links = this.getSidebarLinks();
       if (!links.length) return;
       const file = this.volumeDocFile();
       const sameFile = a => sameDoc(nDoc(a.dataset.file || '').split('/').pop(), file);
-      const match = links.find(a => sameFile(a) && a.dataset.id === id);
-      if (!match) return;
-      if (!this.setActive('activeSidebarLink', match, 'sidebar-link--active')) return;
-      expandTo(match, this.navTree.querySelector('.sidebar-menu'));
+      const targetTop = top ?? (id ? document.getElementById(id)?.getBoundingClientRect().top + scrollY : 0);
+      let best = null, bestTop = -Infinity;
+      for (const link of links) {
+        if (!sameFile(link)) continue;
+        const lid = link.dataset.id;
+        let t = 0;
+        if (lid) {
+          const el = document.getElementById(lid);
+          if (el) t = el.getBoundingClientRect().top + scrollY;
+        }
+        if (t <= targetTop && t > bestTop) { bestTop = t; best = link; }
+      }
+      if (best && this.setActive('activeSidebarLink', best, 'sidebar-link--active')) {
+        expandTo(best, this.navTree.querySelector('.sidebar-menu'));
+      }
     }
 
-    updateTocTracking(id) {
+    updateTocTracking(id, top) {
       const nav = $('#toc-desktop-nav');
-      if (!nav || !id) return;
-      const match = $$('.theme-doc-toc-desktop-link__a', nav).find(a => a.getAttribute('href') === '#' + id);
-      this.setActive('activeTocLink', match, 'theme-doc-toc-desktop-link__a--active');
+      if (!nav) return;
+      const targetTop = top ?? (id ? document.getElementById(id)?.getBoundingClientRect().top + scrollY : 0);
+      let best = null, bestTop = -Infinity;
+      for (const a of $$('.theme-doc-toc-desktop-link__a', nav)) {
+        const hash = a.getAttribute('href')?.slice(1);
+        let t = 0;
+        if (hash) {
+          const el = document.getElementById(hash);
+          if (el) t = el.getBoundingClientRect().top + scrollY;
+        }
+        if (t <= targetTop && t > bestTop) { bestTop = t; best = a; }
+      }
+      if (best) {
+        this.setActive('activeTocLink', best, 'theme-doc-toc-desktop-link__a--active');
+      } else if (!id) {
+        this.setActive('activeTocLink', null, 'theme-doc-toc-desktop-link__a--active');
+      }
     }
 
     syncSidebar(id) {
