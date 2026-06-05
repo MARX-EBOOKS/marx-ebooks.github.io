@@ -279,7 +279,7 @@
       this.lastSyncedId = null; this.linkCache = null;
       this.tracker = null; this.bag = new EventBag();
       this.sidebarObserver = null; this.waitObserver = null;
-      this.volCache = new Map();
+      this.fadeObserver = null; this.volCache = new Map();
     }
 
     init() {
@@ -306,6 +306,7 @@
       this.tracker = null;
       if (this.waitObserver) this.waitObserver.disconnect();
       this.waitObserver = null;
+      if (this.fadeObserver) { this.fadeObserver.disconnect(); this.fadeObserver = null; }
       this.activeHeadingId = this.activeSidebarLink = this.activeTocLink = this.lastSyncedId = null;
       this.linkCache = null;
     }
@@ -483,7 +484,19 @@
       this.renderTocRail();
       this.startTracking();
       this.scrollToPendingAnchor();
+      this.initFade();
       if (window.__PAGE_BAR__?.currentPage != null) window.__PAGE_BAR__._updateBadge(window.__PAGE_BAR__.currentPage);
+    }
+
+    initFade() {
+      if (this.mode !== 'epub' && this.mode !== 'page-toc') return;
+      if (this.fadeObserver) { this.fadeObserver.disconnect(); this.fadeObserver = null; }
+      const bc = $('.breadcrumb', this.navTree), menu = $('.sidebar-menu', this.navTree);
+      if (!bc || !menu) return;
+      this.fadeObserver = new IntersectionObserver(entries => {
+        entries.forEach(en => bc.classList.toggle('breadcrumb--faded', en.boundingClientRect.bottom < en.rootBounds.top));
+      }, { root: this.navTree, threshold: 0 });
+      this.fadeObserver.observe(menu);
     }
 
     async fetchVolumeData(dir) {
