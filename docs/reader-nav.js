@@ -5,14 +5,14 @@
    *  Works with: reader-ui.js, reader-pagebar.js
    *  Link scheme: ?doc=<path>#<hash> */
 
-  /* 基础工具 (unified with nav.js) */
+  /* 基础工具 (unified) */
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const cssEsc = v => (window.CSS?.escape ? CSS.escape(String(v)) : String(v).replace(/["\\]/g, '\\$&'));
   const hasSel = () => {
-    const s = document.getSelection()
-    return !!(s && !s.isCollapsed && s.rangeCount)
+    const s = document.getSelection();
+    return !!(s && !s.isCollapsed && s.rangeCount);
   };
   const scrollToEl = (el, off, b = 'smooth') => {
     if (!el) return;
@@ -20,9 +20,9 @@
     window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + scrollY - offset), behavior: b });
   };
   const syncFill = el => {
-    if (!el) return
-    const min = parseFloat(el.min) || 0, max = parseFloat(el.max) || 100, val = parseFloat(el.value) || 0
-    el.style.setProperty('--_fill', (((val - min) / (max - min)) * 100).toFixed(2) + '%')
+    if (!el) return;
+    const min = parseFloat(el.min) || 0, max = parseFloat(el.max) || 100, val = parseFloat(el.value) || 0;
+    el.style.setProperty('--_fill', (((val - min) / (max - min)) * 100).toFixed(2) + '%');
   };
 
   /* 滚动帧回调 (unified) */
@@ -55,15 +55,20 @@
   const getHeadings = c => c ? $$('h1,h2,h3,h4,h5,h6', c).filter(h => h.id) : [];
   function buildTree(items) {
     const root = { level: 0, children: [] }, stack = [root];
-    items.forEach(it => { const n = { ...it, children: [] }; while (stack.length > 1 && stack[stack.length - 1].level >= it.level) stack.pop(); stack[stack.length - 1].children.push(n); stack.push(n); });
+    items.forEach(it => {
+      const n = { ...it, children: [] };
+      while (stack.length > 1 && stack[stack.length - 1].level >= it.level) stack.pop();
+      stack[stack.length - 1].children.push(n);
+      stack.push(n);
+    });
     return root.children;
   }
   function expandTo(el, container) {
     for (let li = el?.closest('li'); li && container.contains(li); li = li.parentElement?.closest('.sidebar-item')) {
       if (li.classList.contains('sidebar-item--collapsible')) {
-        li.setAttribute('data-collapsed', 'false')
-        const c = $('.sidebar-caret', li)
-        if (c) c.textContent = '\u25be'
+        li.setAttribute('data-collapsed', 'false');
+        const c = $('.sidebar-caret', li);
+        if (c) c.textContent = '\u25be';
       }
     }
   }
@@ -287,6 +292,7 @@
       this.tracker = null; this.bag = new EventBag();
       this.sidebarObserver = null; this.waitObserver = null;
       this.fadeObserver = null; this.volCache = new Map();
+      this.lastWidth = innerWidth;
     }
 
     /* 生命周期 */
@@ -307,7 +313,7 @@
         this.mode = 'epub'
         this.renderEpub(docPath)
       }
-      else if (innerWidth < 997 && getHeadings($('#content')).length > 1) {
+      else if (innerWidth < 997 && getHeadings($('#content')).length > 1 && !this._isHome()) {
         this.mode = 'page-toc'
         this.renderPageToc(docPath)
       }
@@ -330,7 +336,7 @@
     }
 
     afterRender(docPath) {
-      this.linkCache = null; this.highlight(docPath); this.renderToc();
+      this.linkCache = null; this.highlight(); this.renderToc();
       this.startTrack(); this.scrollToPendingAnchor(); this.initFade();
       if (window.__PAGE_BAR__?.currentPage != null) window.__PAGE_BAR__._updateBadge(window.__PAGE_BAR__.currentPage);
     }
@@ -342,8 +348,9 @@
       this.navTree.addEventListener('keydown', e => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
         const t = e.target.closest('.sidebar-caret, .sidebar-category-label');
-        if (!t) return; e.preventDefault(); this.toggleItem(t.closest('.sidebar-item--collapsible'));
+        if (!t || t.closest('a')) return; e.preventDefault(); this.toggleItem(t.closest('.sidebar-item--collapsible'));
       });
+      window.addEventListener('resize', () => this.handleResize(), { passive: true });
     }
     observeSidebar() {
       if (this.sidebarObserver) return;
@@ -354,6 +361,21 @@
         }
       });
       this.sidebarObserver.observe(this.sidebar, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    /* SPA 文档信息 */
+    _isHome() {
+      return !currentDoc();
+    }
+
+    /* 响应式断点切换 */
+    async handleResize() {
+      const w = innerWidth, crossed = (this.lastWidth < 997 && w >= 997) || (this.lastWidth >= 997 && w < 997);
+      this.lastWidth = w;
+      if (crossed) {
+        this.reinit(currentDoc());
+        this.syncSidebar(this.activeHeadingId);
+      }
     }
 
     /* 点击处理 (SPA: 截获 ?doc= 导航) */
@@ -453,6 +475,15 @@
       return (this.currentVol && sameDoc(p, this.currentVol.dir)) ? this.currentVol.dir + '/index.html' : p
     }
     volumeDocFile(dp = currentDoc()) { return normDoc(this.volumeDocPath(dp)).split('/').pop() || 'index'; }
+
+    /* SPA 文档信息 (unified with nav.js _volInfo, adapted for SPA) */
+    _volInfo() {
+      const c = normPath(currentDoc()), v = this.currentVol;
+      const path = (v && c === v.dir) ? v.dir + '/index.html' : c;
+      const file = path.split('/').pop().replace(/\.x?html?$/i, '') || 'index';
+      const isVol = v ? (c === v.dir || c === v.dir + '/index.html') : false;
+      return { path, dir: v?.dir || '', file, isVol };
+    }
 
     /* 面包屑 parts 构建 */
     _breadcrumbParts(col, item, data, extra) {
@@ -570,9 +601,9 @@
     /* TOC */
     pageHeadings() {
       if (this.mode === 'epub') {
-        const file = this.volumeDocFile();
-        return (this.currentVol?.data?.headings || []).filter(h => sameDoc(normDoc(h.file || '').split('/').pop(), file)).map(h => ({
-          level: h.level != null ? h.level : 2, text: h.text || '', id: h.id || null
+        const { file: curFile } = this._volInfo();
+        return (this.currentVol?.data?.headings || []).filter(h => sameDoc((h.file || '').replace(/\.x?html?$/i, ''), curFile)).map(h => ({
+          level: h.level || 2, text: h.text || '', id: h.id || null
         }));
       }
       return getHeadings($('#content')).map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id }));
@@ -618,11 +649,6 @@
       link.classList.add(cls)
       this[slot] = link
       return true
-    }
-    sidebarLinks() {
-      const tree = this.navTree.querySelector('.sidebar-menu'); if (!tree) return [];
-      if (!this.linkCache || this.linkCache.tree !== tree) this.linkCache = { tree, links: $$('.sidebar-link', tree) };
-      return this.linkCache.links;
     }
     sidebarLinks() {
       const tree = this.navTree.querySelector('.sidebar-menu'); if (!tree) return [];
