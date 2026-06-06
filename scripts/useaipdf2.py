@@ -1169,10 +1169,11 @@ class Agent:
         except KeyboardInterrupt:
             self._interrupt.clear()
             self.client._cancel.clear()
-            return AgentResult(AgentSignal.PAUSE, history=history)
+            partial= [m for m in messages if m.get("role") != "system"]
+            return AgentResult(AgentSignal.PAUSE, history=partial)
         except RuntimeError as e:
-            return AgentResult(AgentSignal.ANSWER,
-                               answer=f"错误：{e}", history=history)
+            partial= [m for m in messages if m.get("role") != "system"]
+            return AgentResult(AgentSignal.ANSWER, answer=f"错误：{e}", history=partial)
 
         new_history = [m for m in messages if m.get("role") != "system"]
         return AgentResult(AgentSignal.ANSWER,

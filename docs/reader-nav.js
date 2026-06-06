@@ -101,7 +101,7 @@
     },
     docPathFromUrl(url) {
       const rp = this.normalizePath(location.pathname), p = this.safeDecode(url.pathname);
-      if (this.samePath(p, rp) && url.searchParams.has('doc')) return url.searchParams.get('doc') || '';
+      if (this.normalizePath(p).toLowerCase() === this.normalizePath(rp).toLowerCase() && url.searchParams.has('doc')) return url.searchParams.get('doc') || '';
       return p + url.search;
     },
     resolveDocHref(href, base = '') {
@@ -156,13 +156,10 @@
     }
   };
 
-  // 常用别名
-  const normPath = v => PathUtils.normalizePath(v);
-  const normDoc = v => PathUtils.normalizeDoc(v);
-  const sameDoc = (a, b) => PathUtils.sameDoc(a, b);
-  const makeHref = (dp, h) => PathUtils.makeHref(dp, h);
-  const resolveDocHref = (h, b) => PathUtils.resolveDocHref(h, b);
-
+  // 常用别名 (解构自 PathUtils)
+  const { normalizePath: normPath, makeHref } = PathUtils;
+  const normDoc = PathUtils.normalizeDoc.bind(PathUtils);
+  const resolveDocHref = PathUtils.resolveDocHref.bind(PathUtils);
   /* 带大小写回退的 fetch */
   async function fetchWithLowerFallback(path, opts) {
     const lower = PathUtils.lowerPathFallback(path);
@@ -307,7 +304,7 @@
       this.currentVol = docPath ? this.detectVolume(docPath) : null;
       if (!docPath) {
         this.mode = 'libmap'
-        this.renderLibmap()
+        this.navTree.innerHTML = this.buildLibmap()
       }
       else if (this.currentVol) {
         this.mode = 'epub'
@@ -319,7 +316,7 @@
       }
       else {
         this.mode = 'libmap'
-        this.renderLibmap()
+        this.navTree.innerHTML = this.buildLibmap()
       }
       this.afterRender(docPath);
     }
@@ -403,9 +400,9 @@
         return
       }
       const url = new URL(href, location.href);
-      if (PathUtils.samePath(url.pathname, location.pathname) && url.searchParams.has('doc')) {
+      if (normPath(url.pathname).toLowerCase() === normPath(location.pathname).toLowerCase() && url.searchParams.has('doc')) {
         const docPath = url.searchParams.get('doc') || '', hash = url.hash.slice(1);
-        if (sameDoc(docPath, currentDoc())) {
+        if (normDoc(docPath).toLowerCase() === normDoc(currentDoc()).toLowerCase()) {
           e.preventDefault()
           hash ? this.scrollToHash(hash, true) : window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
         }
@@ -472,10 +469,8 @@
     /* SPA 文档路径辅助 */
     volumeDocPath(dp = currentDoc()) {
       const p = normPath(dp)
-      return (this.currentVol && sameDoc(p, this.currentVol.dir)) ? this.currentVol.dir + '/index.html' : p
+      return (this.currentVol && normDoc(p).toLowerCase() === normDoc(this.currentVol.dir).toLowerCase()) ? this.currentVol.dir + '/index.html' : p
     }
-    volumeDocFile(dp = currentDoc()) { return normDoc(this.volumeDocPath(dp)).split('/').pop() || 'index'; }
-
     /* SPA 文档信息 (unified with nav.js _volInfo, adapted for SPA) */
     _volInfo() {
       const c = normPath(currentDoc()), v = this.currentVol;
@@ -498,14 +493,14 @@
     async renderEpub(docPath) {
       const dir = this.currentVol?.dir || '', data = await this.fetchVolData(dir);
       if (!data) {
-        const np = normPath(docPath), fallback = sameDoc(np, dir) || sameDoc(np, dir + '/index.html') || sameDoc(np, dir + '/nav.html');
+        const np = normPath(docPath), fallback = normDoc(np).toLowerCase() === normDoc(dir).toLowerCase() || normDoc(np).toLowerCase() === normDoc(dir + '/index.html').toLowerCase() || normDoc(np).toLowerCase() === normDoc(dir + '/nav.html').toLowerCase();
         this.mode = fallback ? 'libmap' : (innerWidth < 997 ? 'page-toc' : 'libmap');
-        this.mode === 'page-toc' ? this.renderPageToc(docPath) : this.renderLibmap();
+        this.mode === 'page-toc' ? this.renderPageToc(docPath) : (this.navTree.innerHTML = this.buildLibmap());
         this.afterRender(docPath); return;
       }
       this.currentVol.data = data;
       const { col, item } = this.currentVol, tree = buildTree(data.headings || []), parts = this._breadcrumbParts(col, item, data);
-      this.navTree.innerHTML = this.renderBreadcrumb(parts) + (tree.length ? this.renderTree(tree, 'epub-toc', docPath) : '') + this._divider() + this.buildLibmap();
+      this.navTree.innerHTML = this.renderBreadcrumb(parts) + (tree.length ? this.renderTree(tree, 'epub-toc', docPath) : '') + '<div class="section-divider"><span>All works</span></div>' + this.buildLibmap();
       this.afterRender(docPath);
     }
 
@@ -513,19 +508,16 @@
       const headings = getHeadings($('#content'));
       if (headings.length <= 1) {
         this.mode = 'libmap'
-        this.renderLibmap()
+        this.navTree.innerHTML = this.buildLibmap()
         this.afterRender(docPath)
         return
       }
       const col = this.currentVol?.col || findCollection(docPath), curFile = normPath(docPath).split('/').pop();
       const nodes = headings.map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id, file: curFile }));
       const parts = [col?.path ? { text: col.label || 'Library', href: makeHref(col.path), expand: col.id } : { text: col?.label || 'Library', expand: col?.id }, { text: nodes[0]?.text || document.title }];
-      this.navTree.innerHTML = this.renderBreadcrumb(parts) + this.renderTree(buildTree(nodes), 'page-toc', docPath) + this._divider() + this.buildLibmap();
+      this.navTree.innerHTML = this.renderBreadcrumb(parts) + this.renderTree(buildTree(nodes), 'page-toc', docPath) + '<div class="section-divider"><span>All works</span></div>' + this.buildLibmap();
       this.afterRender(docPath);
     }
-
-    renderLibmap() { this.navTree.innerHTML = this.buildLibmap(); }
-
     /* 数据 */
     async fetchVolData(dir) {
       const raw = await fetchVolData(dir, this.volCache); if (!raw) return null;
@@ -563,7 +555,7 @@
       const volDir = this.currentVol?.dir || '', isPage = this.mode === 'page-toc', curHref = makeHref(this.volumeDocPath(currentDoc()));
       return nodes.map(n => {
         const raw = n.file || '', full = raw && !isPage ? normPath((volDir + '/' + raw).replace(/\/+/g, '/')) : raw;
-        const same = isPage || (full && sameDoc(full, currentFull));
+        const same = isPage || (full && normDoc(full).toLowerCase() === normDoc(currentFull).toLowerCase());
         const href = isPage ? (n.id ? `#${esc(n.id)}` : curHref) : same ? (n.id ? `#${esc(n.id)}` : makeHref(full || currentFull)) : makeHref(full, n.id || '');
         const children = n.children?.length ? `<ul class="sidebar-menu sidebar-menu--nested">${this.renderNodes(n.children, currentFull)}</ul>` : '';
         const caret = children ? '<button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button>' : '';
@@ -596,13 +588,11 @@
       return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-group-path="${esc(gp)}" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}</span><button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(item => `<li class="sidebar-item">${this._renderLink({ path: item.path || '', text: item.label || item.title || '' })}</li>`).join('')}</ul></li>`;
     }
 
-    _divider() { return '<div class="section-divider"><span>All works</span></div>'; }
-
     /* TOC */
     pageHeadings() {
       if (this.mode === 'epub') {
         const { file: curFile } = this._volInfo();
-        return (this.currentVol?.data?.headings || []).filter(h => sameDoc((h.file || '').replace(/\.x?html?$/i, ''), curFile)).map(h => ({
+        return (this.currentVol?.data?.headings || []).filter(h => normDoc((h.file || '').replace(/\.x?html?$/i, '')).toLowerCase() === normDoc(curFile).toLowerCase()).map(h => ({
           level: h.level || 2, text: h.text || '', id: h.id || null
         }));
       }
@@ -664,7 +654,6 @@
       return best;
     }
 
-    _matchFile(link, file) { return sameDoc((link.dataset.file || '').replace(/\.x?html?$/i, ''), file); }
     _elementTop(id) {
       if (!id) return 0;
       const el = document.getElementById(id);
@@ -675,7 +664,7 @@
       if (this.mode === 'libmap') return;
       const links = this.sidebarLinks();
       if (!links.length) return;
-      const { file } = this._volInfo(), fileLinks = links.filter(l => this._matchFile(l, file));
+      const { file } = this._volInfo(), fileLinks = links.filter(l => normDoc((l.dataset.file || '').replace(/\.x?html?$/i, '')).toLowerCase() === normDoc(file).toLowerCase());
       let best = id ? fileLinks.find(l => l.dataset.id === id) : null;
       if (!best) {
         const y = scrollY + 80;
@@ -722,7 +711,7 @@
       let best = null, score = 0;
       $$('.sidebar-link', tree).forEach(a => {
         const f = (a.dataset.file || '').replace(/\.x?html?$/i, ''), id = a.dataset.id || ''; let s = 0;
-        if (sameDoc(f, file)) {
+        if (normDoc(f).toLowerCase() === normDoc(file).toLowerCase()) {
           s = 1;
           if (id && hash && id === hash) s = 3;          // exact hash match
           else if (!id && !hash) s = 2;                  // file-level heading, no hash
@@ -732,7 +721,7 @@
       });
       // If no best yet (e.g. hash doesn't match any id), fall back to file-level heading
       if (!best && !hash) {
-        best = $$('.sidebar-link', tree).find(a => sameDoc((a.dataset.file || '').replace(/\.x?html?$/i, ''), file) && !a.dataset.id);
+        best = $$('.sidebar-link', tree).find(a => normDoc((a.dataset.file || '').replace(/\.x?html?$/i, '')).toLowerCase() === normDoc(file).toLowerCase() && !a.dataset.id);
       }
       if (best) {
         best.classList.add('sidebar-link--active')
@@ -753,7 +742,7 @@
       const hash = sessionStorage.getItem('__reader_pending_anchor'), dp = sessionStorage.getItem('__reader_pending_doc');
       if (!hash) return;
       sessionStorage.removeItem('__reader_pending_anchor'); sessionStorage.removeItem('__reader_pending_doc');
-      if (dp && !sameDoc(dp, currentDoc())) return;
+      if (dp && !(normDoc(dp).toLowerCase() === normDoc(currentDoc()).toLowerCase())) return;
       const tryScroll = () => {
         const el = document.getElementById(hash)
         if (!el) return false
@@ -762,14 +751,12 @@
       };
       if (!tryScroll()) requestAnimationFrame(() => { if (!tryScroll()) setTimeout(tryScroll, 150); });
     }
-
-    findCollectionByCurrentPath() { return findCollection(currentDoc()); }
   }
 
   /* 导出 */
   const Core = {
     $, $$, esc, cssEsc, EventBag, PathUtils, HeadingTracker,
-    normalizePath: normPath, normalizeDoc: normDoc, sameDocValue: sameDoc,
+    normalizePath: normPath, normalizeDoc: normDoc, sameDocValue: PathUtils.sameDoc.bind(PathUtils),
     samePathValue: PathUtils.samePath.bind(PathUtils), startsWithPathValue: PathUtils.startsWithPath.bind(PathUtils),
     fetchWithLowerFallback, hasSelection: hasSel, resolveUrl: PathUtils.resolveUrl.bind(PathUtils),
     resolveDocHref, readerHref: makeHref, resolveCssHref: PathUtils.resolveCssHref.bind(PathUtils),

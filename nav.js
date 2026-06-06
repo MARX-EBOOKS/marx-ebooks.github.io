@@ -31,8 +31,6 @@
   /* 路径工具 (SSG 版：轻量) */
   const normPath = v => String(v || '').replace(/^https?:\/\/[^/]+/i, '').replace(/[?#].*$/, '').replace(/^\/+/, '').replace(/\/+$/, '');
   const normDoc = v => normPath(v).replace(/\.x?html?$/i, '');
-  const sameDoc = (a, b) => normDoc(a).toLowerCase() === normDoc(b).toLowerCase();
-  const samePath = (a, b) => normPath(a).toLowerCase() === normPath(b).toLowerCase();
   const resolveUrl = h => { try { return new URL(h, location.href).href; } catch { return h; } };
 
   /* SSG 链接生成 */
@@ -184,13 +182,13 @@
         this.mode = 'epub'
         await this.renderEpub()
       }
-      else if (innerWidth < 997 && getHeadings($('#content')).length > 1 && !this._isHome()) {
+      else if (innerWidth < 997 && getHeadings($('#content')).length > 1 && !(() => { const p = location.pathname.split('/').pop().toLowerCase(); return !p || p === 'index.html' || p === 'nav.html'; })()) {
         this.mode = 'page-toc'
         this.renderPageToc()
       }
       else {
         this.mode = 'libmap'
-        this.renderLibmap()
+        this.navTree.innerHTML = this.buildLibmap(); 
       }
       this.afterBuild();
     }
@@ -215,7 +213,7 @@
 
     /*  事件绑定 */
     bindEvents() {
-      $('#sidebar-toggle')?.addEventListener('click', () => this.toggle());
+      $('#sidebar-toggle')?.addEventListener('click', () => { this.sidebar?.classList.contains('doc-sidebar--open') ? this.close() : this.open(); });
       this.backdrop?.addEventListener('click', () => this.close());
       $('#sidebar-close-btn')?.addEventListener('click', () => this.close());
       window.addEventListener('resize', () => this.handleResize(), { passive: true });
@@ -231,16 +229,12 @@
       const w = innerWidth, crossed = (this.lastWidth < 997 && w >= 997) || (this.lastWidth >= 997 && w < 997);
       this.lastWidth = w;
       if (crossed) {
-        await this.buildMenu()
-        this.syncSidebar(this.activeHeadingId)
+        this.reinit(currentDoc());
+        this.syncSidebar(this.activeHeadingId);
       }
     }
 
     /*  SSG 文档信息 */
-    _isHome() {
-      const p = location.pathname.split('/').pop().toLowerCase()
-      return !p || p === 'index.html' || p === 'nav.html'
-    }
     _volInfo() {
       const c = normPath(location.pathname), v = this.currentVol;
       const path = (v && c === v.dir) ? v.dir + '/index.html' : c;
@@ -278,7 +272,7 @@
           e.preventDefault()
           this.scrollToHash(url.hash.slice(1))
         }
-        else if (sameDoc(url.pathname, location.pathname) && url.search === location.search && !url.hash) {
+        else if (normDoc(url.pathname).toLowerCase() === normDoc(location.pathname).toLowerCase() && url.search === location.search && !url.hash) {
           e.preventDefault()
           this.scrollToTop(url)
         }
@@ -383,30 +377,28 @@
       if (!data) {
         if (this._volInfo().isVol) {
           this.mode = 'libmap'
-          this.renderLibmap()
+          this.navTree.innerHTML = this.buildLibmap(); 
           return
         }
         this.mode = innerWidth < 997 ? 'page-toc' : 'libmap';
-        this.mode === 'page-toc' ? this.renderPageToc() : this.renderLibmap(); return;
+        this.mode === 'page-toc' ? this.renderPageToc() : this.navTree.innerHTML = this.buildLibmap(); return;
       }
       this.currentVol.data = data;
       const { col, item } = this.currentVol, tree = buildTree(data.headings || []), parts = this._breadcrumbParts(col, item, data);
-      this.navTree.innerHTML = this.renderBreadcrumb(parts) + this.renderTree(tree, 'epub-toc') + this._divider() + this.buildLibmap();
+      this.navTree.innerHTML = this.renderBreadcrumb(parts) + this.renderTree(tree, 'epub-toc') + '<div class="section-divider"><span>All works</span></div>' + this.buildLibmap();
     }
 
     renderPageToc() {
       const headings = getHeadings($('#content'));
       if (headings.length <= 1) {
         this.mode = 'libmap'
-        this.renderLibmap()
+        this.navTree.innerHTML = this.buildLibmap(); 
         return
       }
       const col = this._findCollection(), nodes = headings.map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id, file: location.pathname.split('/').pop() }));
       const parts = [{ text: col?.label || 'Library', href: col?.path ? sitePath(col.path) : '#', expand: col?.id }, { text: nodes[0]?.text || document.title }];
-      this.navTree.innerHTML = this.renderBreadcrumb(parts) + this.renderTree(buildTree(nodes), 'page-toc') + this._divider() + this.buildLibmap();
+      this.navTree.innerHTML = this.renderBreadcrumb(parts) + this.renderTree(buildTree(nodes), 'page-toc') + '<div class="section-divider"><span>All works</span></div>' + this.buildLibmap();
     }
-
-    renderLibmap() { this.navTree.innerHTML = this.buildLibmap(); }
 
     /*  渲染：面包屑 & 链接 */
     renderBreadcrumb(parts) {
@@ -432,7 +424,7 @@
       return nodes.map(n => {
         const raw = n.file || '', full = raw && this.mode !== 'page-toc' ? normPath((this.currentVol.dir + '/' + raw).replace(/\/+/g, '/')) : raw;
         const file = raw.replace(/\.x?html?$/i, '');
-        const same = this.mode === 'page-toc' || !raw || sameDoc(file, curFile);
+        const same = this.mode === 'page-toc' || !raw || normDoc(file).toLowerCase() === normDoc(curFile).toLowerCase();
         const href = this.mode === 'page-toc'
           ? (n.id ? '#' + esc(n.id) : curPath)
           : same ? (n.id ? '#' + esc(n.id) : (full || raw ? sitePath(full || raw) : curPath))
@@ -461,13 +453,12 @@
       if (!items.length) return `<li class="sidebar-item">${this._renderLink(g.path, label)}</li>`;
       return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}</span><button class="sidebar-caret" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(it => `<li class="sidebar-item">${this._renderLink(it.path, it.label || it.title || '')}</li>`).join('')}</ul></li>`;
     }
-    _divider() { return '<div class="section-divider"><span>All works</span></div>'; }
 
     /*  TOC (unified) */
     pageHeadings() {
       if (this.mode === 'epub') {
         const { file: curFile } = this._volInfo();
-        return (this.currentVol?.data?.headings || []).filter(h => sameDoc((h.file || '').replace(/\.x?html?$/i, ''), curFile)).map(h => ({
+        return (this.currentVol?.data?.headings || []).filter(h => normDoc((h.file || '').replace(/\.x?html?$/i, '')).toLowerCase() === normDoc(curFile).toLowerCase()).map(h => ({
           level: h.level || 2, text: h.text || '', id: h.id || null
         }));
       }
@@ -524,7 +515,6 @@
       }
       return best;
     }
-    _matchFile(link, file) { return sameDoc((link.dataset.file || '').replace(/\.x?html?$/i, ''), file); }
     _elementTop(id) {
       if (!id) return 0;
       const el = document.getElementById(id);
@@ -535,7 +525,7 @@
       if (this.mode === 'libmap') return;
       const links = this.sidebarLinks();
       if (!links.length) return;
-      const { file } = this._volInfo(), fileLinks = links.filter(l => this._matchFile(l, file));
+      const { file } = this._volInfo(), fileLinks = links.filter(link => normDoc((link.dataset.file || '').replace(/\.x?html?$/i, '')).toLowerCase() === normDoc(file).toLowerCase());
       let best = id ? fileLinks.find(l => l.dataset.id === id) : null;
       if (!best) {
         const y = scrollY + 80;
@@ -580,7 +570,7 @@
       let best = null, score = 0;
       $$('.sidebar-link', tree).forEach(a => {
         const f = (a.dataset.file || '').replace(/\.x?html?$/i, ''), id = a.dataset.id || ''; let s = 0;
-        if (sameDoc(f, file)) {
+        if (normDoc(f).toLowerCase() === normDoc(file).toLowerCase()) {
           s = 1;
           if (id && hash && id === hash) s = 3;          // exact hash match
           else if (!id && !hash) s = 2;                  // file-level heading, no hash
@@ -590,7 +580,7 @@
       });
       // If no best yet (e.g. hash doesn't match any id), fall back to file-level heading
       if (!best && !hash) {
-        best = $$('.sidebar-link', tree).find(a => sameDoc((a.dataset.file || '').replace(/\.x?html?$/i, ''), file) && !a.dataset.id);
+        best = $$('.sidebar-link', tree).find(a => normDoc((a.dataset.file || '').replace(/\.x?html?$/i, '')).toLowerCase() === normDoc(file).toLowerCase() && !a.dataset.id);
       }
       if (best) {
         best.classList.add('sidebar-link--active')
@@ -625,7 +615,6 @@
     }
 
     /*  SSG 特有：侧边栏开关 */
-    toggle() { this.sidebar?.classList.contains('doc-sidebar--open') ? this.close() : this.open(); }
     open() {
       if (innerWidth >= 997) return
       this.sidebar?.classList.add('doc-sidebar--open')
