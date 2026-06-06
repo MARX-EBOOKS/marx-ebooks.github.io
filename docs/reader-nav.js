@@ -190,13 +190,13 @@
 
     const load = async d => {
       try {
-        const r = await fetch(new URL(d + '/index.json', location.href).href)
+        const r = await fetch(new URL('/'+d + '/index.json', location.origin).href)
         if (r.ok) return await r.json()
       }
       catch {
       }
       try {
-        const r = await fetch(new URL(d + '/index.js', location.href).href);
+        const r = await fetch(new URL('/' + d + '/index.js', location.origin).href);
         if (!r.ok || /text\/html/i.test(r.headers.get('content-type') || '')) return null;
         const js = await r.text(); if (!/\bexport\s+default\b/.test(js)) return null;
         const b = URL.createObjectURL(new Blob([js], { type: 'text/javascript' })), m = await import(b);
