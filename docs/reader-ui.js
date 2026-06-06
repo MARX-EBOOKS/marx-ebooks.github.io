@@ -366,7 +366,26 @@ class ReaderApp {
             await new Promise(resolve => { link.onload = link.onerror = resolve; setTimeout(resolve, 800); });
         }
     }
-
+    resolveBase(docPath, finalUrl) {
+        if (finalUrl) {// 1) 优先使用 fetch 最终 URL（已跟随 301/302 重定向）
+            try {
+                const url = new URL(finalUrl);
+                const p = url.pathname;
+                if (p.endsWith('/')) return p;               // 服务器已明确是目录
+                const lastSeg = p.slice(p.lastIndexOf('/') + 1);
+                if (/\.[a-zA-Z0-9]{1,10}$/i.test(lastSeg))  // 有扩展名 → 文件
+                    return p.slice(0, p.lastIndexOf('/') + 1);
+                return p + '/';                               // 无扩展名 → 视为目录
+            } catch { }
+        }
+        const p = String(docPath || '');// 2) 回退到 docPath
+        if (p.endsWith('/')) return p;
+        const lastSlash = p.lastIndexOf('/');
+        const lastSeg = lastSlash >= 0 ? p.slice(lastSlash + 1) : p;
+        if (/\.[a-zA-Z0-9]{1,10}$/i.test(lastSeg))          // 有扩展名 → 文件
+            return p.slice(0, lastSlash + 1);
+        return p + '/';                                       // 无扩展名 → 视为目录
+    }
     async loadDoc(rawPath) {
         const docPath = this.normalizeDocPath(rawPath);
         this.showLoading(docPath);
@@ -379,7 +398,7 @@ class ReaderApp {
             if (!res.ok) throw new Error(String(res.status));
             const html = await res.text();
             const actualPath = this.normalizeDocPath(loaded.path || docPath);
-            this.renderDoc(html, actualPath);
+            this.renderDoc(html, actualPath, res.url);
             this.revealLoadedContent();
         } catch (error) {
             this.showError(docPath, error.message);
@@ -422,9 +441,9 @@ class ReaderApp {
         });
     }
 
-    renderDoc(html, docPath) {
+    renderDoc(html, docPath, finalUrl) {
         const parsed = new DOMParser().parseFromString(html, 'text/html');
-        const base = docPath.substring(0, docPath.lastIndexOf('/') + 1);
+        const base = this.resolveBase(docPath, finalUrl);
         this.injectDocBase(base);
         this.injectDocStyles(parsed, base);
         this.rewriteDocUrls(parsed, base);
