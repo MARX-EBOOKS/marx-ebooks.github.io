@@ -366,25 +366,31 @@ class ReaderApp {
             await new Promise(resolve => { link.onload = link.onerror = resolve; setTimeout(resolve, 800); });
         }
     }
-    resolveBase(docPath, finalUrl) {
-        if (finalUrl) {// 1) 优先使用 fetch 最终 URL（已跟随 301/302 重定向）
+    resolveBase(docPath, res) {
+        const finalUrl = res?.url || '';
+        const originalPath = String(docPath || '');
+        // 1) 优先用 fetch 最终 URL（已跟随 301/302）
+        if (finalUrl) {
             try {
                 const url = new URL(finalUrl);
                 const p = url.pathname;
-                if (p.endsWith('/')) return p;               // 服务器已明确是目录
-                const lastSeg = p.slice(p.lastIndexOf('/') + 1);
-                if (/\.[a-zA-Z0-9]{1,10}$/i.test(lastSeg))  // 有扩展名 → 文件
+                if (p.endsWith('/')) return p;// 明确以 / 结尾 → 目录
+                const lastSeg = p.slice(p.lastIndexOf('/') + 1);// 有扩展名 → 文件
+                if (/\.[a-zA-Z0-9]{1,10}$/i.test(lastSeg)) {
                     return p.slice(0, p.lastIndexOf('/') + 1);
-                return p + '/';                               // 无扩展名 → 视为目录
+                }
+                return p.slice(0, p.lastIndexOf('/') + 1);// 无扩展名，且无重定向到 / → 在 Cloudflare 上就是去后缀的文件
             } catch { }
         }
-        const p = String(docPath || '');// 2) 回退到 docPath
+        const p = originalPath.replace(/[?#].*$/, ''); // 2) 纯本地回退（无 res 时）
         if (p.endsWith('/')) return p;
         const lastSlash = p.lastIndexOf('/');
         const lastSeg = lastSlash >= 0 ? p.slice(lastSlash + 1) : p;
-        if (/\.[a-zA-Z0-9]{1,10}$/i.test(lastSeg))          // 有扩展名 → 文件
+        if (/\.[a-zA-Z0-9]{1,10}$/i.test(lastSeg)) {
             return p.slice(0, lastSlash + 1);
-        return p + '/';                                       // 无扩展名 → 视为目录
+        }
+        // 无扩展名 → 保守视为文件（适配 Cloudflare 去后缀）
+        return p.slice(0, lastSlash + 1);
     }
     async loadDoc(rawPath) {
         const docPath = this.normalizeDocPath(rawPath);
