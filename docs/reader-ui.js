@@ -526,8 +526,10 @@ class ReaderApp {
         const pieces = displayPath.split('/').filter(Boolean);
         for (let i = 0; i < pieces.length - 1; i++) {
             const sub = (path.startsWith('/') ? '/' : '') + pieces.slice(0, i + 1).join('/');
+            // 假设总层级数为 pieces.length，当前 i 如果小于 pieces.length - 1 才加 '/'
+            const final = (i < pieces.length - 1) ? sub + '/' : sub;
             if (parts.length) parts.push('<span class="crumb-sep">/</span>');
-            parts.push(`<a class="crumb" href="${esc(readerHref(sub))}">${esc(pieces[i])}</a>`);
+            parts.push(`<a class="crumb" href="${esc(readerHref(final))}">${esc(pieces[i])}</a>`);
         }
         if (pieces.length) {
             if (parts.length) parts.push('<span class="crumb-sep">/</span>');

@@ -157,9 +157,11 @@
   };
 
   // 常用别名 (解构自 PathUtils)
-  const { normalizePath: normPath, makeHref } = PathUtils;
-  const normDoc = PathUtils.normalizeDoc.bind(PathUtils);
-  const resolveDocHref = PathUtils.resolveDocHref.bind(PathUtils);
+  const normPath = v => PathUtils.normalizePath(v);
+  const normDoc = v => PathUtils.normalizeDoc(v);
+  const sameDoc = (a, b) => PathUtils.sameDoc(a, b);
+  const makeHref = (dp, h) => PathUtils.makeHref(dp, h);
+  const resolveDocHref = (h, b) => PathUtils.resolveDocHref(h, b);
   /* 带大小写回退的 fetch */
   async function fetchWithLowerFallback(path, opts) {
     const lower = PathUtils.lowerPathFallback(path);
