@@ -1,5 +1,6 @@
 const C = window.ReaderCore;
-const { $, $$, esc, cssEsc, syncFill, findCollection, resolveCssHref, scrollToEl, onScrollFrame, readerHref, normalizeDoc } = C;
+const { $, $$, esc, cssEsc, syncFill, findCollection, resolveCssHref, scrollToEl, onScrollFrame, readerHref } = C;
+const sameDoc = C.sameDocValue;
 const fetchWithLowerFallback = C.fetchWithLowerFallback;
 
 const state = {
@@ -573,8 +574,7 @@ class ReaderApp {
             const f = item.file || item.path || item.url || item.filename || '';
             const src = item.source_file || item.filename || '';
             const candidates = [f, src, f.split('/').pop(), src.split('/').pop()].map(x => x.replace(/\.html(?:#.*)?$/i, ''));
-            const docEq = (a, b) => normalizeDoc(a).toLowerCase() === normalizeDoc(b).toLowerCase();
-            return docEq(f, path) || docEq(f, file) || candidates.some(c => docEq(c, cleanPath) || docEq(c, cleanFile));
+            return sameDoc(f, path) || sameDoc(f, file) || candidates.some(c => sameDoc(c, cleanPath) || sameDoc(c, cleanFile));
         });
     }
 
@@ -657,7 +657,7 @@ class ReaderApp {
     handlePopState() {
         const docPath = this.normalizeDocPath(new URLSearchParams(location.search).get('doc') || '');
         if (!docPath) this.showHome(false);
-        else if (normalizeDoc(docPath).toLowerCase() !== normalizeDoc(state.doc).toLowerCase()) this.loadDoc(docPath);
+        else if (!sameDoc(docPath, state.doc)) this.loadDoc(docPath);
         else if (location.hash) {
             const hash = location.hash.slice(1);
             const el = document.getElementById(hash) || document.querySelector(`[name="${cssEsc(hash)}"]`);
@@ -703,7 +703,7 @@ class ReaderApp {
         const resolved = resolveDocLink(href, state.doc ? state.doc.replace(/\/[^/]*$/, '/') : '');
         if (resolved?.type === 'doc') {
             event.preventDefault();
-            if (normalizeDoc(resolved.docPath).toLowerCase() === normalizeDoc(state.doc).toLowerCase()) {
+            if (sameDoc(resolved.docPath, state.doc)) {
                 if (resolved.hash) this.scrollToAnchor(resolved.hash, true);
                 else this.scrollToTop(resolved.href, true);
                 return;

@@ -2,7 +2,7 @@
   'use strict';
 
   const C = window.ReaderCore || {};
-  const { $, $$, onScrollFrame, hasSelection, scrollToEl, findCollection, normalizePath, startsWithPathValue } = C;
+  const { $, $$, onScrollFrame, hasSelection, scrollToEl, findCollection, normalizePath, samePathValue, startsWithPathValue } = C;
 
   class PageBarManager {
     constructor() {
@@ -414,7 +414,7 @@
           for (const item of group.items || []) {
             const itemPath = normalizePath(item.path);
             const itemDir = itemPath.replace(/\/[^/]+$/, '');
-            if (normalizePath(norm).toLowerCase() === normalizePath(itemPath).toLowerCase() || normalizePath(dir).toLowerCase() === normalizePath(itemDir).toLowerCase() || startsWithPathValue(norm, itemDir)) {
+            if (samePathValue(norm, itemPath) || samePathValue(dir, itemDir) || startsWithPathValue(norm, itemDir)) {
               return { ...(col.citation || {}), ...(group.citation || {}), ...(item.citation || {}), volume: item.volume || group.volume || col.volume || null };
             }
           }
