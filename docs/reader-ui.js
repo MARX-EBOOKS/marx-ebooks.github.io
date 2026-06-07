@@ -366,31 +366,12 @@ class ReaderApp {
             await new Promise(resolve => { link.onload = link.onerror = resolve; setTimeout(resolve, 800); });
         }
     }
-    resolveBase(docPath, res) {
-        const finalUrl = res?.url || '';
-        const originalPath = String(docPath || '');
-        // 1) 优先用 fetch 最终 URL（已跟随 301/302）
-        if (finalUrl) {
-            try {
-                const url = new URL(finalUrl);
-                const p = url.pathname;
-                if (p.endsWith('/')) return p;// 明确以 / 结尾 → 目录
-                const lastSeg = p.slice(p.lastIndexOf('/') + 1);// 有扩展名 → 文件
-                if (/\.[a-zA-Z0-9]{1,10}$/i.test(lastSeg)) {
-                    return p.slice(0, p.lastIndexOf('/') + 1);
-                }
-                return p.slice(0, p.lastIndexOf('/') + 1);// 无扩展名，且无重定向到 / → 在 Cloudflare 上就是去后缀的文件
-            } catch { }
-        }
-        const p = originalPath.replace(/[?#].*$/, ''); // 2) 纯本地回退（无 res 时）
-        if (p.endsWith('/')) return p;
-        const lastSlash = p.lastIndexOf('/');
-        const lastSeg = lastSlash >= 0 ? p.slice(lastSlash + 1) : p;
-        if (/\.[a-zA-Z0-9]{1,10}$/i.test(lastSeg)) {
-            return p.slice(0, lastSlash + 1);
-        }
-        // 无扩展名 → 保守视为文件（适配 Cloudflare 去后缀）
-        return p.slice(0, lastSlash + 1);
+    resolveBase(docPath, finalUrl) {
+        const src = String(finalUrl || docPath || '');
+        try {
+            const p = new URL(src, location.href).pathname;
+            return p.slice(0, p.lastIndexOf('/') + 1) || '/';
+        } catch { return '/'; }
     }
     async loadDoc(rawPath) {
         const docPath = this.normalizeDocPath(rawPath);
@@ -403,8 +384,14 @@ class ReaderApp {
             const res = loaded.res;
             if (!res.ok) throw new Error(String(res.status));
             const html = await res.text();
-            const actualPath = this.normalizeDocPath(loaded.path || docPath);
-            this.renderDoc(html, actualPath, res.url);
+            // 使用浏览器实际返回的 URL 作为权威路径（跟随重定向后的真实路径）
+            const actualUrl = loaded.url || docPath;
+            const actualPath = this.normalizeDocPath(new URL(actualUrl, location.href).pathname);
+            // 如果实际路径和原始查询路径不同，静默同步地址栏，避免后续查询歧义
+            if (actualPath !== docPath) {
+                history.replaceState(history.state || {}, '', readerHref(actualPath));
+            }
+            this.renderDoc(html, actualPath, actualUrl);
             this.revealLoadedContent();
         } catch (error) {
             this.showError(docPath, error.message);
@@ -459,7 +446,7 @@ class ReaderApp {
         this.prepareAnchors(content);
         state.doc = docPath;
         const title = parsed.querySelector('title')?.textContent?.trim();
-        document.title = title ? title + ' - ' + this.siteTitle : this.siteTitle; 
+        document.title = title ? title + ' - ' + this.siteTitle : this.siteTitle;
         this.updateBreadcrumb(docPath, title);
         this.fixOverflow(content);
         this.updatePrevNext(docPath);
@@ -558,9 +545,9 @@ class ReaderApp {
         }
         if (pieces.length) {
             if (parts.length) parts.push('<span class="crumb-sep">/</span>');
-            parts.push(`<span class="crumb crumb--active">${esc(pieces.at(-1))}</span>`);
+            parts.push(`<span class="crumb current">${esc(pieces.at(-1))}</span>`);
         }
-        if (title) parts.push(`<span class="crumb-sep">/</span><span class="crumb crumb--active">${esc(title)}</span>`);
+        if (title) parts.push(`<span class="crumb-sep">/</span><span class="crumb  current">${esc(title)}</span>`);
         bar.innerHTML = parts.join('') || '<span style="color:var(--text-3);">Library</span>';
     }
 

@@ -381,7 +381,9 @@
       }
       if ((e.key === 's' || e.key === 'S') && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        window.__NAV__?.menu?.toggle();
+        const menu = window.__NAV__?.menu;
+        const isOpen = menu?.sidebar?.classList.contains('doc-sidebar--open');
+        isOpen ? menu.close() : menu.open();
       }
     });
     window.addEventListener('resize', () => {

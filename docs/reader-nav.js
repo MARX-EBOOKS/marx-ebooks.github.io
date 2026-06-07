@@ -167,17 +167,22 @@
     const lower = PathUtils.lowerPathFallback(path);
     try {
       const res = await fetch(path, opts);
-      if (res.ok || !lower || lower === path) return { res, path, url: path };
+      const actualUrl = res.url || path;
+      if (res.ok || !lower || lower === path) return { res, path, url: actualUrl };
       try {
         const fb = await fetch(lower, opts)
-        if (fb.ok) return { res: fb, path: lower, url: lower }
+        const fbUrl = fb.url || lower;
+        if (fb.ok) return { res: fb, path: lower, url: fbUrl }
       }
       catch {
       }
-      return { res, path, url: path };
+      return { res, path, url: actualUrl };
     } catch (err) {
       if (!lower || lower === path) throw err;
-      try { return { res: await fetch(lower, opts), path: lower, url: lower }; } catch { throw err; }
+      try {
+        const fb = await fetch(lower, opts);
+        return { res: fb, path: lower, url: fb.url || lower };
+      } catch { throw err; }
     }
   }
 
@@ -190,7 +195,7 @@
 
     const load = async d => {
       try {
-        const r = await fetch(new URL('/'+d + '/index.json', location.origin).href)
+        const r = await fetch(new URL('/' + d + '/index.json', location.origin).href)
         if (r.ok) return await r.json()
       }
       catch {
