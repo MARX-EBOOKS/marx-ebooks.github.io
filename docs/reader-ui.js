@@ -713,7 +713,7 @@ class ReaderApp {
             this.scrollToAnchor(href.slice(1), false);
             return;
         }
-        const resolved = resolveDocLink(a.href || href, state.doc || '');
+        const resolved = resolveDocLink(href, state.doc || '');
         if (resolved?.type === 'doc') {
             event.preventDefault();
             if (sameDoc(resolved.docPath, state.doc)) {
