@@ -1,5 +1,6 @@
 const C = window.ReaderCore;
 const { $, $$, esc, cssEsc, syncFill, findCollection, resolveCssHref, scrollToEl, onScrollFrame, readerHref } = C;
+const PathUtils = C.PathUtils;
 const sameDoc = C.sameDocValue;
 const fetchWithLowerFallback = C.fetchWithLowerFallback;
 
@@ -209,7 +210,7 @@ class ReaderApp {
         this.buildWelcomeCards();
         this.bindEvents();
         this.handleResize();
-        const initialDoc = this.normalizeDocPath(new URLSearchParams(location.search).get('doc') || '');
+        const initialDoc = (new URLSearchParams(location.search).get('doc') || '') + location.hash;
         initialDoc ? this.loadDoc(initialDoc) : this.showHome(false);
     }
 
@@ -372,23 +373,10 @@ class ReaderApp {
         }
     }
     resolveBase(docPath, finalUrl) {
-        const src = String(finalUrl || docPath || '');
-        try {
-            let normalized = src;
-            // 非协议、非查询路径补 / 前缀，避免基于 reader.html 位置解析
-            if (normalized && !normalized.startsWith('/') && !normalized.startsWith('?') && !/^[a-z][a-z0-9+.-]*:/i.test(normalized)) {
-                normalized = '/' + normalized;
-            }
-            const p = new URL(normalized, location.origin).pathname;
-            return p.slice(0, p.lastIndexOf('/') + 1) || '/';
-        } catch { return '/'; }
+        return PathUtils.contentBase(docPath, finalUrl);
     }
     async loadDoc(rawPath) {
-        let docPath = this.normalizeDocPath(rawPath);
-        // 确保非协议、非查询路径以 / 开头，避免基于 reader.html 位置解析为相对路径
-        if (docPath && !docPath.startsWith('/') && !docPath.startsWith('?') && !/^[a-z][a-z0-9+.-]*:/i.test(docPath)) {
-            docPath = '/' + docPath;
-        }
+        let docPath = PathUtils.browserUrlForDoc(rawPath);
         this.showLoading(docPath);
         this.clearDynamicStyles();
         await this.loadCollectionStyles(docPath);
@@ -398,16 +386,12 @@ class ReaderApp {
             const res = loaded.res;
             if (!res.ok) throw new Error(String(res.status));
             const html = await res.text();
-            // 使用浏览器实际返回的 URL 作为权威路径（跟随重定向后的真实路径）
-            const hash = rawPath.includes('#') ? rawPath.slice(rawPath.indexOf('#')+1) : '';
-            let actualPath = this.normalizeDocPath(new URL(actualUrl, location.href).pathname);
-            // 修正1：如果实际URL以斜杠结尾，将docPath同步改写为斜杠后缀形式
-            if (loaded.url.endsWith('/') && !docPath.endsWith('/')) {
-                docPath = docPath+'/';
-                state.doc = docPath;
-            }
-            history.replaceState(history.state || {}, '', readerHref(docPath,hash));
-            this.renderDoc(html, actualPath, docPath);
+            const hash = PathUtils.splitHash(rawPath).hash;
+            const actualUrl = loaded.url || loaded.path || docPath;
+            const actualPathname = new URL(actualUrl, location.href).pathname;
+            docPath = actualPathname.endsWith('/') ? PathUtils.directoryUrlForDoc(docPath) : PathUtils.browserUrlForDoc(docPath, hash);
+            history.replaceState(history.state || {}, '', readerHref(docPath));
+            this.renderDoc(html, docPath, actualUrl);
             this.revealLoadedContent();
         } catch (error) {
             this.showError(docPath, error.message);
@@ -455,7 +439,6 @@ class ReaderApp {
         const base = this.resolveBase(docPath, finalUrl);
         this.injectDocBase(base);
         this.injectDocStyles(parsed, base);
-        this.rewriteDocUrls(parsed, base);
         const content = $('#content');
         injectContentLang(parsed, content);
         content.innerHTML = (parsed.body.querySelector('div.prose#content') || parsed.body).innerHTML;
@@ -554,7 +537,7 @@ class ReaderApp {
         const pieces = displayPath.split('/').filter(Boolean);
         for (let i = 0; i < pieces.length - 1; i++) {
             const sub = (path.startsWith('/') ? '/' : '') + pieces.slice(0, i + 1).join('/');
-            // 假设总层级数为 pieces.length，当前 i 如果小于 pieces.length - 1 才加 '/'
+            // 目录层级面包屑：中间层级链接到对应目录
             const final = (i < pieces.length - 1) ? sub + '/' : sub;
             if (parts.length) parts.push('<span class="crumb-sep">/</span>');
             parts.push(`<a class="crumb" href="${esc(readerHref(final))}">${esc(pieces[i])}</a>`);
@@ -685,7 +668,7 @@ class ReaderApp {
     }
 
     handlePopState() {
-        const docPath = this.normalizeDocPath(new URLSearchParams(location.search).get('doc') || '');
+        const docPath = (new URLSearchParams(location.search).get('doc') || '') + location.hash;
         if (!docPath) this.showHome(false);
         else if (!sameDoc(docPath, state.doc)) this.loadDoc(docPath);
         else if (location.hash) {
@@ -730,7 +713,7 @@ class ReaderApp {
             this.scrollToAnchor(href.slice(1), false);
             return;
         }
-        const resolved = resolveDocLink(href, state.doc ? state.doc.replace(/\/[^/]*$/, '/') : '');
+        const resolved = resolveDocLink(a.href || href, state.doc || '');
         if (resolved?.type === 'doc') {
             event.preventDefault();
             if (sameDoc(resolved.docPath, state.doc)) {

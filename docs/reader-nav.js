@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  /* reader-nav.js — SPA sidebar navigation
+  /* reader-nav.js - SPA sidebar navigation
    *  Works with: reader-ui.js, reader-pagebar.js
    *  Link scheme: ?doc=<path>#<hash> */
 
@@ -79,7 +79,7 @@
     return (window.LIBRARY_CONFIG || []).find(c => PathUtils.startsWithPath(norm, c?.basePath || c?.basepath || `/${c?.id || ''}/`)) || null;
   };
 
-  /* 路径处理 (SPA 专用：保留完整 PathUtils) */
+  /* 路径处理 (SPA 专用，统一收口到 PathUtils) */
   const PathUtils = {
     specRe: /^(?:mailto|tel|javascript|data|blob):/i,
     httpRe: /^https?:$/i,
@@ -94,10 +94,53 @@
     },
     safeDecode(v) { try { return decodeURIComponent(v); } catch { return v; } },
     resolveUrl(h) { try { return new URL(h, location.href).href; } catch { return location.pathname.replace(/[^/]*$/, '') + h; } },
+    splitHash(v) {
+      const raw = String(v || '');
+      const i = raw.indexOf('#');
+      return i >= 0 ? { path: raw.slice(0, i), hash: raw.slice(i + 1) } : { path: raw, hash: '' };
+    },
+    isSpecial(raw) { return this.specRe.test(String(raw || '')) || /^[a-z][a-z0-9+.-]*:/i.test(String(raw || '')); },
+    rootPath(path) {
+      const raw = String(path || '').trim();
+      if (!raw || raw.startsWith('/') || raw.startsWith('?') || this.isSpecial(raw)) return raw;
+      return '/' + raw.replace(/^\.?\//, '');
+    },
+    docDir(docPath = '') {
+      const clean = this.splitHash(docPath).path || '';
+      if (!clean) return '/';
+      const rooted = this.rootPath(clean);
+      return rooted.slice(0, rooted.lastIndexOf('/') + 1) || '/';
+    },
+    browserUrlForDoc(docPath = '', hash = '') {
+      const parts = this.splitHash(docPath);
+      const h = hash || parts.hash;
+      return this.rootPath(parts.path) + (h ? '#' + h : '');
+    },
+    directoryUrlForDoc(docPath = '') {
+      const parts = this.splitHash(docPath);
+      const rawPath = this.rootPath(parts.path);
+      const q = rawPath.indexOf('?');
+      let path = q >= 0 ? rawPath.slice(0, q) : rawPath;
+      const query = q >= 0 ? rawPath.slice(q) : '';
+      const suffix = parts.hash ? '#' + parts.hash : '';
+      if (!path || path.endsWith('/')) return path + query + suffix;
+      path = path.replace(/\/(?:index|nav)\.x?html?$/i, '/');
+      if (!path.endsWith('/')) path += '/';
+      return path + query + suffix;
+    },
+    fetchPath(docPath = '') { return this.rootPath(this.splitHash(docPath).path) || '/'; },
+    contentBase(docPath = '', finalUrl = '') {
+      const src = finalUrl || docPath || '/';
+      try {
+        const u = new URL(src, location.origin);
+        return u.pathname.slice(0, u.pathname.lastIndexOf('/') + 1) || '/';
+      } catch {
+        return this.docDir(docPath);
+      }
+    },
 
     docBaseUrl(base = '') {
-      const c = this.normalizePath(base);
-      return new URL('/' + (c ? c.replace(/\/?$/, '/') : ''), location.origin);
+      return new URL(this.docDir(base), location.origin);
     },
     docPathFromUrl(url) {
       const rp = this.normalizePath(location.pathname), p = this.safeDecode(url.pathname);
@@ -119,28 +162,14 @@
       const dp = this.docPathFromUrl(url);
       if (!dp) return { type: 'external', href: url.href };
       const hash = url.hash.slice(1);
-      return { type: 'doc', href: this.makeHref(dp, hash), docPath: dp, hash };
+      return { type: 'doc', href: this.makeHref(dp, hash), docPath: this.browserUrlForDoc(dp), hash };
     },
     makeHref(dp, hash = '') {
-      let raw = String(dp || '');
-      const i = raw.indexOf('#');
-      const path = i >= 0 ? raw.slice(0, i) : raw;
-      const h = hash || (i >= 0 ? raw.slice(i + 1) : '');
-      let finalPath = path;
-      if (path && !path.startsWith('/') && !path.startsWith('?') && !/^[a-z][a-z0-9+.-]*:/i.test(path)) {
-        if (path.includes('/') && !path.startsWith('.')) {
-          // 已经是绝对路径格式（只是缺少 / 前缀），直接补 /
-          finalPath = '/' + path;
-        } else {
-          // 真正的相对路径，基于 currentDoc 解析
-          const doc = currentDoc() || '';
-          if (doc) {
-            const docDir = doc.replace(/\/[^/]*$/, '');
-            if (docDir) finalPath = docDir + '/' + path;
-          }
-        }
-      }
-      return location.pathname + '?doc=' + finalPath + (h ?'#'+h : '');
+      return location.pathname + '?doc=' + this.browserUrlForDoc(dp, hash);
+    },
+    toReaderHref(raw, base = currentDoc()) {
+      const resolved = this.resolveDocHref(raw, base);
+      return resolved?.type === 'doc' ? resolved.href : (resolved?.href || raw);
     },
     resolveCssHref(href, base) {
       if (!href) return '';
@@ -185,10 +214,7 @@
   const resolveDocHref = (h, b) => PathUtils.resolveDocHref(h, b);
   /* 带大小写回退的 fetch */
   async function fetchWithLowerFallback(path, opts) {
-    let finalPath = path;
-    if (path && !path.startsWith('/') && !path.startsWith('?') && !/^[a-z][a-z0-9+.-]*:/i.test(path)) {
-      finalPath = '/' + path;
-    }
+    const finalPath = PathUtils.fetchPath(path);
     const lower = PathUtils.lowerPathFallback(finalPath);
     try {
       const res = await fetch(finalPath, opts);
@@ -309,7 +335,7 @@
     }
   }
 
-  /* MenuManager — SPA 版 */
+  /* MenuManager - SPA 版 */
   const currentDoc = () => (window.ReaderState?.doc || (typeof state !== 'undefined' ? state.doc : null) || '');
 
   class MenuManager {
@@ -571,9 +597,9 @@
     }
 
     _renderLink({ href, path, text, badge = '', dataFile = '', dataId = '', extra = '' }) {
-      const raw = String(href || path || '').trim(), ext = /^(?:http|https):/i.test(raw);
+      const raw = String(href || path || '').trim(), ext = /^(?:https?:)?\/\//i.test(raw) || PathUtils.isSpecial(raw);
       const clean = !href && !ext ? normPath(raw) : '', final = ext || href ? raw : makeHref(raw);
-      const attrs = [`href="${esc(final)}"`, !href && clean ? `data-path="${esc('/' + clean)}"` : '', dataFile ? `data-file="${esc(dataFile)}"` : '', dataId ? `data-id="${esc(dataId)}"` : '', extra, 'class="sidebar-link"',ext ? `target="_blank"` : ''].filter(Boolean).join(' ');
+      const attrs = [`href="${esc(final)}"`, !href && clean ? `data-path="${esc('/' + clean)}"` : '', dataFile ? `data-file="${esc(dataFile)}"` : '', dataId ? `data-id="${esc(dataId)}"` : '', extra, 'class="sidebar-link"', ext ? `target="_blank"` : ''].filter(Boolean).join(' ');
       return `<a ${attrs}>${esc(text || '')}${badge}</a>`;
     }
 
@@ -611,7 +637,8 @@
       if (groups.length) {
         const direct = groups.every(g => g.path && !(g.items || []).length);
         const nested = direct ? `<ul class="sidebar-menu sidebar-menu--nested">${groups.map(g => this.renderGroup(g)).join('')}</ul>` : '';
-        return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-section="${esc(col.id)}" data-collapsed="true"${direct ? ' data-loaded="true"' : ''}><div class="sidebar-item-row"><span class="sidebar-category-label">${label}${badge}</span><button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div>${nested}</li>`;
+        const head = `<span class="sidebar-category-label">${label}${badge}</span>`;
+        return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-section="${esc(col.id)}" data-collapsed="true"${direct ? ' data-loaded="true"' : ''}><div class="sidebar-item-row">${head}<button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div>${nested}</li>`;
       }
       return `<li class="sidebar-item"><span class="sidebar-category-label">${label}${badge}</span></li>`;
     }
@@ -619,7 +646,8 @@
     renderGroup(group) {
       const label = esc(group.label || ''), items = group.items || [], raw = String(group.path || '').trim(), gp = normPath(group.path);
       if (!items.length) return raw ? `<li class="sidebar-item">${this._renderLink({ path: group.path, text: group.label || '' })}</li>` : `<li class="sidebar-item"><span class="sidebar-category-label">${label}</span></li>`;
-      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-group-path="${esc(gp)}" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}</span><button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(item => `<li class="sidebar-item">${this._renderLink({ path: item.path || '', text: item.label || item.title || '' })}</li>`).join('')}</ul></li>`;
+      const head = raw ? this._renderLink({ path: group.path, text: group.label || '' }) : `<span class="sidebar-category-label">${label}</span>`;
+      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-group-path="${esc(gp)}" data-collapsed="true"><div class="sidebar-item-row">${head}<button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(item => `<li class="sidebar-item">${this._renderLink({ path: item.path || '', text: item.label || item.title || '' })}</li>`).join('')}</ul></li>`;
     }
 
     /* TOC */
@@ -749,7 +777,7 @@
           s = 1;
           if (id && hash && id === hash) s = 3;          // exact hash match
           else if (!id && !hash) s = 2;                  // file-level heading, no hash
-          else if (!id && hash) s = 0;                   // file-level heading but URL has hash → skip
+          else if (!id && hash) s = 0;                   // file-level heading but URL has hash -> skip
         }
         if (s > score) { score = s; best = a; }
       });
