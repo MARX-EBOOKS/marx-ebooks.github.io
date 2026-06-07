@@ -399,16 +399,15 @@ class ReaderApp {
             if (!res.ok) throw new Error(String(res.status));
             const html = await res.text();
             // 使用浏览器实际返回的 URL 作为权威路径（跟随重定向后的真实路径）
-            const actualUrl = loaded.url || docPath;
             const hash = rawPath.includes('#') ? rawPath.slice(rawPath.indexOf('#')+1) : '';
             let actualPath = this.normalizeDocPath(new URL(actualUrl, location.href).pathname);
             // 修正1：如果实际URL以斜杠结尾，将docPath同步改写为斜杠后缀形式
-            if (actualUrl.endsWith('/') && !docPath.endsWith('/')) {
+            if (loaded.url.endsWith('/') && !docPath.endsWith('/')) {
                 docPath = docPath+'/';
                 state.doc = docPath;
             }
             history.replaceState(history.state || {}, '', readerHref(docPath,hash));
-            this.renderDoc(html, actualPath, actualUrl);
+            this.renderDoc(html, actualPath, docPath);
             this.revealLoadedContent();
         } catch (error) {
             this.showError(docPath, error.message);
