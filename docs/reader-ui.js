@@ -400,14 +400,14 @@ class ReaderApp {
             const html = await res.text();
             // 使用浏览器实际返回的 URL 作为权威路径（跟随重定向后的真实路径）
             const actualUrl = loaded.url || docPath;
+            const hash = rawPath.includes('#') ? rawPath.slice(rawPath.indexOf('#')+1) : '';
             let actualPath = this.normalizeDocPath(new URL(actualUrl, location.href).pathname);
             // 修正1：如果实际URL以斜杠结尾，将docPath同步改写为斜杠后缀形式
             if (actualUrl.endsWith('/') && !docPath.endsWith('/')) {
-                docPath = actualPath;
+                docPath = docPath+'/';
                 state.doc = docPath;
             }
-            // 始终用浏览器实际返回的权威路径同步地址栏，避免路径歧义
-            history.replaceState(history.state || {}, '', readerHref(actualPath));
+            history.replaceState(history.state || {}, '', readerHref(docPath,hash));
             this.renderDoc(html, actualPath, actualUrl);
             this.revealLoadedContent();
         } catch (error) {
@@ -740,7 +740,8 @@ class ReaderApp {
                 return;
             }
             history.pushState({}, '', resolved.href);
-            this.loadDoc(resolved.docPath);
+            const final_href = resolved.hash ? resolved.docPath+'#' + resolved.hash : resolved.docPath
+            this.loadDoc(final_href);
         }
     }
 

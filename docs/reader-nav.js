@@ -136,11 +136,11 @@
           const doc = currentDoc() || '';
           if (doc) {
             const docDir = doc.replace(/\/[^/]*$/, '');
-            if (docDir) finalPath = normPath(docDir + '/' + path);
+            if (docDir) finalPath = docDir + '/' + path;
           }
         }
       }
-      return location.pathname + '?doc=' + finalPath + (h ? '#' + h : '');
+      return location.pathname + '?doc=' + finalPath + (h ?'#'+h : '');
     },
     resolveCssHref(href, base) {
       if (!href) return '';
@@ -439,8 +439,7 @@
           hash ? this.scrollToHash(hash, true) : window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
         }
         else if (hash) {
-          sessionStorage.setItem('__reader_pending_anchor', hash)
-          sessionStorage.setItem('__reader_pending_doc', docPath)
+          e.preventDefault()
         }
       }
     }
@@ -574,7 +573,7 @@
     _renderLink({ href, path, text, badge = '', dataFile = '', dataId = '', extra = '' }) {
       const raw = String(href || path || '').trim(), ext = /^(?:http|https):/i.test(raw);
       const clean = !href && !ext ? normPath(raw) : '', final = ext || href ? raw : makeHref(raw);
-      const attrs = [`href="${esc(final)}"`, !href && clean ? `data-path="${esc('/' + clean)}"` : '', dataFile ? `data-file="${esc(dataFile)}"` : '', dataId ? `data-id="${esc(dataId)}"` : '', extra, 'class="sidebar-link"'].filter(Boolean).join(' ');
+      const attrs = [`href="${esc(final)}"`, !href && clean ? `data-path="${esc('/' + clean)}"` : '', dataFile ? `data-file="${esc(dataFile)}"` : '', dataId ? `data-id="${esc(dataId)}"` : '', extra, 'class="sidebar-link"',ext ? `target="_blank"` : ''].filter(Boolean).join(' ');
       return `<a ${attrs}>${esc(text || '')}${badge}</a>`;
     }
 
