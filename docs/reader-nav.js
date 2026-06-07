@@ -122,17 +122,38 @@
       return { type: 'doc', href: this.makeHref(dp, hash), docPath: dp, hash };
     },
     makeHref(dp, hash = '') {
-      const raw = String(dp || ''), i = raw.indexOf('#');
+      let raw = String(dp || '');
+      const i = raw.indexOf('#');
       const path = i >= 0 ? raw.slice(0, i) : raw;
       const h = hash || (i >= 0 ? raw.slice(i + 1) : '');
-      return location.pathname + '?doc=' + path + (h ? '#' + h : '');
+      let finalPath = path;
+      if (path && !path.startsWith('/') && !path.startsWith('?') && !/^[a-z][a-z0-9+.-]*:/i.test(path)) {
+        if (path.includes('/') && !path.startsWith('.')) {
+          // 已经是绝对路径格式（只是缺少 / 前缀），直接补 /
+          finalPath = '/' + path;
+        } else {
+          // 真正的相对路径，基于 currentDoc 解析
+          const doc = currentDoc() || '';
+          if (doc) {
+            const docDir = doc.replace(/\/[^/]*$/, '');
+            if (docDir) finalPath = normPath(docDir + '/' + path);
+          }
+        }
+      }
+      return location.pathname + '?doc=' + finalPath + (h ? '#' + h : '');
     },
     resolveCssHref(href, base) {
       if (!href) return '';
       if (/^(https?:|\/\/)/i.test(href)) return href;
       try {
-        const dir = String(base || '').replace(/\/?$/, '/'), bu = dir.startsWith('/') ? new URL(dir, location.origin) : new URL(dir, location.href), u = new URL(href, bu)
-        return u.pathname + u.search + u.hash
+        let dir = String(base || '').replace(/\/?$/, '/');
+        // base 含 / 且不以 . 开头时视为绝对路径，补 / 前缀避免基于 reader.html 位置解析
+        if (!dir.startsWith('/') && dir.includes('/') && !dir.startsWith('.')) {
+          dir = '/' + dir;
+        }
+        const bu = dir.startsWith('/') ? new URL(dir, location.origin) : new URL(dir, location.href);
+        const u = new URL(href, bu);
+        return u.pathname + u.search + u.hash;
       }
       catch { return [String(base || '').replace(/^\/+|\/+$/g, ''), href.replace(/^\.+\//, '')].filter(Boolean).join('/'); }
     },
@@ -164,11 +185,15 @@
   const resolveDocHref = (h, b) => PathUtils.resolveDocHref(h, b);
   /* 带大小写回退的 fetch */
   async function fetchWithLowerFallback(path, opts) {
-    const lower = PathUtils.lowerPathFallback(path);
+    let finalPath = path;
+    if (path && !path.startsWith('/') && !path.startsWith('?') && !/^[a-z][a-z0-9+.-]*:/i.test(path)) {
+      finalPath = '/' + path;
+    }
+    const lower = PathUtils.lowerPathFallback(finalPath);
     try {
-      const res = await fetch(path, opts);
-      const actualUrl = res.url || path;
-      if (res.ok || !lower || lower === path) return { res, path, url: actualUrl };
+      const res = await fetch(finalPath, opts);
+      const actualUrl = res.url || finalPath;
+      if (res.ok || !lower || lower === finalPath) return { res, path: finalPath, url: actualUrl };
       try {
         const fb = await fetch(lower, opts)
         const fbUrl = fb.url || lower;
@@ -176,9 +201,9 @@
       }
       catch {
       }
-      return { res, path, url: actualUrl };
+      return { res, path: finalPath, url: actualUrl };
     } catch (err) {
-      if (!lower || lower === path) throw err;
+      if (!lower || lower === finalPath) throw err;
       try {
         const fb = await fetch(lower, opts);
         return { res: fb, path: lower, url: fb.url || lower };
@@ -555,11 +580,14 @@
 
     /* 渲染：树 */
     renderTree(nodes, cls, docPath) {
-      return `<ul class="sidebar-menu ${esc(cls)}">${this.renderNodes(nodes, normDoc(this.volumeDocPath(docPath || currentDoc())))}</ul>`;
+      const effectiveDoc = docPath || currentDoc();
+      return `<ul class="sidebar-menu ${esc(cls)}">${this.renderNodes(nodes, normDoc(this.volumeDocPath(effectiveDoc)), effectiveDoc)}</ul>`;
     }
 
-    renderNodes(nodes, currentFull) {
-      const volDir = this.currentVol?.dir || '', isPage = this.mode === 'page-toc', curHref = makeHref(this.volumeDocPath(currentDoc()));
+    renderNodes(nodes, currentFull, docPath) {
+      const volDir = this.currentVol?.dir || '', isPage = this.mode === 'page-toc';
+      const curDoc = docPath || currentDoc();
+      const curHref = makeHref(this.volumeDocPath(curDoc));
       return nodes.map(n => {
         const raw = n.file || '', full = raw && !isPage ? normPath((volDir + '/' + raw).replace(/\/+/g, '/')) : raw;
         const same = isPage || (full && normDoc(full).toLowerCase() === normDoc(currentFull).toLowerCase());

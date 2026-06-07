@@ -215,6 +215,7 @@ window.LIBRARY_CONFIG = [
         basePath: '/MEGA/',
         badge: 'DE',
         path: '/MEGA/index.html',
+        stylesheets: ['/MEGA/II/MEGA.css'],
         citation: { prefix: 'MEGA²'  },
         groups: [
             { label: 'Digitalisierung „Neue Rheinische Zeitung“', path: '/MEGA/nrhz/index.html' },

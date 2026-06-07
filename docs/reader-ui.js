@@ -135,7 +135,12 @@ class FootnotePopup {
         $$('[id]', clone).forEach(el => el.removeAttribute('id'));
         viewer.replaceChildren(clone);
         if (jump) {
-            jump.href = cross ? C.resolveUrl(href) : href;
+            if (cross) {
+                const resolved = resolveDocLink(href, state.doc ? state.doc.replace(/\/[^/]*$/, '/') : '');
+                jump.href = resolved?.type === 'doc' ? resolved.href : C.resolveUrl(href);
+            } else {
+                jump.href = href;
+            }
             jump.textContent = cross ? 'Go to note (other page)' : 'Jump to footnote';
             jump.classList.toggle('popover__jump--cross', cross);
             jump.style.display = '';
@@ -369,12 +374,21 @@ class ReaderApp {
     resolveBase(docPath, finalUrl) {
         const src = String(finalUrl || docPath || '');
         try {
-            const p = new URL(src, location.href).pathname;
+            let normalized = src;
+            // 非协议、非查询路径补 / 前缀，避免基于 reader.html 位置解析
+            if (normalized && !normalized.startsWith('/') && !normalized.startsWith('?') && !/^[a-z][a-z0-9+.-]*:/i.test(normalized)) {
+                normalized = '/' + normalized;
+            }
+            const p = new URL(normalized, location.origin).pathname;
             return p.slice(0, p.lastIndexOf('/') + 1) || '/';
         } catch { return '/'; }
     }
     async loadDoc(rawPath) {
-        const docPath = this.normalizeDocPath(rawPath);
+        let docPath = this.normalizeDocPath(rawPath);
+        // 确保非协议、非查询路径以 / 开头，避免基于 reader.html 位置解析为相对路径
+        if (docPath && !docPath.startsWith('/') && !docPath.startsWith('?') && !/^[a-z][a-z0-9+.-]*:/i.test(docPath)) {
+            docPath = '/' + docPath;
+        }
         this.showLoading(docPath);
         this.clearDynamicStyles();
         await this.loadCollectionStyles(docPath);
@@ -386,11 +400,14 @@ class ReaderApp {
             const html = await res.text();
             // 使用浏览器实际返回的 URL 作为权威路径（跟随重定向后的真实路径）
             const actualUrl = loaded.url || docPath;
-            const actualPath = this.normalizeDocPath(new URL(actualUrl, location.href).pathname);
-            // 如果实际路径和原始查询路径不同，静默同步地址栏，避免后续查询歧义
-            if (actualPath !== docPath) {
-                history.replaceState(history.state || {}, '', readerHref(actualPath));
+            let actualPath = this.normalizeDocPath(new URL(actualUrl, location.href).pathname);
+            // 修正1：如果实际URL以斜杠结尾，将docPath同步改写为斜杠后缀形式
+            if (actualUrl.endsWith('/') && !docPath.endsWith('/')) {
+                docPath = actualPath;
+                state.doc = docPath;
             }
+            // 始终用浏览器实际返回的权威路径同步地址栏，避免路径歧义
+            history.replaceState(history.state || {}, '', readerHref(actualPath));
             this.renderDoc(html, actualPath, actualUrl);
             this.revealLoadedContent();
         } catch (error) {
