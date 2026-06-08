@@ -383,9 +383,8 @@ class ReaderApp {
             const html = await res.text();
             const hash = rawPath.includes('#') ? rawPath.split('#')[1] : '';
             const actualUrl = loaded.url || loaded.path || docPath;
-            const actualPathname = new URL(actualUrl, location.href).pathname;
             history.replaceState(history.state || {}, '', PathResolver.makeSpa(docPath,hash));
-            this.renderDoc(html, docPath+'#'+hash, actualUrl);
+            this.renderDoc(html, hash?docPath+'#'+hash:docPath, actualUrl);
             this.revealLoadedContent();
         } catch (error) {
             this.showError(docPath, error.message);
@@ -430,7 +429,7 @@ class ReaderApp {
 
     renderDoc(html, docPath, finalUrl) {
         const parsed = new DOMParser().parseFromString(html, 'text/html');
-        this.rewriteDocUrls(parsed, finalUrl);
+        this.rewriteDocUrls(parsed, docPath);
         this.rewriteDocAssets(parsed, finalUrl);
         this.injectDocStyles(parsed, finalUrl);
         const content = $('#content');
