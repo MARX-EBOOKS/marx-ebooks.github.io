@@ -105,56 +105,60 @@
       if (!raw || raw.startsWith('/') || raw.startsWith('?') || this.isSpecial(raw)) return raw;
       return '/' + raw.replace(/^\.?\//, '');
     },
-    docDir(docPath = '') {
-      const clean = this.splitHash(docPath).path || '';
-      if (!clean) return '/';
-      const rooted = this.rootPath(clean);
-      return rooted.slice(0, rooted.lastIndexOf('/') + 1) || '/';
+    fetchPath(docPath = '') {
+      const raw = this.rootPath(this.splitHash(docPath).path);
+      return raw || '/';
+    },
+    contentUrl(docPath = '', finalUrl = '') {
+      return new URL(finalUrl || this.fetchPath(docPath), location.origin);
+    },
+    contentDirUrl(docPath = '', finalUrl = '') {
+      return new URL('./', this.contentUrl(docPath, finalUrl));
+    },
+    docDir(docPath = '', finalUrl = '') {
+      return this.contentDirUrl(docPath, finalUrl).pathname;
     },
     browserUrlForDoc(docPath = '', hash = '') {
       const parts = this.splitHash(docPath);
+      const url = this.contentUrl(parts.path || '/', '');
       const h = hash || parts.hash;
-      return this.rootPath(parts.path) + (h ? '#' + h : '');
+      return url.pathname + url.search + (h ? '#' + h : '');
     },
-    directoryUrlForDoc(docPath = '') {
+    directoryUrlForDoc(docPath = '', finalUrl = '') {
       const parts = this.splitHash(docPath);
-      const rawPath = this.rootPath(parts.path);
-      const q = rawPath.indexOf('?');
-      let path = q >= 0 ? rawPath.slice(0, q) : rawPath;
-      const query = q >= 0 ? rawPath.slice(q) : '';
-      const suffix = parts.hash ? '#' + parts.hash : '';
-      if (!path || path.endsWith('/')) return path + query + suffix;
-      path = path.replace(/\/(?:index|nav)\.x?html?$/i, '/');
-      if (!path.endsWith('/')) path += '/';
-      return path + query + suffix;
+      const url = this.contentDirUrl(parts.path || '/', finalUrl);
+      return url.pathname + url.search + (parts.hash ? '#' + parts.hash : '');
     },
-    fetchPath(docPath = '') { return this.rootPath(this.splitHash(docPath).path) || '/'; },
     contentBase(docPath = '', finalUrl = '') {
-      const src = finalUrl || docPath || '/';
+      return this.docDir(docPath, finalUrl);
+    },
+    resolveAssetUrl(raw, docPath = '', finalUrl = '') {
+      const href = String(raw || '').trim();
+      if (!href) return null;
       try {
-        const u = new URL(src, location.origin);
-        return u.pathname.slice(0, u.pathname.lastIndexOf('/') + 1) || '/';
+        return new URL(href, this.contentDirUrl(docPath, finalUrl));
       } catch {
-        return this.docDir(docPath);
+        return null;
       }
     },
-
-    docBaseUrl(base = '') {
-      return new URL(this.docDir(base), location.origin);
+    resolveAssetPath(raw, docPath = '', finalUrl = '') {
+      const url = this.resolveAssetUrl(raw, docPath, finalUrl);
+      if (!url) return String(raw || '');
+      return url.origin === location.origin ? (url.pathname + url.search + url.hash) : url.href;
     },
     docPathFromUrl(url) {
       const rp = this.normalizePath(location.pathname), p = this.safeDecode(url.pathname);
       if (this.normalizePath(p).toLowerCase() === this.normalizePath(rp).toLowerCase() && url.searchParams.has('doc')) return url.searchParams.get('doc') || '';
       return p + url.search;
     },
-    resolveDocHref(href, base = '') {
+    resolveDocHref(href, base = '', finalUrl = '') {
       const raw = String(href || '').trim();
       if (!raw) return null;
       if (raw.startsWith('#')) return { type: 'anchor', href: raw, hash: raw.slice(1) };
       if (this.specRe.test(raw)) return { type: 'external', href: raw };
       let url;
       try {
-        url = new URL(raw, raw.startsWith('?') ? location.href : this.docBaseUrl(base));
+        url = new URL(raw, raw.startsWith('?') ? location.href : this.contentUrl(base || '/', finalUrl));
       } catch {
         return { type: 'external', href: raw };
       }
@@ -171,7 +175,10 @@
       const resolved = this.resolveDocHref(raw, base);
       return resolved?.type === 'doc' ? resolved.href : (resolved?.href || raw);
     },
-    resolveCssHref(href, base) {
+    resolveCssHref(href, base, finalUrl = '') {
+      return this.resolveAssetPath(href, base, finalUrl);
+    },
+    _legacyResolveCssHref(href, base) {
       if (!href) return '';
       if (/^(https?:|\/\/)/i.test(href)) return href;
       try {
