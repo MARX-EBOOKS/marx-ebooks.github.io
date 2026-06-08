@@ -384,9 +384,8 @@ class ReaderApp {
             const hash = rawPath.includes('#') ? rawPath.split('#')[1] : '';
             const actualUrl = loaded.url || loaded.path || docPath;
             const actualPathname = new URL(actualUrl, location.href).pathname;
-            docPath = actualPathname + (hash ? '#' + hash : '');
-            history.replaceState(history.state || {}, '', PathResolver.makeSpa(docPath));
-            this.renderDoc(html, docPath, actualUrl);
+            history.replaceState(history.state || {}, '', PathResolver.makeSpa(docPath,hash));
+            this.renderDoc(html, docPath+'#'+hash, actualUrl);
             this.revealLoadedContent();
         } catch (error) {
             this.showError(docPath, error.message);
