@@ -4,13 +4,14 @@ h1 {font-family: "黑体"; text-align:center;margin-top:0.5em;margin-bottom:1em;
 h2 {font-family: "黑体"; text-align:center;margin:1.5em auto;line-height:200%;}
 h3,h4,h5,h6 {font-family: "黑体"; text-align:center;margin:1em auto;line-height:200%;}
 table {margin:1.5em auto;max-width:100%;}
-hr {margin:1em auto;text-align:center;}
-.quote,blockquote,.footnote,.src {font-size: 0.75em;line-height:150%;}
+hr {margin:1em auto;text-align:center;max-width:80%;}
+.quote,blockquote,.footnote,p.footnote div,.src {font-size: 0.75em;line-height:150%;}
+
 blockquote p {line-height:150%;}
 .quote,blockquote,.footnote {margin: 1.5em 0;}
 .footnote,.sign {margin-top:2em;}
 table.quote,table.footnote,blockquote table,.add td,.src td {font-size: 0.75em;margin: 1.5em auto;line-height:150%;}
-.style2 {font-weight:bold;font-size: 1.25rem;}
+.style2 {font-weight:bold;font-size: 1.25rem;margin: 0 0 2em 0;}
 .date,.style3 {font-size: 0.75em;text-align:center;margin-top:0;margin-bottom:2em;}
 .TCC {width: 20%;font-size: 0.75em;text-align:justify;margin:1em auto;}
 .TOC {width: 85%;text-align:justify;margin:2em auto;}

@@ -1,29 +1,12 @@
 {
-  "name": "mlread-zh-cn",
-  "private": true,
-  "description": "Cloudflare Worker application",
-  "main": "src/index.ts",
+  "name": "mlclassic",
   "type": "module",
-  "engines": {
-    "node": ">=18.0.0"
-  },
+  "version": "8.0.0",
   "scripts": {
-    "dev": "wrangler dev",
-    "build": "tsc",
-    "deploy": "wrangler deploy",
-    "tail": "wrangler tail"
+    "build": "node build11.js",
+    "preview":"npx http-server ./dist -p 17117 -f False"
   },
-  "keywords": [
-    "cloudflare",
-    "workers",
-    "edge"
-  ],
-  "author": "",
-  "license": "MIT",
-  "devDependencies": {
-    "@cloudflare/workers-types": "^4.0.0",
-    "typescript": "^5.0.0",
-    "wrangler": "^3.0.0"
-  },
-  "dependencies": {}
+  "dependencies": {
+    "cheerio": "^1.2.0"
+  }
 }
