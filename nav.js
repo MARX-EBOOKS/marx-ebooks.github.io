@@ -35,12 +35,57 @@
 
   /* SSG 链接生成 */
   const siteRoot = () => (document.body.dataset.site || '').replace(/\/$/, '');
-  const sitePath = p => {
-    if (!p) return '#';
-    if (/^https?:/i.test(p)) return p;
-    const root = siteRoot(), c = normPath(p);
-    return root ? `${root}/${c}` : '/' + c;
+  const PathResolver = {
+    special: /^(?:mailto|tel|javascript|data|blob):/i,
+    split(v) {
+      const raw = String(v || '').trim();
+      const h = raw.indexOf('#');
+      return h >= 0
+        ? { path: raw.slice(0, h), hash: raw.slice(h + 1) }
+        : { path: raw, hash: '' };
+    },
+    stripRoot(v) {
+      const root = siteRoot();
+      const raw = String(v || '').replace(/^https?:\/\/[^/]+/i, '').replace(/[?#].*$/, '');
+      const path = root && raw.startsWith(root + '/') ? raw.slice(root.length) : raw;
+      return path.replace(/^\/+/, '');
+    },
+    dir(base) {
+      const p = this.stripRoot(base == null ? location.pathname : base);
+      return !p || p.endsWith('/') ? p : p.slice(0, p.lastIndexOf('/') + 1);
+    },
+    logical(base, href) {
+      const parts = this.split(href);
+      const raw = parts.path.replace(/^https?:\/\/[^/]+/i, '');
+      if (!raw || raw.startsWith('?')) return raw + (parts.hash ? '#' + parts.hash : '');
+      if (raw.startsWith('/')) return this.stripRoot(raw) + (parts.hash ? '#' + parts.hash : '');
+      else {
+        let dir = this.dir(base), rel = raw.replace(/^\.\//, '');
+        for (; rel.startsWith('../'); rel = rel.slice(3)) {
+          dir = dir.replace(/\/?[^/]+\/?$/, '');
+        }
+        return (dir.replace(/\/?$/, '/') + rel).replace(/\/+/g, '/').replace(/^\/+/, '') + (parts.hash ? '#' + parts.hash : '');
+      }
+    },
+    path(base, href) {
+      const raw = String(href || '').trim();
+      if (raw.startsWith('#')) return raw;
+      if (!raw || this.special.test(raw) || /^(?:https?:)?\/\//i.test(raw)) return raw || '#';
+      const logical = this.logical(base, raw);
+      const root = siteRoot();
+      return (root ? root + '/' : '/') + logical.replace(/^\/+/, '');
+    },
+    resolve(base, href) {
+      const raw = String(href || '').trim();
+      if (!raw) return null;
+      if (raw.startsWith('#')) return { type: 'anchor', href: raw, hash: raw.slice(1) };
+      if (this.special.test(raw) || /^(?:https?:)?\/\//i.test(raw)) return { type: 'external', href: raw };
+      const hrefOut = this.path(base, raw);
+      const parts = this.split(hrefOut);
+      return { type: 'doc', href: hrefOut, path: parts.path, hash: parts.hash };
+    }
   };
+  const sitePath = p => PathResolver.path('', p);
 
   /* 滚动帧回调 (unified) */
   const scrollCbs = new Set();
@@ -148,7 +193,7 @@
 
   /* ReaderCore (unified 导出) */
   const ReaderCore = window.ReaderCore || {
-    $, $$, esc, cssEsc, EventBag, HeadingTracker,
+    $, $$, esc, cssEsc, EventBag, HeadingTracker, PathResolver,
     normalizePath: normPath, normalizeDoc: normDoc, resolveUrl, hasSelection: hasSel,
     scrollToEl, syncFill, onScrollFrame, getDomHeadings: getHeadings, buildHeadingTree: buildTree, expandTo
   };
@@ -236,7 +281,7 @@
 
     /*  SSG 文档信息 */
     _volInfo() {
-      const c = normPath(location.pathname), v = this.currentVol;
+      const c = normPath(PathResolver.stripRoot(location.pathname)), v = this.currentVol;
       const path = (v && c === v.dir) ? v.dir + '/index.html' : c;
       const file = path.split('/').pop().replace(/\.x?html?$/i, '') || 'index';
       const isVol = v ? (c === v.dir || c === v.dir + '/index.html') : false;
@@ -315,7 +360,7 @@
 
     /*  卷册检测 (unified 算法) */
     detectVolume() {
-      const cur = normPath(location.pathname), curL = cur.toLowerCase();
+      const cur = normPath(PathResolver.stripRoot(location.pathname)), curL = cur.toLowerCase();
       const matchPath = p => {
         if (!p || /^https?:/i.test(p)) return null;
         const ip = normPath(p); if (!/\/index\.html?$/i.test(ip)) return null;
@@ -349,7 +394,7 @@
     }
     async _importVolData(d) {
       const urls = [], meta = window.__PAGE_META__ || {};
-      if (meta.indexJsPath) urls.push(new URL(meta.indexJsPath, location.href).href);
+      if (meta.indexJsPath) urls.push(PathResolver.path(location.pathname, meta.indexJsPath));
       const dirs = [d], dl = d.toLowerCase(); if (dl !== d) dirs.push(dl);
       dirs.forEach(dir => urls.push(new URL(sitePath(dir + '/index.js'), location.href).href));
       for (const url of [...new Set(urls)]) { try { const m = await import(url); if (m?.default) return m.default; } catch { } }
@@ -610,8 +655,11 @@
 
     /*  SSG 特有：合集查找 */
     _findCollection() {
-      const path = normPath(location.pathname), find = fn => (window.LIBRARY_CONFIG || []).find(c => { const b = fn(c.basePath || c.basepath || ''); return b && path.startsWith(b); });
-      return find(normPath) || find(p => normPath(p).toLowerCase()) || null;
+      const path = normPath(PathResolver.stripRoot(location.pathname));
+      return (window.LIBRARY_CONFIG || []).find(c => {
+        const b = normPath(c.path || '');
+        return b && (path.startsWith(b) || path.toLowerCase().startsWith(b.toLowerCase()));
+      }) || null;
     }
 
     /*  SSG 特有：侧边栏开关 */
@@ -648,7 +696,7 @@
         const btn = $('#' + k + '-btn'), data = meta[k]; if (!btn || !data) return;
         const label = $('.pagination-link__label', btn);
         if (label && data.title) label.textContent = data.title;
-        if (data.file) btn.href = data.file.startsWith('/') ? data.file : location.pathname.replace(/[^/]*$/, '') + data.file;
+        if (data.file) btn.href = PathResolver.path(location.pathname, data.file);
       });
     }
   }

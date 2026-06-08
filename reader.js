@@ -12,7 +12,7 @@
   });
   const scrollToEl = C.scrollToEl || (el => el?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   const cssEsc = C.cssEsc || (v => (window.CSS?.escape ? CSS.escape(String(v)) : String(v).replace(/["\\]/g, '\\$&')));
-
+  const PathResolver = C.PathResolver;
   const state = {
     fs: parseFloat(localStorage.fontSize) || 1,
     lh: parseFloat(localStorage.lineHeight) || 2.0,
@@ -22,7 +22,7 @@
   };
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-  const resolveUrl = href => { try { return new URL(href, location.href).href; } catch { return location.pathname.replace(/[^/]*$/, '') + href; } };
+  const resolveUrl = href => PathResolver.path(location.pathname, href);
   const lowerUrlFallback = value => {
     try {
       const url = new URL(value, location.href);
@@ -36,8 +36,8 @@
   };
   const samePath = (a, b) => {
     try {
-      const left = new URL(a, location.href).pathname.replace(/\/+$/, '');
-      const right = new URL(b, location.href).pathname.replace(/\/+$/, '');
+      const left = PathResolver.stripRoot(a).replace(/\/+$/, '');
+      const right = PathResolver.stripRoot(b).replace(/\/+$/, '');
       return left === right || left.toLowerCase() === right.toLowerCase();
     } catch {
       return String(a || '') === String(b || '') || String(a || '').toLowerCase() === String(b || '').toLowerCase();
@@ -412,10 +412,10 @@
       }
       if (href.includes('#') && !/^(https?:|\/\/)/i.test(href)) {
         try {
-          const resolved = new URL(href, location.href);
-          if (samePath(resolved.href, location.href) && resolved.hash) {
+          const resolved = PathResolver.resolve(location.pathname, href);
+          if (resolved?.type === 'doc' && samePath(resolved.href, location.href) && resolved.hash) {
             e.preventDefault();
-            const target = document.getElementById(resolved.hash.slice(1));
+            const target = document.getElementById(resolved.hash);
             if (target) scrollToEl(target);
           }
         } catch { }

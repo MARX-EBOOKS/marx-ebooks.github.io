@@ -76,7 +76,7 @@
   /* 合集查找 */
   const findCollection = path => {
     const norm = PathUtils.normalizePath(path);
-    return (window.LIBRARY_CONFIG || []).find(c => PathUtils.startsWithPath(norm, c?.basePath || c?.basepath || `/${c?.id || ''}/`)) || null;
+    return (window.LIBRARY_CONFIG || []).find(c => PathUtils.startsWithPath(norm, c?.path || '')) || null;
   };
 
   /* 路径处理 (SPA 专用，统一收口到 PathUtils) */
@@ -105,94 +105,7 @@
       if (!raw || raw.startsWith('/') || raw.startsWith('?') || this.isSpecial(raw)) return raw;
       return '/' + raw.replace(/^\.?\//, '');
     },
-    fetchPath(docPath = '') {
-      const raw = this.rootPath(this.splitHash(docPath).path);
-      return raw || '/';
-    },
-    contentUrl(docPath = '', finalUrl = '') {
-      return new URL(finalUrl || this.fetchPath(docPath), location.origin);
-    },
-    contentDirUrl(docPath = '', finalUrl = '') {
-      return new URL('./', this.contentUrl(docPath, finalUrl));
-    },
-    docDir(docPath = '', finalUrl = '') {
-      return this.contentDirUrl(docPath, finalUrl).pathname;
-    },
-    browserUrlForDoc(docPath = '', hash = '') {
-      const parts = this.splitHash(docPath);
-      const url = this.contentUrl(parts.path || '/', '');
-      const h = hash || parts.hash;
-      return url.pathname + url.search + (h ? '#' + h : '');
-    },
-    directoryUrlForDoc(docPath = '', finalUrl = '') {
-      const parts = this.splitHash(docPath);
-      const url = this.contentDirUrl(parts.path || '/', finalUrl);
-      return url.pathname + url.search + (parts.hash ? '#' + parts.hash : '');
-    },
-    contentBase(docPath = '', finalUrl = '') {
-      return this.docDir(docPath, finalUrl);
-    },
-    resolveAssetUrl(raw, docPath = '', finalUrl = '') {
-      const href = String(raw || '').trim();
-      if (!href) return null;
-      try {
-        return new URL(href, this.contentDirUrl(docPath, finalUrl));
-      } catch {
-        return null;
-      }
-    },
-    resolveAssetPath(raw, docPath = '', finalUrl = '') {
-      const url = this.resolveAssetUrl(raw, docPath, finalUrl);
-      if (!url) return String(raw || '');
-      return url.origin === location.origin ? (url.pathname + url.search + url.hash) : url.href;
-    },
-    docPathFromUrl(url) {
-      const rp = this.normalizePath(location.pathname), p = this.safeDecode(url.pathname);
-      if (this.normalizePath(p).toLowerCase() === this.normalizePath(rp).toLowerCase() && url.searchParams.has('doc')) return url.searchParams.get('doc') || '';
-      return p + url.search;
-    },
-    resolveDocHref(href, base = '', finalUrl = '') {
-      const raw = String(href || '').trim();
-      if (!raw) return null;
-      if (raw.startsWith('#')) return { type: 'anchor', href: raw, hash: raw.slice(1) };
-      if (this.specRe.test(raw)) return { type: 'external', href: raw };
-      let url;
-      try {
-        url = new URL(raw, raw.startsWith('?') ? location.href : this.contentUrl(base || '/', finalUrl));
-      } catch {
-        return { type: 'external', href: raw };
-      }
-      if (!this.httpRe.test(url.protocol) || url.origin !== location.origin) return { type: 'external', href: url.href };
-      const dp = this.docPathFromUrl(url);
-      if (!dp) return { type: 'external', href: url.href };
-      const hash = url.hash.slice(1);
-      return { type: 'doc', href: this.makeHref(dp, hash), docPath: this.browserUrlForDoc(dp), hash };
-    },
-    makeHref(dp, hash = '') {
-      return location.pathname + '?doc=' + this.browserUrlForDoc(dp, hash);
-    },
-    toReaderHref(raw, base = currentDoc()) {
-      const resolved = this.resolveDocHref(raw, base);
-      return resolved?.type === 'doc' ? resolved.href : (resolved?.href || raw);
-    },
-    resolveCssHref(href, base, finalUrl = '') {
-      return this.resolveAssetPath(href, base, finalUrl);
-    },
-    _legacyResolveCssHref(href, base) {
-      if (!href) return '';
-      if (/^(https?:|\/\/)/i.test(href)) return href;
-      try {
-        let dir = String(base || '').replace(/\/?$/, '/');
-        // base 含 / 且不以 . 开头时视为绝对路径，补 / 前缀避免基于 reader.html 位置解析
-        if (!dir.startsWith('/') && dir.includes('/') && !dir.startsWith('.')) {
-          dir = '/' + dir;
-        }
-        const bu = dir.startsWith('/') ? new URL(dir, location.origin) : new URL(dir, location.href);
-        const u = new URL(href, bu);
-        return u.pathname + u.search + u.hash;
-      }
-      catch { return [String(base || '').replace(/^\/+|\/+$/g, ''), href.replace(/^\.+\//, '')].filter(Boolean).join('/'); }
-    },
+    fetchPath(docPath = '') { return this.rootPath(this.splitHash(docPath).path) || '/'; },
     lowerPathFallback(v) {
       const raw = String(v || ''); if (!raw) return raw;
       if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith('/')) {
@@ -217,8 +130,88 @@
   const normPath = v => PathUtils.normalizePath(v);
   const normDoc = v => PathUtils.normalizeDoc(v);
   const sameDoc = (a, b) => PathUtils.sameDoc(a, b);
-  const makeHref = (dp, h) => PathUtils.makeHref(dp, h);
-  const resolveDocHref = (h, b) => PathUtils.resolveDocHref(h, b);
+  const makeHref = (dp, h) => PathResolver.makeSpa(dp, h);
+  const resolveDocHref = (h, b) => PathResolver.resolve(b || '', h);
+
+  const PathResolver = {
+    special: /^(?:mailto|tel|javascript|data|blob):/i,
+
+    split(v) {
+      const raw = String(v || '').trim();
+      const h = raw.indexOf('#');
+      if (h >= 0) {
+        return { path: raw.slice(0, h), hash: raw.slice(h + 1) };
+      }
+      return { path: raw, hash: '' };
+    },
+
+    doc(v) {
+      const parts = this.split(v);
+      let raw = parts.path.replace(/^https?:\/\/[^/]+/i, '');
+      const q = raw.indexOf('?');
+      const query = q >= 0 ? raw.slice(q + 1) : '';
+      const doc = query ? new URLSearchParams(query).get('doc') : '';
+      const result = (doc || raw) + (parts.hash ? '#' + parts.hash : '');
+      return result;
+    },
+
+    dir(base) {
+      const p = this.split(this.doc(base)).path.replace(/[?#].*$/, '');
+      if (!p || p.endsWith('/')) {
+        return p;
+      }
+      return p.slice(0, p.lastIndexOf('/') + 1);
+    },
+
+    path(base, href) {
+      const parts = this.split(this.doc(href));
+      const raw = parts.path;
+      if (!raw || raw.startsWith('/') || raw.startsWith('?')) {
+        return raw + (parts.hash ? '#' + parts.hash : '');
+      }
+      let dir = this.dir(base);
+      let rel = raw.replace(/^\.\//, '');
+      for (; rel.startsWith('../'); rel = rel.slice(3)) {
+        dir = dir.replace(/\/?[^/]+\/?$/, '/');
+      }
+      const result = (dir.replace(/\/?$/, '/') + rel).replace(/\/+/g, '/').replace(/^([^/])/, '/$1');
+      return result + (parts.hash ? '#' + parts.hash : '');
+    },
+
+    makeSpa(path, hash = '') {
+      const p = this.split(this.doc(path));
+      const h = hash || p.hash;
+      const spaPath = location.pathname + '?doc=' + this.path('', p.path) + (h ? '#' + h : '');
+      return spaPath;
+    },
+
+    resolve(base, href) {
+      const raw = String(href || '').trim();
+      if (!raw) return null;
+      if (raw.startsWith('#')) {
+        return { type: 'anchor', href: raw, hash: raw.slice(1) };
+      }
+      if (this.special.test(raw) || (/^(?:https?:)?\/\//i.test(raw) && !raw.startsWith(location.origin))) {
+        return { type: 'external', href: raw };
+      }
+      const p = this.path(this.doc(base), raw);
+      const h = this.split(p).hash;
+      return {
+        type: 'doc',
+        href: this.makeSpa(p),
+        docPath: this.split(p).path,
+        hash: h,
+      };
+    },
+
+    resolveResource(base, href) {
+      const raw = String(href || '').trim();
+      if (!raw || this.special.test(raw) || (/^(?:https?:)?\/\//i.test(raw) && !raw.startsWith(location.origin))) {
+        return raw;
+      }
+      return this.path(this.doc(base), raw);
+    },
+  };
   /* 带大小写回退的 fetch */
   async function fetchWithLowerFallback(path, opts) {
     const finalPath = PathUtils.fetchPath(path);
@@ -824,11 +817,11 @@
 
   /* 导出 */
   const Core = {
-    $, $$, esc, cssEsc, EventBag, PathUtils, HeadingTracker,
+    $, $$, esc, cssEsc, EventBag, PathUtils, PathResolver, HeadingTracker,
     normalizePath: normPath, normalizeDoc: normDoc, sameDocValue: PathUtils.sameDoc.bind(PathUtils),
     samePathValue: PathUtils.samePath.bind(PathUtils), startsWithPathValue: PathUtils.startsWithPath.bind(PathUtils),
     fetchWithLowerFallback, hasSelection: hasSel, resolveUrl: PathUtils.resolveUrl.bind(PathUtils),
-    resolveDocHref, readerHref: makeHref, resolveCssHref: PathUtils.resolveCssHref.bind(PathUtils),
+    resolveDocHref, readerHref: makeHref,
     findCollection, scrollToEl, syncFill, onScrollFrame,
     getDomHeadings: getHeadings, getActiveHeadingId: (headings, t = 200) => {
       for (let i = (headings || []).length - 1; i >= 0; i--) if (headings[i].getBoundingClientRect().top <= t) return headings[i].id
@@ -839,7 +832,7 @@
 
   Object.assign(window, {
     ReaderCore: Core, $, $$, on: (t, e, h, o) => t && t.addEventListener(e, h, o || false),
-    esc, syncFill: Core.syncFill, resolveUrl: Core.resolveUrl, resolveCssHref: Core.resolveCssHref,
+    esc, syncFill: Core.syncFill, resolveUrl: Core.resolveUrl,
     fetchWithLowerFallback, findCollection, scrollToEl, getDomHeadings: getHeadings,
     getActiveHeadingId: Core.getActiveHeadingId, hasActiveTextSelection: hasSel,
     buildHeadingTree: buildTree, expandTo, fetchVolData, onScrollFrame
