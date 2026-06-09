@@ -206,8 +206,11 @@
 
     resolveResource(base, href) {
       const raw = String(href || '').trim();
-      if (!raw || this.special.test(raw) || (/^(?:https?:)?\/\//i.test(raw) && !raw.startsWith(location.origin) && /^(?:https?:)?\/\//i.test(base) && base.startsWith(location.origin))) {
+      if (!raw || this.special.test(raw) || (/^(?:https?:)?\/\//i.test(raw) && !raw.startsWith(location.origin))) {
         return raw;
+      }
+      if (/^(?:https?:)?\/\//i.test(base) && !base.startsWith(location.origin) && !(/^(?:https?:)?\/\//i.test(raw))){
+        return this.path(base, raw);
       }
       return this.path(this.doc(base), raw);
     },
