@@ -175,7 +175,7 @@
       for (; rel.startsWith('../'); rel = rel.slice(3)) {
         dir = dir.replace(/\/?[^/]+\/?$/, '/');
       }
-      domain=(domain && !dir.startsWith('/')) ? domain+'/':domain ;
+      domain = (domain && !dir.startsWith('/')) ? domain + '/' : domain;
       const result = domain + (dir.replace(/\/?$/, '/') + rel).replace(/\/+/g, '/').replace(/^([^/])/, '/$1');
       return result + (parts.hash ? '#' + parts.hash : '');
     },
