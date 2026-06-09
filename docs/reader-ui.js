@@ -360,21 +360,14 @@ class ReaderApp {
         }
     }
 
-    clearDynamicStyles() { $$('.dynamic-doc-css, .dynamic-doc-style').forEach(el => el.remove()); }
-
-    async loadCollectionStyles(docPath) {
-        const col = findCollection(docPath);
-        for (const css of col?.stylesheets || []) {
-            const link = Object.assign(document.createElement('link'), { rel: 'stylesheet', type: 'text/css', className: 'dynamic-doc-css', href: PathResolver.resolveResource(docPath, css) });
-            document.head.insertBefore(link, document.head.firstChild);
-            await new Promise(resolve => { link.onload = link.onerror = resolve; setTimeout(resolve, 800); });
-        }
+    clearDynamicStyles() { 
+        $$('.dynamic-doc-css, .dynamic-doc-style').forEach(el => el.remove()); 
     }
+
     async loadDoc(rawPath) {
         let docPath = PathResolver.path('', rawPath);
         this.showLoading(docPath);
         this.clearDynamicStyles();
-        await this.loadCollectionStyles(docPath);
         this.updateBreadcrumb(docPath, null);
         try {
             const loaded = await fetchWithLowerFallback(docPath);
@@ -383,10 +376,8 @@ class ReaderApp {
             const html = await res.text();
             const hash = rawPath.includes('#') ? rawPath.split('#')[1] : '';
             const actualUrl = loaded.url || loaded.path || docPath;
-            const actualPathname = new URL(actualUrl, location.href).pathname;
-            docPath = actualPathname + (hash ? '#' + hash : '');
-            history.replaceState(history.state || {}, '', PathResolver.makeSpa(docPath));
-            this.renderDoc(html, docPath, actualUrl);
+            history.replaceState(history.state || {}, '', PathResolver.makeSpa(docPath,hash));
+            this.renderDoc(html, hash ? docPath+'#'+hash : docPath, actualUrl);
             this.revealLoadedContent();
         } catch (error) {
             this.showError(docPath, error.message);
@@ -431,7 +422,7 @@ class ReaderApp {
 
     renderDoc(html, docPath, finalUrl) {
         const parsed = new DOMParser().parseFromString(html, 'text/html');
-        this.rewriteDocUrls(parsed, finalUrl);
+        this.rewriteDocUrls(parsed, docPath);
         this.rewriteDocAssets(parsed, finalUrl);
         this.injectDocStyles(parsed, finalUrl);
         const content = $('#content');
