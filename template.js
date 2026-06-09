@@ -125,7 +125,7 @@ function generateTemplate(opts) {
   } = opts;
 
   const brandOpts = { logo, logoText };
-  const preload = hasVolIndex && volJsPath ? `<link rel="preload" href="${esc(volJsPath)}" as="fetch" crossorigin>` : '';
+  const preload = hasVolIndex && volJsPath ? `<link rel="modulepreload" href="${esc(volJsPath)}" as="fetch" crossorigin>` : '';
   const pageMeta = { ...(meta || {}) };
   if (hasVolIndex && volJsPath && !pageMeta.indexJsPath) pageMeta.indexJsPath = volJsPath;
 
