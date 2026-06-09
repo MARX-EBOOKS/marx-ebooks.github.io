@@ -274,7 +274,7 @@
       const w = innerWidth, crossed = (this.lastWidth < 997 && w >= 997) || (this.lastWidth >= 997 && w < 997);
       this.lastWidth = w;
       if (crossed) {
-        this.reinit(currentDoc());
+        await this.buildMenu();
         this.syncSidebar(this.activeHeadingId);
       }
     }
