@@ -360,21 +360,14 @@ class ReaderApp {
         }
     }
 
-    clearDynamicStyles() { $$('.dynamic-doc-css, .dynamic-doc-style').forEach(el => el.remove()); }
-
-    async loadCollectionStyles(docPath) {
-        const col = findCollection(docPath);
-        for (const css of col?.stylesheets || []) {
-            const link = Object.assign(document.createElement('link'), { rel: 'stylesheet', type: 'text/css', className: 'dynamic-doc-css', href: PathResolver.resolveResource(docPath, css) });
-            document.head.insertBefore(link, document.head.firstChild);
-            await new Promise(resolve => { link.onload = link.onerror = resolve; setTimeout(resolve, 800); });
-        }
+    clearDynamicStyles() { 
+        $$('.dynamic-doc-css, .dynamic-doc-style').forEach(el => el.remove()); 
     }
+
     async loadDoc(rawPath) {
         let docPath = PathResolver.path('', rawPath);
         this.showLoading(docPath);
         this.clearDynamicStyles();
-        await this.loadCollectionStyles(docPath);
         this.updateBreadcrumb(docPath, null);
         try {
             const loaded = await fetchWithLowerFallback(docPath);
