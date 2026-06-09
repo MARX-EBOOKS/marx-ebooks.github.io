@@ -525,7 +525,7 @@ class ReaderApp {
         const bar = $('#doc-pathbar');
         if (!bar) return;
         const parts = [];
-        const displayPath = path.replace(/^\/+/, '');
+        const displayPath = path.replace(/^\/+/, '').replace(/[?#].*$/, '');
         const pieces = displayPath.split('/').filter(Boolean);
         for (let i = 0; i < pieces.length - 1; i++) {
             const sub = (path.startsWith('/') ? '/' : '') + pieces.slice(0, i + 1).join('/');
@@ -538,7 +538,7 @@ class ReaderApp {
             if (parts.length) parts.push('<span class="crumb-sep">/</span>');
             parts.push(`<span class="crumb current">${esc(pieces.at(-1))}</span>`);
         }
-        if (title) parts.push(`<span class="crumb-sep">/</span><span class="crumb  current">${esc(title)}</span>`);
+        if (title) parts.push(`<span class="crumb-sep">/</span><span class="crumb current">${esc(title)}</span>`);
         bar.innerHTML = parts.join('') || '<span style="color:var(--text-3);">Library</span>';
     }
 

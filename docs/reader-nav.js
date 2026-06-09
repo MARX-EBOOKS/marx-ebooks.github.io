@@ -104,25 +104,6 @@
       const raw = String(path || '').trim();
       if (!raw || raw.startsWith('/') || raw.startsWith('?') || this.isSpecial(raw)) return raw;
       return '/' + raw.replace(/^\.?\//, '');
-    },
-    fetchPath(docPath = '') { return this.rootPath(this.splitHash(docPath).path) || '/'; },
-    lowerPathFallback(v) {
-      const raw = String(v || ''); if (!raw) return raw;
-      if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith('/')) {
-        try {
-          const u = new URL(raw, location.href)
-          if (u.origin === location.origin) {
-            const n = new URL(u.href)
-            n.pathname = n.pathname.toLowerCase()
-            return /^[a-z][a-z0-9+.-]*:/i.test(raw) ? n.href : n.pathname + n.search + n.hash
-          }
-        }
-        catch {
-        }
-        return raw;
-      }
-      const qi = raw.indexOf('?'), hi = raw.indexOf('#'), sp = [qi, hi].filter(i => i >= 0).sort((a, b) => a - b)[0];
-      return sp >= 0 ? raw.slice(0, sp).toLowerCase() + raw.slice(sp) : raw.toLowerCase();
     }
   };
 
@@ -216,27 +197,41 @@
   };
   /* 带大小写回退的 fetch */
   async function fetchWithLowerFallback(path, opts) {
-    const finalPath = PathUtils.fetchPath(path);
-    const lower = PathUtils.lowerPathFallback(finalPath);
-    try {
-      const res = await fetch(finalPath, opts);
-      const actualUrl = res.url || finalPath;
-      if (res.ok || !lower || lower === finalPath) return { res, path: finalPath, url: actualUrl };
+    const rawPath = String(path || '').trim();
+    const external = PathResolver.special.test(rawPath) || (/^(?:https?:)?\/\//i.test(rawPath) && !rawPath.startsWith(location.origin));
+    const finalPath = external ? PathResolver.split(rawPath).path : (PathResolver.split(PathResolver.path('', PathResolver.doc(rawPath))).path || '/');
+    const lower = (() => {
+      if (!finalPath || finalPath.startsWith('?')) return finalPath;
       try {
-        const fb = await fetch(lower, opts)
-        const fbUrl = fb.url || lower;
-        if (fb.ok) return { res: fb, path: lower, url: fbUrl }
+        const u = new URL(finalPath, location.href);
+        if (u.origin !== location.origin) return finalPath;
+        u.pathname = u.pathname.toLowerCase();
+        return /^[a-z][a-z0-9+.-]*:/i.test(finalPath) ? u.href : u.pathname + u.search;
+      } catch {
+        const q = finalPath.indexOf('?');
+        return q >= 0 ? finalPath.slice(0, q).toLowerCase() + finalPath.slice(q) : finalPath.toLowerCase();
       }
-      catch {
+    })();
+    const paths = [finalPath, lower].filter((v, i, arr) => v && arr.indexOf(v) === i);
+    const tryFetch = async (i, firstErr = null, firstResult = null) => {
+      const p = paths[i];
+      if (!p) {
+        if (firstResult) return firstResult;
+        throw firstErr;
       }
-      return { res, path: finalPath, url: actualUrl };
-    } catch (err) {
-      if (!lower || lower === finalPath) throw err;
       try {
-        const fb = await fetch(lower, opts);
-        return { res: fb, path: lower, url: fb.url || lower };
-      } catch { throw err; }
-    }
+        const res = await fetch(p, opts);
+        const result = { res, path: p, url: res.url || p };
+        return (res.ok || i === paths.length - 1) ? result : tryFetch(i + 1, firstErr, result);
+      } catch (err) {
+        if (i === paths.length - 1) {
+          if (firstResult) return firstResult;
+          throw (firstErr || err);
+        }
+        return tryFetch(i + 1, firstErr || err, firstResult);
+      }
+    };
+    return tryFetch(0);
   }
 
   /* 卷册数据获取 (SPA 版：index.json + index.js 双回退) */
