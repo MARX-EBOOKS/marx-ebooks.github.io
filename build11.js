@@ -494,7 +494,7 @@ class VolumeIndexBuilder {
 
       const breadcrumbParts = data.volumePath.replace(/^\/|\/$/g, '').split('/');
       const breadcrumbHtml = breadcrumbParts.map((part, i) => i === breadcrumbParts.length - 1
-        ? `<span class="crumb crumb--active">${this.esc(part)}</span>`
+        ? `<span class="crumb current">${this.esc(part)}</span>`
         : `<a class="crumb" href="${this.config.SITE ? this.config.SITE + '/' : '/'}${breadcrumbParts.slice(0, i + 1).join('/')}/index.html">${this.esc(part)}</a>`
       ).join('<span class="crumb-sep">/</span>');
 

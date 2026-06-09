@@ -275,7 +275,6 @@
       this.lastWidth = w;
       if (crossed) {
         await this.buildMenu();
-        this.syncSidebar(this.activeHeadingId);
       }
     }
 

@@ -426,7 +426,6 @@
       this.lastWidth = w;
       if (crossed) {
         this.reinit(currentDoc());
-        this.syncSidebar(this.activeHeadingId);
       }
     }
 
