@@ -169,12 +169,14 @@
       if (!raw || raw.startsWith('/') || raw.startsWith('?')) {
         return raw + (parts.hash ? '#' + parts.hash : '');
       }
+      let domain = (base && /^(?:[\S]+?:)?\/\//i.test(base) && !base.startsWith(location.origin)) ? base.replace(/^((?:[\S]+?:)?\/\/[^/?#]+).*/, '$1') : '';
       let dir = this.dir(base);
       let rel = raw.replace(/^\.\//, '');
       for (; rel.startsWith('../'); rel = rel.slice(3)) {
         dir = dir.replace(/\/?[^/]+\/?$/, '/');
       }
-      const result = (dir.replace(/\/?$/, '/') + rel).replace(/\/+/g, '/').replace(/^([^/])/, '/$1');
+      domain=dir.startsWith('/')? domain: domain+'/';
+      const result = domain + (dir.replace(/\/?$/, '/') + rel).replace(/\/+/g, '/').replace(/^([^/])/, '/$1');
       return result + (parts.hash ? '#' + parts.hash : '');
     },
 
@@ -209,10 +211,7 @@
       if (!raw || this.special.test(raw) || (/^(?:https?:)?\/\//i.test(raw) && !raw.startsWith(location.origin))) {
         return raw;
       }
-      if (/^(?:https?:)?\/\//i.test(base) && !base.startsWith(location.origin) && !(/^(?:https?:)?\/\//i.test(raw))){
-        return this.path(base, raw);
-      }
-      return this.path(this.doc(base), raw);
+      return this.path(base, raw);
     },
   };
   /* 带大小写回退的 fetch */

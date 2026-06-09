@@ -377,7 +377,7 @@ class ReaderApp {
             const hash = rawPath.includes('#') ? rawPath.split('#')[1] : '';
             const actualUrl = loaded.url || loaded.path || docPath;
             history.replaceState(history.state || {}, '', PathResolver.makeSpa(docPath,hash));
-            this.renderDoc(html, hash?docPath+'#'+hash:docPath, actualUrl);
+            this.renderDoc(html, hash ? docPath+'#'+hash : docPath, actualUrl);
             this.revealLoadedContent();
         } catch (error) {
             this.showError(docPath, error.message);
