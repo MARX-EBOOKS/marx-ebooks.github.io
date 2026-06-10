@@ -441,6 +441,7 @@ class ReaderApp {
 
     async injectDocStyles(parsed, finalUrl) {
         $$('.dynamic-doc-style').forEach(el => el.remove());
+        let waits=[];
         parsed.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
             const href = link.getAttribute('href');
             if (!href || /\/?reader\.css(?:[?#].*)?$/i.test(href)) return;
