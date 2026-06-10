@@ -423,7 +423,7 @@ class ReaderApp {
         const parsed = new DOMParser().parseFromString(html, 'text/html');
         this.rewriteDocUrls(parsed, docPath);
         this.rewriteDocAssets(parsed, finalUrl);
-        this.injectDocStyles(parsed, finalUrl);
+        await this.injectDocStyles(parsed, finalUrl);
         const content = $('#content');
         injectContentLang(parsed, content);
         content.innerHTML = (parsed.body.querySelector('div.prose#content') || parsed.body).innerHTML;
