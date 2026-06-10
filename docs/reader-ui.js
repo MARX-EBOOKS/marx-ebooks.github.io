@@ -419,7 +419,7 @@ class ReaderApp {
         });
     }
 
-    renderDoc(html, docPath, finalUrl) {
+    async renderDoc(html, docPath, finalUrl) {
         const parsed = new DOMParser().parseFromString(html, 'text/html');
         this.rewriteDocUrls(parsed, docPath);
         this.rewriteDocAssets(parsed, finalUrl);
@@ -439,7 +439,7 @@ class ReaderApp {
         $('#toc-desktop').style.display = '';
     }
 
-    injectDocStyles(parsed, finalUrl) {
+    async injectDocStyles(parsed, finalUrl) {
         $$('.dynamic-doc-style').forEach(el => el.remove());
         parsed.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
             const href = link.getAttribute('href');
