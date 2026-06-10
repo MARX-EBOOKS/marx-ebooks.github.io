@@ -34,7 +34,6 @@
   const resolveUrl = h => { try { return new URL(h, location.href).href; } catch { return h; } };
 
   /* SSG 链接生成 */
-  const siteRoot = () => (document.body.dataset.site || '').replace(/\/$/, '');
   const PathResolver = {
     special: /^(?:mailto|tel|javascript|data|blob):/i,
     split(v) {
@@ -45,7 +44,7 @@
         : { path: raw, hash: '' };
     },
     stripRoot(v) {
-      const root = siteRoot();
+      const root = (document.body.dataset.site || '').replace(/\/$/, '');
       const raw = String(v || '').replace(/^https?:\/\/[^/]+/i, '').replace(/[?#].*$/, '');
       const path = root && raw.startsWith(root + '/') ? raw.slice(root.length) : raw;
       return path.replace(/^\/+/, '');
@@ -72,7 +71,7 @@
       if (raw.startsWith('#')) return raw;
       if (!raw || this.special.test(raw) || /^(?:https?:)?\/\//i.test(raw)) return raw || '#';
       const logical = this.logical(base, raw);
-      const root = siteRoot();
+      const root = (document.body.dataset.site || '').replace(/\/$/, '');
       return (root ? root + '/' : '/') + logical.replace(/^\/+/, '');
     },
     resolve(base, href) {
@@ -137,17 +136,17 @@
 
   /* 标题追踪 (unified) */
   class HeadingTracker {
-    constructor({ getHeadings: gh, onChange }) {
+    constructor({ content, header, getHeadings: gh, onChange }) {
+      this.content = content; this.header = header;
       this.getHeadings = gh; this.onChange = onChange;
-      this.headings = []; this.tops = []; this.activeId = null; this.frame = 0;
+      this.headings = []; this.activeId = null; this.frame = 0;
       this.bag = new EventBag(); this.offScroll = null;
     }
     start() {
       this.stop(); this.headings = this.getHeadings();
       if (!this.headings.length) return false;
-      this.measure();
       const qm = () => {
-        if (!this.frame) this.frame = requestAnimationFrame(() => { this.frame = 0; this.measure(); this.track(true); })
+        if (!this.frame) this.frame = requestAnimationFrame(() => { this.frame = 0; this.headings = this.getHeadings(); this.track(true); })
       };
       this.bag.on(window, 'resize', qm, { passive: true });
       this.bag.on(window, 'load', qm, { once: true });
@@ -158,9 +157,16 @@
     stop() {
       this.bag.clear(); if (this.offScroll) this.offScroll(); this.offScroll = null;
       if (this.frame) cancelAnimationFrame(this.frame); this.frame = 0;
-      this.headings = []; this.tops = []; this.activeId = null;
+      this.headings = []; this.activeId = null;
     }
-    measure() { this.tops = this.headings.map(h => h.getBoundingClientRect().top + scrollY); }
+    visibleRange() {
+      const contentTop = this.content ? this.content.getBoundingClientRect().top : 0;
+      const contentBottom = this.content ? this.content.getBoundingClientRect().bottom : innerHeight;
+      const headerBottom = this.header ? Math.max(0, this.header.getBoundingClientRect().bottom) : 0;
+      const visibleTop = Math.max(0, headerBottom, contentTop);
+      const visibleBottom = Math.min(innerHeight, contentBottom);
+      return [visibleTop, Math.max(visibleTop, visibleBottom)];
+    }
     track(force) {
       if (hasSel()) return;
       const id = this.pick();
@@ -170,24 +176,20 @@
       }
     }
     pick() {
-      if (!this.tops.length) return null;
-      const y = scrollY + 80, bottom = y + innerHeight;
-      let best = -1;
-      for (let i = 0; i < this.tops.length; i++) {
-        const t = this.tops[i];
-        if (t >= y && t <= bottom) {
-          if (best < 0 || t < this.tops[best]) best = i
+      if (!this.headings.length) return null;
+      const [visibleTop, visibleBottom] = this.visibleRange();
+      let visible = -1, fallback = 0;
+      for (let i = 0; i < this.headings.length; i++) {
+        const start = this.headings[i].getBoundingClientRect().top;
+        if (start < visibleTop) fallback = i;
+        else if (start <= visibleBottom) {
+          visible = i;
+          break;
         }
+        else break;
       }
-      if (best < 0) {
-        for (let i = this.tops.length - 1; i >= 0; i--) {
-          if (this.tops[i] <= y) {
-            best = i;
-            break;
-          }
-        }
-      }
-      return best >= 0 ? (this.headings[best]?.id || null) : null;
+      const best = visible >= 0 ? visible : fallback;
+      return this.headings[best]?.id || null;
     }
   }
 
@@ -227,7 +229,7 @@
         this.mode = 'epub'
         await this.renderEpub()
       }
-      else if (innerWidth < 997 && getHeadings($('#content')).length > 1 && !(() => { const p = location.pathname.split('/').pop().toLowerCase(); return !p || p === 'index.html' || p === 'nav.html'; })()) {
+      else if (innerWidth < 997 && getHeadings($('#content')).length > 1 && !(() => { const p = location.pathname.split('/').pop().toLowerCase(); return !p || (/\/(?:index|nav)\.x?html?$/i.test(p)); })()) {
         this.mode = 'page-toc'
         this.renderPageToc()
       }
@@ -362,8 +364,9 @@
       const cur = normPath(PathResolver.stripRoot(location.pathname)), curL = cur.toLowerCase();
       const matchPath = p => {
         if (!p || /^https?:/i.test(p)) return null;
-        const ip = normPath(p); if (!/\/index\.html?$/i.test(ip)) return null;
-        const d = ip.replace(/\/index\.html$/i, ''), dl = d.toLowerCase();
+        const ip = normPath(p); 
+        if (!/\/(?:index|nav)\.x?html?$/i.test(ip)) return null;
+        const d = ip.replace(/\/(?:index|nav)\.x?html?$/i, ''), dl = d.toLowerCase();
         return (curL === ip.toLowerCase() || curL === dl || curL.startsWith(dl + '/')) ? d : null;
       };
       let best = null;
@@ -525,12 +528,21 @@
     startTrack() {
       const content = $('#content');
       const start = () => {
-        this.tracker = new HeadingTracker({ getHeadings: () => getHeadings(content), onChange: (id) => this.updateTrack(id) });
+        this.tracker = new HeadingTracker({ content, header: $('#navbar') || $('header'), getHeadings: () => this.trackHeadings(content), onChange: (id) => this.updateTrack(id) });
         return this.tracker.start();
       };
       if (!content || start()) return;
       this.waitObserver = new MutationObserver((_, o) => { if (start()) o.disconnect(); });
       this.waitObserver.observe(content, { subtree: true, attributes: true, attributeFilter: ['id'] });
+    }
+    trackHeadings(content) {
+      if (!content) return [];
+      if (this.mode !== 'epub') return getHeadings(content);
+      return this.pageHeadings().map(h => {
+        if (!h.id) return { id: null, getBoundingClientRect: () => content.getBoundingClientRect() };
+        const el = document.getElementById(h.id);
+        return el && content.contains(el) ? el : null;
+      }).filter(Boolean);
     }
     updateTrack(id) {
       this.activeHeadingId = id;
@@ -551,30 +563,12 @@
       if (!this.linkCache || this.linkCache.tree !== tree) this.linkCache = { tree, links: $$('.sidebar-link', tree) };
       return this.linkCache.links;
     }
-    _pickClosest(links, targetTop, getTop) {
-      let best = null, bestTop = -Infinity;
-      for (const link of links) {
-        const t = getTop(link)
-        if (t <= targetTop && t > bestTop) { bestTop = t; best = link; }
-      }
-      return best;
-    }
-    _elementTop(id) {
-      if (!id) return 0;
-      const el = document.getElementById(id);
-      return el ? el.getBoundingClientRect().top + scrollY : -Infinity;
-    }
-
     updateSidebar(id) {
       if (this.mode === 'libmap') return;
       const links = this.sidebarLinks();
       if (!links.length) return;
       const { file } = this._volInfo(), fileLinks = links.filter(link => normDoc((link.dataset.file || '').replace(/\.x?html?$/i, '')).toLowerCase() === normDoc(file).toLowerCase());
       let best = id ? fileLinks.find(l => l.dataset.id === id) : null;
-      if (!best) {
-        const y = scrollY + 80;
-        best = this._pickClosest(fileLinks, y, l => this._elementTop(l.dataset.id));
-      }
       if (!best) {
         best = fileLinks.find(l => !l.dataset.id) || fileLinks[0] || null;
       }
@@ -587,10 +581,6 @@
       if (!nav) return;
       const links = $$('.theme-doc-toc-desktop-link__a', nav);
       let best = id ? links.find(a => a.dataset.id === id) : null;
-      if (!best) {
-        const y = scrollY + 80;
-        best = this._pickClosest(links, y, a => this._elementTop(a.dataset.id));
-      }
       if (!best) {
         best = links.find(a => !a.dataset.id) || links[0] || null;
       }
@@ -656,7 +646,7 @@
     _findCollection() {
       const path = normPath(PathResolver.stripRoot(location.pathname));
       return (window.LIBRARY_CONFIG || []).find(c => {
-        const b = normPath(c.path || '');
+        const b = normPath(c.basePath || '');
         return b && (path.startsWith(b) || path.toLowerCase().startsWith(b.toLowerCase()));
       }) || null;
     }

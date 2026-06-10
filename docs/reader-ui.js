@@ -1,7 +1,7 @@
 const C = window.ReaderCore;
 const { $, $$, esc, cssEsc, syncFill, findCollection, scrollToEl, onScrollFrame, PathResolver } = C;
 const sameDoc = C.sameDocValue;
-const fetchWithLowerFallback = C.fetchWithLowerFallback;
+const fetchReaderResource = C.fetchReaderResource;
 
 const state = {
     fs: parseFloat(localStorage.fontSize) || 1,
@@ -79,7 +79,7 @@ class FootnotePopup {
                 try {
                     const ctrl = new AbortController();
                     const t = setTimeout(() => ctrl.abort(), 3000);
-                    const loaded = await fetchWithLowerFallback(pageUrl, { signal: ctrl.signal });
+                    const loaded = await fetchReaderResource(pageUrl, { signal: ctrl.signal });
                     clearTimeout(t);
                     const res = loaded.res;
                     if (!res.ok) return null;
@@ -192,7 +192,6 @@ class FootnotePopup {
 class ReaderApp {
     constructor() {
         this.popup = new FootnotePopup();
-        this.manifestCache = {};
         this.resizeTimer = null;
         this.siteTitle = document.title;
     }
@@ -370,7 +369,7 @@ class ReaderApp {
         this.clearDynamicStyles();
         this.updateBreadcrumb(docPath, null);
         try {
-            const loaded = await fetchWithLowerFallback(docPath);
+            const loaded = await fetchReaderResource(docPath);
             const res = loaded.res;
             if (!res.ok) throw new Error(String(res.status));
             const html = await res.text();
@@ -564,7 +563,7 @@ class ReaderApp {
         const candidates = [...new Set([dir, (col?.path || '').replace(/^\/+|\/+$/g, ''), location.pathname.split('/').slice(1, -1).join('/')].filter(Boolean))];
         for (const c of candidates) {
             try {
-                const raw = await C.fetchVolData(c, this.manifestCache);
+                const raw = await C.VolDataStore.fetchVolData(c);
                 const items = Array.isArray(raw) ? raw : raw?.files;
                 if (items?.length) return { items, dir: c };
             } catch { }
@@ -573,12 +572,12 @@ class ReaderApp {
     }
 
     findManifestIndex(items, path, file) {
-        const cleanPath = path.replace(/\.html(?:#.*)?$/i, '');
-        const cleanFile = file.replace(/\.html(?:#.*)?$/i, '');
+        const cleanPath = path.replace(/\.x?html?(?:#.*)?$/i, '');
+        const cleanFile = file.replace(/\.x?html?(?:#.*)?$/i, '');
         return items.findIndex(item => {
             const f = item.file || item.path || item.url || item.filename || '';
             const src = item.source_file || item.filename || '';
-            const candidates = [f, src, f.split('/').pop(), src.split('/').pop()].map(x => x.replace(/\.html(?:#.*)?$/i, ''));
+            const candidates = [f, src, f.split('/').pop(), src.split('/').pop()].map(x => x.replace(/\.x?html?(?:#.*)?$/i, ''));
             return sameDoc(f, path) || sameDoc(f, file) || candidates.some(c => sameDoc(c, cleanPath) || sameDoc(c, cleanFile));
         });
     }
@@ -597,7 +596,7 @@ class ReaderApp {
         const current = parseInt(number, 10);
         const tryBtn = async (btn, p, kind) => {
             try {
-                const { res, path: lp } = await fetchWithLowerFallback(p, { method: 'HEAD', mode: 'same-origin' });
+                const { res, path: lp } = await fetchReaderResource(p, { method: 'HEAD', mode: 'same-origin' });
                 if (res.ok) this.setupPagination(btn, lp, null, kind);
             } catch { }
         };
@@ -617,7 +616,7 @@ class ReaderApp {
         };
         setTitle(title);
         if (!title) {
-            fetchWithLowerFallback(path.split('#')[0]).then(({ res }) => res.text()).then(html => {
+            fetchReaderResource(path.split('#')[0]).then(({ res }) => res.text()).then(html => {
                 setTitle(new DOMParser().parseFromString(html, 'text/html').querySelector('title')?.textContent?.trim());
             }).catch(() => { });
         }

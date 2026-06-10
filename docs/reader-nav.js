@@ -195,100 +195,78 @@
       return this.path(base, raw);
     },
   };
-  /* 带大小写回退的 fetch */
-  async function fetchWithLowerFallback(path, opts) {
+  async function fetchReaderResource(path, opts) {
     const rawPath = String(path || '').trim();
     const external = PathResolver.special.test(rawPath) || (/^(?:https?:)?\/\//i.test(rawPath) && !rawPath.startsWith(location.origin));
     const finalPath = external ? PathResolver.split(rawPath).path : (PathResolver.split(PathResolver.path('', PathResolver.doc(rawPath))).path || '/');
-    const lower = (() => {
-      if (!finalPath || finalPath.startsWith('?')) return finalPath;
-      try {
-        const u = new URL(finalPath, location.href);
-        if (u.origin !== location.origin) return finalPath;
-        u.pathname = u.pathname.toLowerCase();
-        return /^[a-z][a-z0-9+.-]*:/i.test(finalPath) ? u.href : u.pathname + u.search;
-      } catch {
-        const q = finalPath.indexOf('?');
-        return q >= 0 ? finalPath.slice(0, q).toLowerCase() + finalPath.slice(q) : finalPath.toLowerCase();
-      }
-    })();
-    const paths = [finalPath, lower].filter((v, i, arr) => v && arr.indexOf(v) === i);
-    const tryFetch = async (i, firstErr = null, firstResult = null) => {
-      const p = paths[i];
-      if (!p) {
-        if (firstResult) return firstResult;
-        throw firstErr;
-      }
-      try {
-        const res = await fetch(p, opts);
-        const result = { res, path: p, url: res.url || p };
-        return (res.ok || i === paths.length - 1) ? result : tryFetch(i + 1, firstErr, result);
-      } catch (err) {
-        if (i === paths.length - 1) {
-          if (firstResult) return firstResult;
-          throw (firstErr || err);
-        }
-        return tryFetch(i + 1, firstErr || err, firstResult);
-      }
-    };
-    return tryFetch(0);
+    const res = await fetch(finalPath, opts);
+    return { res, path: finalPath, url: res.url || finalPath };
   }
 
-  /* 卷册数据获取 (SPA 版：index.json + index.js 双回退) */
-  const volCache = new Map();
-  async function fetchVolData(dir, cache = volCache) {
-    const clean = normPath(dir);
-    if (!clean) return null;
-    if (cache instanceof Map ? cache.has(clean) : cache[clean]) return cache instanceof Map ? cache.get(clean) : cache[clean];
-
-    const load = async d => {
-      try {
-        const r = await fetch(new URL('/' + d + '/index.json', location.origin).href)
-        if (r.ok) return await r.json()
-      }
-      catch {
-      }
-      try {
-        const r = await fetch(new URL('/' + d + '/index.js', location.origin).href);
-        if (!r.ok || /text\/html/i.test(r.headers.get('content-type') || '')) return null;
-        const js = await r.text(); if (!/\bexport\s+default\b/.test(js)) return null;
-        const b = URL.createObjectURL(new Blob([js], { type: 'text/javascript' })), m = await import(b);
-        URL.revokeObjectURL(b); return m?.default || null;
-      } catch { return null; }
-    };
-
-    const lower = clean.toLowerCase();
-    let data = await load(clean);
-    if (!data && lower !== clean) {
-      if (cache instanceof Map ? cache.has(lower) : cache[lower]) data = cache instanceof Map ? cache.get(lower) : cache[lower];
-      else data = await load(lower);
-    }
-    if (data) {
-      if (cache instanceof Map) {
-        cache.set(clean, data)
-        if (lower !== clean) cache.set(lower, data)
-      }
-      else {
-        cache[clean] = data
-        if (lower !== clean) cache[lower] = data
-      }
-    }
-    return data;
+  /* 卷册数据获取：全局唯一请求与缓存 */
+  async function loadVolData(clean) {
+    try {
+      const r = await fetch(new URL('/' + clean + '/index.json', location.origin).href);
+      if (r.ok) return await r.json();
+    } catch { }
+    try {
+      const r = await fetch(new URL('/' + clean + '/index.js', location.origin).href);
+      if (!r.ok || /text\/html/i.test(r.headers.get('content-type') || '')) return null;
+      const js = await r.text();
+      if (!/\bexport\s+default\b/.test(js)) return null;
+      const url = URL.createObjectURL(new Blob([js], { type: 'text/javascript' }));
+      try { return (await import(url))?.default || null; }
+      finally { URL.revokeObjectURL(url); }
+    } catch { return null; }
   }
+
+  function normalizeVolData(raw, dir, title) {
+    if (!raw) return null;
+    if (!Array.isArray(raw) && raw.version === 1) return raw;
+    if (!Array.isArray(raw)) return null;
+    const headings = [];
+    raw.forEach(f => (f.headings || []).forEach(h => headings.push({ level: h.level ?? 2, text: h.text || '', id: h.id || null, file: h.filename || f.file || f.path || '' })));
+    return { version: 1, title: title || dir, files: raw, headings };
+  }
+
+  const VolDataStore = {
+    cache: new Map(),
+    key(dir) { return normPath(dir); },
+
+    async fetchVolData(dir) {
+      const clean = this.key(dir);
+      if (!clean) return null;
+      let entry = this.cache.get(clean);
+      if (!entry) {
+        entry = { raw: null, volume: null, promise: loadVolData(clean).then(data => (entry.raw = data || null)) };
+        this.cache.set(clean, entry);
+      }
+      return entry.promise;
+    },
+
+    async fetchVolume(dir, title) {
+      const clean = this.key(dir);
+      if (!clean) return null;
+      const raw = await this.fetchVolData(clean), entry = this.cache.get(clean);
+      return entry.volume || (entry.volume = normalizeVolData(raw, clean, title));
+    },
+
+    clear() { this.cache.clear(); }
+  };
 
   /* 标题追踪 (unified) */
   class HeadingTracker {
-    constructor({ getHeadings: gh, onChange }) {
+    constructor({ content, header, getHeadings: gh, onChange }) {
+      this.content = content; this.header = header;
       this.getHeadings = gh; this.onChange = onChange;
-      this.headings = []; this.tops = []; this.activeId = null; this.frame = 0;
+      this.headings = []; this.activeId = null; this.frame = 0;
       this.bag = new EventBag(); this.offScroll = null;
     }
     start() {
       this.stop(); this.headings = this.getHeadings();
       if (!this.headings.length) return false;
-      this.measure();
       const qm = () => {
-        if (!this.frame) this.frame = requestAnimationFrame(() => { this.frame = 0; this.measure(); this.track(true); })
+        if (!this.frame) this.frame = requestAnimationFrame(() => { this.frame = 0; this.headings = this.getHeadings(); this.track(true); })
       };
       this.bag.on(window, 'resize', qm, { passive: true });
       this.bag.on(window, 'load', qm, { once: true });
@@ -299,9 +277,16 @@
     stop() {
       this.bag.clear(); if (this.offScroll) this.offScroll(); this.offScroll = null;
       if (this.frame) cancelAnimationFrame(this.frame); this.frame = 0;
-      this.headings = []; this.tops = []; this.activeId = null;
+      this.headings = []; this.activeId = null;
     }
-    measure() { this.tops = this.headings.map(h => h.getBoundingClientRect().top + scrollY); }
+    visibleRange() {
+      const contentTop = this.content ? this.content.getBoundingClientRect().top : 0;
+      const contentBottom = this.content ? this.content.getBoundingClientRect().bottom : innerHeight;
+      const headerBottom = this.header ? Math.max(0, this.header.getBoundingClientRect().bottom) : 0;
+      const visibleTop = Math.max(0, headerBottom, contentTop);
+      const visibleBottom = Math.min(innerHeight, contentBottom);
+      return [visibleTop, Math.max(visibleTop, visibleBottom)];
+    }
     track(force) {
       if (hasSel()) return;
       const id = this.pick();
@@ -311,24 +296,20 @@
       }
     }
     pick() {
-      if (!this.tops.length) return null;
-      const y = scrollY + 80, bottom = y + innerHeight;
-      let best = -1;
-      for (let i = 0; i < this.tops.length; i++) {
-        const t = this.tops[i];
-        if (t >= y && t <= bottom) {
-          if (best < 0 || t < this.tops[best]) best = i
+      if (!this.headings.length) return null;
+      const [visibleTop, visibleBottom] = this.visibleRange();
+      let visible = -1, fallback = 0;
+      for (let i = 0; i < this.headings.length; i++) {
+        const start = this.headings[i].getBoundingClientRect().top;
+        if (start < visibleTop) fallback = i;
+        else if (start <= visibleBottom) {
+          visible = i;
+          break;
         }
+        else break;
       }
-      if (best < 0) {
-        for (let i = this.tops.length - 1; i >= 0; i--) {
-          if (this.tops[i] <= y) {
-            best = i;
-            break;
-          }
-        }
-      }
-      return best >= 0 ? (this.headings[best]?.id || null) : null;
+      const best = visible >= 0 ? visible : fallback;
+      return this.headings[best]?.id || null;
     }
   }
 
@@ -343,7 +324,7 @@
       this.lastSyncedId = null; this.linkCache = null;
       this.tracker = null; this.bag = new EventBag();
       this.sidebarObserver = null; this.waitObserver = null;
-      this.fadeObserver = null; this.volCache = new Map();
+      this.fadeObserver = null;
       this.lastWidth = innerWidth;
     }
 
@@ -365,7 +346,7 @@
         this.mode = 'epub'
         this.renderEpub(docPath)
       }
-      else if (innerWidth < 997 && getHeadings($('#content')).length > 1 && !this._isHome()) {
+      else if (innerWidth < 997 && getHeadings($('#content')).length > 1 && !(/\/(?:index|nav)\.x?html?$/i.test(docPath)) && this.currentDoc()) {
         this.mode = 'page-toc'
         this.renderPageToc(docPath)
       }
@@ -413,11 +394,6 @@
         }
       });
       this.sidebarObserver.observe(this.sidebar, { attributes: true, attributeFilter: ['class'] });
-    }
-
-    /* SPA 文档信息 */
-    _isHome() {
-      return !currentDoc();
     }
 
     /* 响应式断点切换 */
@@ -501,8 +477,9 @@
       const dl = dn.toLowerCase(), drl = dd.toLowerCase();
       const matchPath = p => {
         if (!p || /^https?:/i.test(p)) return null;
-        const ip = normPath(p); if (!/\/index\.html?$/i.test(ip)) return null;
-        const d = ip.replace(/\/index\.html?$/i, '').replace(/\/nav\.x?html?$/i, '');
+        const ip = normPath(p); 
+        if (!/\/(?:index|nav)\.x?html?$/i.test(ip)) return null;
+        const d = ip.replace(/\/(?:index|nav)\.x?html?$/i, '');
         return (dl === normDoc(ip).toLowerCase() || dl === normDoc(d).toLowerCase() || drl === d.toLowerCase() || pn.toLowerCase().startsWith(d.toLowerCase() + '/')) ? d : null;
       };
       let best = null;
@@ -544,7 +521,7 @@
 
     /* 渲染入口 */
     async renderEpub(docPath) {
-      const dir = this.currentVol?.dir || '', data = await this.fetchVolData(dir);
+      const dir = this.currentVol?.dir || '', data = await VolDataStore.fetchVolume(dir, this.currentVol?.item?.label || dir);
       if (!data) {
         const np = normPath(docPath), fallback = normDoc(np).toLowerCase() === normDoc(dir).toLowerCase() || normDoc(np).toLowerCase() === normDoc(dir + '/index.html').toLowerCase() || normDoc(np).toLowerCase() === normDoc(dir + '/nav.html').toLowerCase();
         this.mode = fallback ? 'libmap' : (innerWidth < 997 ? 'page-toc' : 'libmap');
@@ -571,16 +548,6 @@
       this.navTree.innerHTML = this.renderBreadcrumb(parts) + this.renderTree(buildTree(nodes), 'page-toc', docPath) + '<div class="section-divider"><span>All works</span></div>' + this.buildLibmap();
       this.afterRender(docPath);
     }
-    /* 数据 */
-    async fetchVolData(dir) {
-      const raw = await fetchVolData(dir, this.volCache); if (!raw) return null;
-      if (!Array.isArray(raw) && raw.version === 1) return raw;
-      if (!Array.isArray(raw)) return null;
-      const headings = [];
-      raw.forEach(f => (f.headings || []).forEach(h => headings.push({ level: h.level != null ? h.level : 2, text: h.text || '', id: h.id || null, file: h.filename || f.file || f.path || '' })));
-      return { version: 1, title: this.currentVol?.item?.label || dir, files: raw, headings };
-    }
-
     /* 渲染：面包屑 & 链接 */
     renderBreadcrumb(parts) {
       return '<div class="breadcrumb" aria-label="Breadcrumb">' + parts.map((p, i) => {
@@ -675,12 +642,22 @@
     startTrack() {
       const content = $('#content');
       const start = () => {
-        this.tracker = new HeadingTracker({ getHeadings: () => getHeadings(content), onChange: (id) => this.updateTrack(id) });
+        this.tracker = new HeadingTracker({ content, header: $('#navbar') || $('header'), getHeadings: () => this.trackHeadings(content), onChange: (id) => this.updateTrack(id) });
         return this.tracker.start();
       };
       if (!content || start()) return;
       this.waitObserver = new MutationObserver((_, o) => { if (start()) o.disconnect(); });
       this.waitObserver.observe(content, { subtree: true, attributes: true, attributeFilter: ['id'] });
+    }
+
+    trackHeadings(content) {
+      if (!content) return [];
+      if (this.mode !== 'epub') return getHeadings(content);
+      return this.pageHeadings().map(h => {
+        if (!h.id) return { id: null, getBoundingClientRect: () => content.getBoundingClientRect() };
+        const el = document.getElementById(h.id);
+        return el && content.contains(el) ? el : null;
+      }).filter(Boolean);
     }
 
     updateTrack(id) {
@@ -703,31 +680,12 @@
       if (!this.linkCache || this.linkCache.tree !== tree) this.linkCache = { tree, links: $$('.sidebar-link', tree) };
       return this.linkCache.links;
     }
-    _pickClosest(links, targetTop, getTop) {
-      let best = null, bestTop = -Infinity;
-      for (const link of links) {
-        const t = getTop(link)
-        if (t <= targetTop && t > bestTop) { bestTop = t; best = link; }
-      }
-      return best;
-    }
-
-    _elementTop(id) {
-      if (!id) return 0;
-      const el = document.getElementById(id);
-      return el ? el.getBoundingClientRect().top + scrollY : -Infinity;
-    }
-
     updateSidebar(id) {
       if (this.mode === 'libmap') return;
       const links = this.sidebarLinks();
       if (!links.length) return;
       const { file } = this._volInfo(), fileLinks = links.filter(l => normDoc((l.dataset.file || '').replace(/\.x?html?$/i, '')).toLowerCase() === normDoc(file).toLowerCase());
       let best = id ? fileLinks.find(l => l.dataset.id === id) : null;
-      if (!best) {
-        const y = scrollY + 80;
-        best = this._pickClosest(fileLinks, y, l => this._elementTop(l.dataset.id));
-      }
       if (!best) {
         best = fileLinks.find(l => !l.dataset.id) || fileLinks[0] || null;
       }
@@ -740,10 +698,6 @@
       if (!nav) return;
       const links = $$('.theme-doc-toc-desktop-link__a', nav);
       let best = id ? links.find(a => a.dataset.id === id) : null;
-      if (!best) {
-        const y = scrollY + 80;
-        best = this._pickClosest(links, y, a => this._elementTop(a.dataset.id));
-      }
       if (!best) {
         best = links.find(a => !a.dataset.id) || links[0] || null;
       }
@@ -816,22 +770,22 @@
     $, $$, esc, cssEsc, EventBag, PathUtils, PathResolver, HeadingTracker,
     normalizePath: normPath, normalizeDoc: normDoc, sameDocValue: PathUtils.sameDoc.bind(PathUtils),
     samePathValue: PathUtils.samePath.bind(PathUtils), startsWithPathValue: PathUtils.startsWithPath.bind(PathUtils),
-    fetchWithLowerFallback, hasSelection: hasSel, resolveUrl: PathUtils.resolveUrl.bind(PathUtils),
+    fetchReaderResource, hasSelection: hasSel, resolveUrl: PathUtils.resolveUrl.bind(PathUtils),
     resolveDocHref, readerHref: makeHref,
     findCollection, scrollToEl, syncFill, onScrollFrame,
     getDomHeadings: getHeadings, getActiveHeadingId: (headings, t = 200) => {
       for (let i = (headings || []).length - 1; i >= 0; i--) if (headings[i].getBoundingClientRect().top <= t) return headings[i].id
       return headings[0]?.id || null
     },
-    buildHeadingTree: buildTree, expandTo, fetchVolData
+    buildHeadingTree: buildTree, expandTo, VolDataStore
   };
 
   Object.assign(window, {
     ReaderCore: Core, $, $$, on: (t, e, h, o) => t && t.addEventListener(e, h, o || false),
     esc, syncFill: Core.syncFill, resolveUrl: Core.resolveUrl,
-    fetchWithLowerFallback, findCollection, scrollToEl, getDomHeadings: getHeadings,
+    fetchReaderResource, findCollection, scrollToEl, getDomHeadings: getHeadings,
     getActiveHeadingId: Core.getActiveHeadingId, hasActiveTextSelection: hasSel,
-    buildHeadingTree: buildTree, expandTo, fetchVolData, onScrollFrame
+    buildHeadingTree: buildTree, expandTo, VolDataStore, onScrollFrame
   });
 
   window.MenuManager = MenuManager;
