@@ -447,8 +447,10 @@ class ReaderApp {
             const el = link.cloneNode(false);
             el.classList.add('dynamic-doc-style');
             el.href = PathResolver.resolveResource(finalUrl, href);
+            waits.push(new Promise(resolve => { el.onload = el.onerror = resolve; setTimeout(resolve, 5000); }));
             document.head.appendChild(el);
         });
+        await Promise.allSettled(waits);
         parsed.querySelectorAll('style').forEach(style => {
             const el = style.cloneNode(true);
             el.classList.add('dynamic-doc-style');
