@@ -226,15 +226,15 @@
     async buildMenu() {
       this.cleanup(); this.currentVol = this.detectVolume();
       if (this.currentVol) {
-        this.mode = 'epub'
-        await this.renderEpub()
+        this.mode = 'epub';
+        await this.renderEpub();
       }
       else if (innerWidth < 997 && getHeadings($('#content')).length > 1 && !(() => { const p = location.pathname.split('/').pop().toLowerCase(); return !p || (/\/(?:index|nav)\.x?html?$/i.test(p)); })()) {
-        this.mode = 'page-toc'
-        this.renderPageToc()
+        this.mode = 'page-toc';
+        this.renderPageToc();
       }
       else {
-        this.mode = 'libmap'
+        this.mode = 'libmap';
         this.navTree.innerHTML = this.buildLibmap(); 
       }
       this.afterBuild();
@@ -252,10 +252,10 @@
     }
 
     afterBuild() {
-      this.highlight()
-      this.renderToc()
-      this.startTrack()
-      this.initFade()
+      this.highlight();
+      this.renderToc();
+      this.startTrack();
+      this.initFade();
     }
 
     /*  事件绑定 */
@@ -591,10 +591,13 @@
       }
     }
     syncSidebar(id) {
-      if (innerWidth >= 997 || hasSel() || !id || id === this.lastSyncedId) return;
+      if (innerWidth >= 997 || hasSel()) return;
       if (!this.sidebar?.classList.contains('doc-sidebar--open')) return;
       const active = this.activeSidebarLink || $('.sidebar-link.sidebar-link--active', this.navTree); if (!active) return;
-      this.lastSyncedId = id;
+      const links = this.sidebarLinks();
+      const key = id || `${active.dataset.file || ''}#${active.dataset.id || ''}@${links.indexOf(active)}`;
+      if (key === this.lastSyncedId) return;
+      this.lastSyncedId = key;
       requestAnimationFrame(() => active.scrollIntoView({ block: 'center', behavior: 'auto' }));
     }
     highlight() {

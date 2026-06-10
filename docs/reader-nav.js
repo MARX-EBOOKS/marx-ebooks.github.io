@@ -343,16 +343,16 @@
         this.navTree.innerHTML = this.buildLibmap()
       }
       else if (this.currentVol) {
-        this.mode = 'epub'
-        this.renderEpub(docPath)
+        this.mode = 'epub';
+        this.renderEpub(docPath);
       }
       else if (innerWidth < 997 && getHeadings($('#content')).length > 1 && !(/\/(?:index|nav)\.x?html?$/i.test(docPath)) && this.currentDoc()) {
-        this.mode = 'page-toc'
-        this.renderPageToc(docPath)
+        this.mode = 'page-toc';
+        this.renderPageToc(docPath);
       }
       else {
-        this.mode = 'libmap'
-        this.navTree.innerHTML = this.buildLibmap()
+        this.mode = 'libmap';
+        this.navTree.innerHTML = this.buildLibmap();
       }
       this.afterRender(docPath);
     }
@@ -370,7 +370,9 @@
 
     afterRender(docPath) {
       this.linkCache = null; this.highlight(); this.renderToc();
-      this.startTrack(); this.scrollToPendingAnchor(); this.initFade();
+      this.startTrack(); 
+      this.scrollToPendingAnchor(); 
+      this.initFade();
       if (window.__PAGE_BAR__?.currentPage != null) window.__PAGE_BAR__._updateBadge(window.__PAGE_BAR__.currentPage);
     }
 
@@ -709,10 +711,13 @@
     }
 
     syncSidebar(id) {
-      if (innerWidth >= 997 || hasSel() || !id || id === this.lastSyncedId) return;
+      if (innerWidth >= 997 || hasSel()) return;
       if (!this.sidebar?.classList.contains('doc-sidebar--open')) return;
       const active = this.activeSidebarLink || $('.sidebar-link.sidebar-link--active', this.navTree); if (!active) return;
-      this.lastSyncedId = id;
+      const links = this.sidebarLinks();
+      const key = id || `${active.dataset.file || ''}#${active.dataset.id || ''}@${links.indexOf(active)}`;
+      if (key === this.lastSyncedId) return;
+      this.lastSyncedId = key;
       requestAnimationFrame(() => active.scrollIntoView({ block: 'center', behavior: 'auto' }));
     }
 
