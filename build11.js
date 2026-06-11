@@ -149,11 +149,19 @@ class FileScanner {
   constructor(root, pathMatcher) {
     this.root = root;
     this.pm = pathMatcher;
+    this.items = [];
     this.SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.github', '.vscode', '.idea', 'assets']);
     this.SKIP_FILES = new Set(['build.js', 'nav.js', 'reader.js', 'reader.css', 'build.cjs', 'libmap.js', 'package.json', 'package-lock.json', 'yarn.lock', '.DS_Store', 'index.json']);
   }
 
   async *scan(base = '', copyMode = false) {
+    this.items = [];
+    await this._collect(base, copyMode);
+    await this._attachPrevNext();
+    for (const item of this.items) yield item;
+  }
+
+  async _collect(base = '', copyMode = false) {
     const dir = base ? path.join(this.root, base) : this.root;
     let entries;
     try { entries = await fs.readdir(dir, { withFileTypes: true }); } catch { return; }
@@ -165,15 +173,54 @@ class FileScanner {
       const fullPath = path.join(dir, ent.name);
 
       if (ent.isDirectory()) {
-        yield* this.scan(relPath, copyMode || this.pm.isCopyOnly(relPath));
+        await this._collect(relPath, copyMode || this.pm.isCopyOnly(relPath));
       } else if (ent.isFile() && (copyMode || !this.SKIP_FILES.has(ent.name))) {
-        yield {
+        this.items.push({
           type: copyMode || this.pm.isCopyOnly(relPath) || !/\.html?$/i.test(ent.name) ? 'copy' : 'render',
-          path: relPath, fullPath
-        };
+          path: relPath, fullPath, prev: null, next: null
+        });
       }
     }
   }
+
+  async _attachPrevNext() {
+    const byDir = new Map();
+    for (const item of this.items) {
+      if (item.type !== 'render') continue;
+      const dir = path.dirname(item.path).replace(/\\/g, '/');
+      if (!byDir.has(dir)) byDir.set(dir, []);
+      byDir.get(dir).push(item);
+    }
+
+    for (const pages of byDir.values()) {
+      pages.sort((a, b) => {
+        const af = path.basename(a.path);
+        const bf = path.basename(b.path);
+        return af < bf ? -1 : af > bf ? 1 : 0;
+      });
+      const titles = Object.fromEntries(await Promise.all(
+        pages.map(async item => [item.path, await this.parseTitle(item.fullPath)])
+      ));
+      pages.forEach((item, i) => {
+        const prev = pages[i - 1] || null;
+        const next = pages[i + 1] || null;
+        item.prev = prev ? { file: path.basename(prev.path), title: titles[prev.path] } : null;
+        item.next = next ? { file: path.basename(next.path), title: titles[next.path] } : null;
+      });
+    }
+  }
+
+  async parseTitle(filePath) {
+    try {
+      const buf = Buffer.alloc(2048);
+      const fd = await fs.open(filePath, 'r');
+      const { bytesRead } = await fd.read(buf, 0, 2048, 0);
+      await fd.close();
+      return buf.toString('utf-8', 0, bytesRead).match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() || this.fallbackName(filePath);
+    } catch { return this.fallbackName(filePath); }
+  }
+
+  fallbackName(p) { return path.basename(p).replace(/\.html?$/i, ''); }
 }
 
 // ── HTMLProcessor ─────────────────────────────────────────────
@@ -286,49 +333,6 @@ class HTMLProcessor {
     }
     return result;
   }
-}
-
-// ── PrevNextResolver ───────────────────────────────────────────
-class PrevNextResolver {
-  constructor(root, pathMatcher) { this.root = root; this.cache = new Map(); this.pm = pathMatcher; }
-
-  async getLocalPrevNext(filePath) {
-    const dir = path.dirname(filePath);
-    if (this.cache.has(dir)) return this.cache.get(dir);
-
-    let files = [];
-    try {
-      const entries = await fs.readdir(path.join(this.root, dir), { withFileTypes: true });
-      files = entries.filter(e => e.isFile() && /\.x?html?$/i.test(e.name) && this.pm.shouldBuild(dir + '/' + e.name)).map(e => e.name).sort();
-    } catch { }
-
-    const titleMap = Object.fromEntries(await Promise.all(
-      files.map(async f => [f, await this.parseTitle(path.join(this.root, dir, f))])
-    ));
-
-    const map = {};
-    files.forEach((f, i) => {
-      map[f] = {
-        prev: i > 0 ? { file: files[i - 1], title: titleMap[files[i - 1]] } : null,
-        next: i < files.length - 1 ? { file: files[i + 1], title: titleMap[files[i + 1]] } : null
-      };
-    });
-
-    this.cache.set(dir, map);
-    return map;
-  }
-
-  async parseTitle(filePath) {
-    try {
-      const buf = Buffer.alloc(2048);
-      const fd = await fs.open(filePath, 'r');
-      const { bytesRead } = await fd.read(buf, 0, 2048, 0);
-      await fd.close();
-      return buf.toString('utf-8', 0, bytesRead).match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() || this.fallbackName(filePath);
-    } catch { return this.fallbackName(filePath); }
-  }
-
-  fallbackName(p) { return path.basename(p).replace(/\.html?$/i, ''); }
 }
 
 // ── VolumeIndexBuilder ─────────────────────────────────────────
@@ -515,9 +519,8 @@ class VolumeIndexBuilder {
 
 // ── PageRenderer ───────────────────────────────────────────────
 class PageRenderer {
-  constructor(config, prevNextResolver, libraryConfig) {
+  constructor(config, libraryConfig) {
     this.config = config;
-    this.prevNext = prevNextResolver;
     this.libraryConfig = libraryConfig || [];
     this._volCache = new Map();
   }
@@ -554,9 +557,7 @@ class PageRenderer {
     const processedBody = HTMLProcessor.processFootnoteRefs(body);
 
     const colId = item.path.split('/')[0];
-    const localNav = await this.prevNext.getLocalPrevNext(item.path);
-    const curFile = item.path.split('/').pop();
-    const local = localNav[curFile] || {};
+    const local = { prev: item.prev || null, next: item.next || null };
 
     const parts = item.path.split('/');
     const breadcrumb = parts.map((part, i) => i === parts.length - 1
@@ -641,8 +642,7 @@ class BuildEngine {
 
     const pathMatcher = new PathMatcher(args.only, args.copyOnly, args.skip);
     const scanner = new FileScanner(ROOT, pathMatcher);
-    const prevNextResolver = new PrevNextResolver(ROOT, pathMatcher);
-    const renderer = new PageRenderer(config, prevNextResolver, rawConfig);
+    const renderer = new PageRenderer(config, rawConfig);
     const volBuilder = new VolumeIndexBuilder(config, pathMatcher);
     const volIndexPaths = volBuilder.collectVolumePaths(rawConfig);
     const { generated: volIndexCount } = await volBuilder.buildAll(rawConfig, DIST);
