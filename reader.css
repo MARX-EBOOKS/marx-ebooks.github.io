@@ -881,7 +881,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 
 .prose tr:nth-child(even) { background: var(--bg-card); }
 .prose img { max-width: 100%; height: auto; display: block; margin: 1em auto; }
-.prose hr { border: none; height: 1px; background: var(--border); margin: 2em 0; }
+.prose hr { border: none; height: 1px; background: var(--border); margin: 2em auto; }
 .prose sup { font-size: 0.75em; vertical-align: super; line-height: 0; }
 .prose sup a { color: var(--accent); font-weight: 500; }
 
@@ -947,6 +947,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 
 /* 文档头部路径栏 */
 .doc-header {
+  line-height: 1.5;
   padding: 2rem 0 0;
 }
 
@@ -955,7 +956,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   align-items: center;
   flex-wrap: nowrap;
   gap: 4px;
-  font-size: 13px;
+  font-size: 12px;
   font-family: var(--font-ui) !important;
   overflow: hidden;
 }

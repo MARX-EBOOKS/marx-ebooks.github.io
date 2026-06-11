@@ -17,15 +17,15 @@
 <link rel="stylesheet" href="reader.css">
 <style>
 /* SPA-only skeleton, not present in SSG reader.css */
-#doc-skeleton{display:none;padding:2rem 0}
-#doc-skeleton.active{display:block}
-.skeleton{background:var(--bg-hover);border-radius:4px;margin:12px 0;animation:skeleton-pulse 1.5s ease-in-out infinite}
-.skeleton.h2{height:1.6em;width:60%}
-.skeleton.h3{height:1.3em;width:45%}
-.skeleton.p{height:1em;width:100%}
-.skeleton.p.short{width:75%}
-.skeleton.p.xshort{width:40%}
-@keyframes skeleton-pulse{0%,100%{opacity:1}50%{opacity:.5}}
+#doc-skeleton {display:none;padding:2rem 0;}
+#doc-skeleton.active {display:block}
+.skeleton {background:var(--bg-hover);border-radius:4px;margin:12px 0;animation:skeleton-pulse 1.5s ease-in-out infinite}
+.skeleton.h2 {height:1.6em;width:60%}
+.skeleton.h3 {height:1.3em;width:45%}
+.skeleton.p {height:1em;width:100%}
+.skeleton.p.short {width:75%}
+.skeleton.p.xshort {width:40%}
+@keyframes skeleton-pulse {0%,100%{opacity:1}50%{opacity:.5}}
 </style>
 </head>
 <body data-site="">
@@ -131,17 +131,6 @@
 
           </div>
 
-          <!-- 骨架屏 -->
-          <div id="doc-skeleton">
-            <div class="skeleton h2"></div>
-            <div class="skeleton p"></div>
-            <div class="skeleton p short"></div>
-            <div class="skeleton p xshort"></div>
-            <div class="skeleton h3"></div>
-            <div class="skeleton p"></div>
-            <div class="skeleton p"></div>
-          </div>
-
           <!-- 文章视图 -->
           <div class="doc-content" id="article-view" style="display:none">
             <header class="doc-header" id="doc-header">
@@ -149,6 +138,16 @@
                 <span style="color:var(--text-3);">Library</span>
               </div>
             </header>
+            <!-- 骨架屏 -->
+            <div id="doc-skeleton">
+             <div class="skeleton h2"></div>
+             <div class="skeleton p"></div>
+             <div class="skeleton p short"></div>
+             <div class="skeleton p xshort"></div>
+             <div class="skeleton h3"></div>
+             <div class="skeleton p"></div>
+             <div class="skeleton p"></div>
+            </div>
             <div class="prose" id="content"></div>
             <nav class="doc-footer" id="doc-footer">
               <a href="#" class="pagination-link pagination-link--prev" id="prev-btn" style="display:none">
