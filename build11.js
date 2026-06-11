@@ -290,7 +290,7 @@ class HTMLProcessor {
 
 // ── PrevNextResolver ───────────────────────────────────────────
 class PrevNextResolver {
-  constructor(root) { this.root = root; this.cache = new Map(); }
+  constructor(root, pathMatcher) { this.root = root; this.cache = new Map(); this.pm = pathMatcher; }
 
   async getLocalPrevNext(filePath) {
     const dir = path.dirname(filePath);
@@ -299,7 +299,7 @@ class PrevNextResolver {
     let files = [];
     try {
       const entries = await fs.readdir(path.join(this.root, dir), { withFileTypes: true });
-      files = entries.filter(e => e.isFile() && /\.html?$/i.test(e.name)).map(e => e.name).sort();
+      files = entries.filter(e => e.isFile() && /\.x?html?$/i.test(e.name) && this.pm.shouldBuild(dir + '/' + e.name)).map(e => e.name).sort();
     } catch { }
 
     const titleMap = Object.fromEntries(await Promise.all(
@@ -333,9 +333,10 @@ class PrevNextResolver {
 
 // ── VolumeIndexBuilder ─────────────────────────────────────────
 class VolumeIndexBuilder {
-  constructor(config) {
+  constructor(config,pathMatcher) {
     this.config = config;
     this.esc = config.esc || (t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'));
+    this.pm = pathMatcher;
   }
 
   _eachItem(libraryConfig, cb) {
@@ -347,13 +348,12 @@ class VolumeIndexBuilder {
   }
 
   collectVolumePaths(libraryConfig) {
-    const pm = new PathMatcher(this.config.args.only, this.config.args.copyOnly, this.config.args.skip);
     const paths = new Set();
     this._eachItem(libraryConfig, (_c, _g, item) => {
       const p = item.path || '';
       if (!p.endsWith('/index.html')) return;
       const dir = p.replace(/^\//, '').replace(/\/index\.html$/, '');
-      if (!pm.isCopyOnly(dir)) paths.add(dir + '/index.html');
+      if (!this.pm.isCopyOnly(dir)) paths.add(dir + '/index.html');
     });
     return paths;
   }
@@ -641,9 +641,9 @@ class BuildEngine {
 
     const pathMatcher = new PathMatcher(args.only, args.copyOnly, args.skip);
     const scanner = new FileScanner(ROOT, pathMatcher);
-    const prevNextResolver = new PrevNextResolver(ROOT);
+    const prevNextResolver = new PrevNextResolver(ROOT, pathMatcher);
     const renderer = new PageRenderer(config, prevNextResolver, rawConfig);
-    const volBuilder = new VolumeIndexBuilder(config);
+    const volBuilder = new VolumeIndexBuilder(config, pathMatcher);
     const volIndexPaths = volBuilder.collectVolumePaths(rawConfig);
     const { generated: volIndexCount } = await volBuilder.buildAll(rawConfig, DIST);
     console.log(`   Volume index.js: ${volIndexCount} generated`);
