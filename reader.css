@@ -948,7 +948,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 /* 文档头部路径栏 */
 .doc-header {
   line-height: 1.5;
-  padding: 2rem 0;
+  padding: clamp(0.75rem, calc(1.5 * var(--fs-user)), 3rem) 0;
 }
 
 .doc-header__pathbar {
@@ -956,7 +956,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
   align-items: center;
   flex-wrap: nowrap;
   gap: 4px;
-  font-size: 12px;
+  font-size: calc(0.75 * var(--fs-user));
   font-family: var(--font-ui) !important;
   overflow: hidden;
 }
