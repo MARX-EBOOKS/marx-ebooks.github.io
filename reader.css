@@ -933,7 +933,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 .table-wrapper {
   overflow-x: auto;
   display: block;
-  margin: 1em 0;
+  margin: 1em auto;
   min-width: 0;
   width: 96%;
   box-sizing: border-box;
@@ -942,7 +942,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 .table-wrapper table {
   width: auto;
   max-width: none;
-  margin: 0;
+  margin: 0 auto;
 }
 
 /* 文档头部路径栏 */
