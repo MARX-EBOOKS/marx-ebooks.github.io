@@ -12,6 +12,7 @@ li {hyphens: auto;}
 h1.title { }
 h2.author {font-size:0.8em;}
 h3.date {font-size:0.8em;}
+table.HeaderTable { margin: 1em 0;}
 nav#toc ol,
 nav#landmarks ol {padding: 0; margin-left: 0;overflow: hidden;}
 nav#toc ol li,
@@ -37,9 +38,9 @@ pre {max-width: 100%;overflow-x: auto;white-space: pre;}
 .mw-references-wrap {border-top: 1px solid; margin-top:1em;padding-top:1em;}
 hr.clearhr {margin-bottom:2em; }
 @media (prefers-color-scheme: dark) {
-    body {
-    background-color: #020206;
-color:#ABABAB;
+body {
+  background-color: #020206;
+  color:#ABABAB;
 }
 a {
   color: #64ABD5;
@@ -53,9 +54,6 @@ a:visited {
 a:active  {
   color: #a3d4ff;
   text-decoration: underline;
-}
-h1,h2,h3,h4,h5,h6,b {
- color:  #F0F0F0;
 }
 a b,b a {
  color:   #64ABD5;
