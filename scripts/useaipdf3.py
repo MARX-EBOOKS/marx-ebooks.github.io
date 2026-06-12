@@ -247,10 +247,10 @@ class VLMClient:
 
     @staticmethod
     def build_multimodal_messages(prompt: str, images_b64: list[str]) -> list[dict]:
-        content = [{"type": "image_url",
+        content = [{"type": "text", "text": prompt}]
+        content.append({"type": "image_url",
                     "image_url": {"url": f"data:image/png;base64,{b64}"}}
-                   for b64 in images_b64]
-        content.append({"type": "text", "text": prompt})
+                   for b64 in images_b64)
         return [{"role": "user", "content": content}]
 
     def _request_with_retry(self, payload: dict, validate_fn=None) -> httpx.Response:
@@ -414,10 +414,10 @@ class PageProcessor:
     def convert_and_merge(self, page_list: list[int], user_instruction: str = "",enable_think:bool=False) -> str:
         capital=""
         if self.cfg.VOL in range(23,26):
-            capital=f"，正在处理资本论第 {self.cfg.VOL-22} 卷内容。"
+            capital=f"。\n同时请注意，当前你正在处理资本论第 {self.cfg.VOL-22} 卷内容！"
         self._fixed_messages = [{"role": "system", "content":
-                f"你是一个专业的 PDF 转 HTML 助手{capital}。\n"
-                f"请严格按照以下格式要求转换：\n{self.FORMAT_REQUIREMENTS}\n"}]
+                f"你是一个专业的电子出版物编辑，有着丰富的网页编辑和出版物校排的经验，正在协助用户完成书籍数字化、网页化的工作{capital}。\n"
+                f"因此，请根据对应书籍的页面图像，严格按照以下格式要求编写网页代码，以还原对应页面，完成该组页面的高质量录入：\n{self.FORMAT_REQUIREMENTS}\n"}]
         if not self._cache_initialized and self.vlm.cfg.ENABLE_EXPLICIT_CACHE and self.vlm.cfg.API_URL in self.vlm.cfg.SUPPORT_CACHE:
             self._cache_initialized = True
 
@@ -1042,7 +1042,7 @@ def get_system_prompt(vol: int,model:str) -> str:
 - 在确定用户要求的页码范围的篇目划分后，务必按组转换各篇目，即将各组相应页面分入多个 merge_pages 交由其他模型排版，应先发页数较多的请求，不确定页码组的时候应调用函数page_group查对
 - 用户要求从某页的某个标题开始到其他页某个标题结束，则应严格按照用户要求，仅识别并转换某个标题开始至另个标题结束前的内容，不可缺漏，不可多余
 - 用户也可要求对特定内容格式批量进行修改，如更正标题层级、插入特定标签等，此时可以调用 grep_file 利用需修改的关键词与对应格式标签进行检索，检索后调用有关替换工具对内容进行替换
-- 可调用 table_content 查看文件的标题层级是否正确，如不正确请代用户修改。如用户要求检查、修改已转换的文件标题层级是否正确，则首先通过关键词检索标题对应文件的上下文及标签来检查、找到应替换内容，标题不仅可能在<h[1-6]>中，也可能在<p align="center">标签中，搜索时应注意随情况调整，未查到时阅读全文。转换包含标题的页码组时也可指示 VLM 将对应标题转换为目录表中的特定样式。
+- 可调用 table_content 查看文件的标题层级是否正确，如不正确请代用户修改，仅需修改标题层级，保留方括号、脚注上标、尾注锚点，保留斜体、换行等格式。可首先通过关键词检索标题对应文件的上下文及标签来检查、找到应替换内容。标题不仅可能在<h[1-6]>中，也可能在<p align="center">标签中，搜索时应注意随情况调整，未查到时阅读全文。转换包含标题的页码组时也可指示 VLM 按对应层级转换。
 - 检查注释时可通过以下几个特征判断异常：
   - 各类注释编号不连续，如 A/F/M/E 为前缀的 id 数字在同一文件中出现一个异常大的编号数字插在小编号之前
   - F 后数字 2 位数以上，A 后数字 4 位数以上
@@ -1092,7 +1092,6 @@ class Agent:
         except RuntimeError as e:
             partial= [m for m in messages if m.get("role") != "system"]
             return AgentResult(AgentSignal.ANSWER, answer=f"错误：{e}", history=partial)
-
         new_history = [m for m in messages if m.get("role") != "system"]
         return AgentResult(AgentSignal.ANSWER,
                            answer=msg.get("content", ""), history=new_history)
@@ -1200,13 +1199,14 @@ def main():
     MS=API_SERVERICE("https://api-inference.modelscope.cn/v1/chat/completions","ms-...")
     NIM=API_SERVERICE("https://integrate.api.nvidia.com/v1/chat/completions","nvapi-...")
     BL=API_SERVERICE("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions","sk-...")
-    CT=API_SERVERICE("https://wishub-x6.ctyun.cn/v1/chat/completions","")
-    MM=API_SERVERICE("https://api.minimaxi.com/v1/text/chatcompletion_v2","")
-    MIS=API_SERVERICE("https://api.mistral.ai/v1/chat/completions","")
-    GLM=API_SERVERICE("https://open.bigmodel.cn/api/paas/v4/chat/completions","")
-    MI=API_SERVERICE("https://api.xiaomimimo.com/v1/chat/completions","sk-...")
-    OR=API_SERVERICE("https://openrouter.ai/api/v1/chat/completions","sk-...")
-    MON=API_SERVERICE("https://api.kimi.com/coding/v1/chat/completions","sk-...")
+    CT=API_SERVERICE("https://wishub-x6.ctyun.cn/v1/chat/completions","...")
+    MM=API_SERVERICE("https://api.minimaxi.com/v1/text/chatcompletion_v2","sk-...")
+    MIS=API_SERVERICE("https://api.mistral.ai/v1/chat/completions","...")
+    GLM=API_SERVERICE("https://open.bigmodel.cn/api/paas/v4/chat/completions","...")
+    MI=API_SERVERICE("https://api.xiaomimimo.com/v1/chat/completions","...")
+
+    OR=API_SERVERICE("https://openrouter.ai/api/v1/chat/completions","sk-or-v1-...")
+    MON=API_SERVERICE("https://api.kimi.com/coding/v1/chat/completions","sk-kimi-...")
     DS=API_SERVERICE("https://api.deepseek.com/chat/completions","sk-...")
     cfg.LONG_SHORT=args.long_short if args.long_short else 1
     cfg.LONG_THINK=True
@@ -1228,12 +1228,12 @@ def main():
     #page_cfg_long.MODEL= "qwen3.6-plus"
     #page_cfg_long.MODEL= "mimo-v2.5"
     #page_cfg_long.MODEL="qwen/qwen3.6-plus-preview:free"
-    #page_cfg_long.MODEL= "qwen/qwen3.5-397b-a17b"
+    page_cfg_long.MODEL= "qwen/qwen3.5-397b-a17b"
     #page_cfg_long.MODEL= "qwen/qwen3.5-27b"
     #page_cfg_long.MODEL= "glm-4.6v-flash"
     #page_cfg_long.MODEL= "mistralai/mistral-medium-3.5-128b"
-    #page_cfg_long.MODEL= "mistral-medium-2604"
-    page_cfg_long.MODEL= "moonshotai/Kimi-K2.5"
+    #page_cfg_long.MODEL= "stepfun-ai/step-3.7-flash"
+    #page_cfg_long.MODEL= "moonshotai/Kimi-K2.5"
     #page_cfg_long.MODEL="Shanghai_AI_Laboratory/Intern-S1-Pro"
     
     #page_cfg_long.MODEL="kimi-code/kimi-for-coding"
@@ -1249,15 +1249,15 @@ def main():
     #page_cfg_long.THINK_TYPE= "chat_template_kwargs"
     #page_cfg_long.THINK_TYPE= "extra_body"
 
-    page_cfg_short=Config(MS,cfg,True,MAX_CONCURRENT,"enable_thinking")
+    #page_cfg_short=Config(MS,cfg,True,MAX_CONCURRENT,"enable_thinking")
     #page_cfg_short=Config(CT,cfg,True,MAX_CONCURRENT,"enable_thinking")
     #page_cfg_short=Config(MON,cfg,True,MAX_CONCURRENT,"thinking")
     #page_cfg_short.MODEL="Kimi-K2.5"
-    #page_cfg_short=Config(NIM,cfg,True,MAX_CONCURRENT,"chat_template_kwargs")
+    page_cfg_short=Config(NIM,cfg,True,MAX_CONCURRENT,"chat_template_kwargs")
     #page_cfg=Config(NIM,cfg,True,MAX_CONCURRENT)
     #page_cfg_short.MODEL= "qwen3.5-plus"
     page_cfg_short.MODEL= "qwen/qwen3.5-397b-a17b"
-    #page_cfg_short.MODEL= "qwen/qwen3.5-122b-a10b"
+    #page_cfg_short.MODEL= "stepfun-ai/step-3.7-flash"
     #page_cfg_short.MODEL= "moonshotai/kimi-k2.5"
     #page_cfg_short.MODEL="fde2b0a897b140bda7909861ed734671"
     #page_cfg_short.MODEL= "qwen/qwen3-vl-235b-a22b-thinking-2507"
@@ -1277,15 +1277,15 @@ def main():
     #chat_cfg=Config(MS,cfg,False,MAX_CONCURRENT,"thinking")
     #chat_cfg=Config(NIM,cfg,False,MAX_CONCURRENT,"reasoning_effort")
     #chat_cfg=Config(MM,cfg,False,MAX_CONCURRENT,"thinking")
-    #chat_cfg=Config(MS,cfg,False,MAX_CONCURRENT,"enable_thinking")
+    chat_cfg=Config(MS,cfg,False,MAX_CONCURRENT,"enable_thinking")
     #chat_cfg=Config(MS,cfg,False,MAX_CONCURRENT,"reasoning_effort")
-    chat_cfg=Config(DS,cfg,False,MAX_CONCURRENT,"thinking")
+    #chat_cfg=Config(DS,cfg,False,MAX_CONCURRENT,"thinking")
     #chat_cfg.MODEL= "qwen/qwen3.5-397b-a17b"
     #chat_cfg.MODEL= "qwen/qwen3.5-122b-a10b"
     #chat_cfg.THINK_TYPE= "chat_template_kwargs"
     #chat_cfg.MODEL= "mistralai/mistral-small-4-119b-2603"
-    #chat_cfg.MODEL="stepfun-ai/step-3.5-flash"
-    chat_cfg.MODEL="deepseek-v4-flash"
+    chat_cfg.MODEL="stepfun-ai/step-3.5-flash"
+    #chat_cfg.MODEL="deepseek-v4-flash"
     #chat_cfg.MODEL="deepseek-ai/DeepSeek-V4-Flash"
     #chat_cfg.MODEL="nvidia/nemotron-3-super-120b-a12b"
     #chat_cfg.TIMEOUT=httpx.Timeout(connect=10.0, read=43200.0, write=120.0, pool=10.0)

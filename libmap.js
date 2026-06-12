@@ -226,7 +226,7 @@ window.LIBRARY_CONFIG = [
                 path: '/MEGA/II/index.html',
                 items: [{ label: 'II/1: Ökonomische Manuskripte 1857/58 (Grundrisse der Kritik der politischen Ökonomie)', path: '/MEGA/II/1/index.html', volume: 'II/1', citation: { year: '1981ff', publisher: 'Berlin: Dietz Verlag' } },
                 { label: 'II/5: Das Kapital. Kritik der Politischen Ökonomie, Erster Band Hamburg 1867', path: '/MEGA/II/5/index.html', volume: 'II/5', citation: { year: 1983, publisher: 'Berlin: Dietz Verlag' } },
-                { label: 'II/10: Das Kapital. Kritik der Politischen Ökonomie. Erster Band, Hamburg 1890', path: '/MEGA/II/10/index.html', volume: 'II/10', citation: { year: 1991 } },
+                { label: 'II/10: Das Kapital. Kritik der Politischen Ökonomie. Erster Band, Hamburg 1890', path: '/MEGA/II/10/index.html', volume: 'II/10', citation: { year: 1991, publisher: 'Berlin: Dietz Verlag' } },
                 { label: 'II/13: Das Kapital. Kritik der politischen Ökonomie. Zweiter Band, Druckfassung 1885', path: '/MEGA/II/13/index.html', volume: 'II/13', citation: { year: 2008, publisher: 'Berlin: Akademie Verlag' } },
                 { label: 'II/15: Das Kapital. Kritik der politischen Ökonomie. Dritter Band, Druckfassung 1894', path: '/MEGA/II/15/index.html', volume: 'II/13', citation: { year: 2004, publisher: 'Berlin: Akademie Verlag' } },],
             },

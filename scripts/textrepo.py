@@ -308,6 +308,7 @@ class textrep:
         fixed_content=re.sub(r"</center>\s*</div>",r'</div>',fixed_content, flags=re.DOTALL | re.IGNORECASE)
         fixed_content=re.sub(r"<center>",r'<div class="ct">',fixed_content, flags=re.DOTALL | re.IGNORECASE)
         fixed_content=re.sub(r"</center>",r'</div>',fixed_content, flags=re.DOTALL | re.IGNORECASE)
+        fixed_content=re.sub(r'<span lang="EN-US">','',fixed_content, flags=re.DOTALL | re.IGNORECASE)
         replacebr=True
         if self.volume_number in range(6,9) and self.bookname=="MEA":
             replacebr=False
@@ -365,7 +366,7 @@ class textrep:
         fixed_content=re.sub(r'<p class="skip">\s*</p>(\s*<br>)*[\r\n]',r'',fixed_content,flags=re.DOTALL|re.IGNORECASE)
         fixed_content=re.sub(r'<a name=["\']*([\S]+?)["\']*></a>[\s\r\n]*(?:<br>)*?[\s\r\n]*(<h[\d])([ >])',r'\2 id="\1"\3',fixed_content,flags=re.DOTALL|re.IGNORECASE)
         fixed_content=re.sub(r'<a name=["\']*([\S]+?)["\']*></a>[\s\r\n]*(?:<br>)*?[\s\r\n]*(<hr[^<]+?>(?:<br>)*)[\s\r\n]*(<h[\d])([ >])',r'\2'+'\n'+r'\3 id="\1"\4',fixed_content,flags=re.DOTALL|re.IGNORECASE)
-        fixed_content=re.sub(r'(<h[\d]) style=["\']*text-align:[\s]*center[;]*["\'\s]*>',r'\1>', fixed_content,flags=re.DOTALL|re.IGNORECASE)
+        fixed_content=re.sub(r'''(<h[\d](?: id=[\S]+?)*) style=["']*text-align:[\s]*center[;]*["'\s]*>''',r'\1>', fixed_content,flags=re.DOTALL|re.IGNORECASE)
         if (self.bookname=="VIL" and self.volume_number not in range(44,61)) or (self.bookname=="MEW" and self.volume_number not in range(46,50)):
             quote_pattern = r'(<div class="quote">(?:(?!div class="quote")[\s\r\n\S])+?(?:</div>)*</div>)(?:<br>)*'
             fixed_content=re.sub(quote_pattern,self.save_quote,fixed_content, flags=re.DOTALL|re.IGNORECASE)

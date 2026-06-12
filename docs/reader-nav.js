@@ -477,22 +477,20 @@
     detectVolume(docPath) {
       const pn = normPath(docPath), dn = normDoc(pn), dd = pn.replace(/\/[^/]+$/, '');
       const dl = dn.toLowerCase(), drl = dd.toLowerCase();
-      const matchPath = p => {
+      const matchDir = p => {
         if (!p || /^https?:/i.test(p)) return null;
-        const ip = normPath(p); 
-        if (!/\/(?:index|nav)\.x?html?$/i.test(ip)) return null;
-        const d = ip.replace(/\/(?:index|nav)\.x?html?$/i, '');
-        return (dl === normDoc(ip).toLowerCase() || dl === normDoc(d).toLowerCase() || drl === d.toLowerCase() || pn.toLowerCase().startsWith(d.toLowerCase() + '/')) ? d : null;
+        const ip = normPath(p).replace(/\/[^/]*$/i, ''); 
+        return (dl === normDoc(ip).toLowerCase() || dl === normDoc(ip).toLowerCase() || drl === ip.toLowerCase() || pn.toLowerCase().startsWith(ip.toLowerCase() + '/')) ? ip : null;
       };
       let best = null;
       const consider = (col, group, item, dir) => {
         if (dir && (!best || dir.length > best.dir.length)) best = { col, group, item, dir }
       };
       for (const col of window.LIBRARY_CONFIG || []) {
-        consider(col, null, col, matchPath(col.path));
+        consider(col, null, col, matchDir(col.path));
         for (const group of col.groups || []) {
-          consider(col, group, group, matchPath(group.path))
-          for (const item of group.items || []) consider(col, group, item, matchPath(item.path))
+          consider(col, group, group, matchDir(group.path))
+          for (const item of group.items || []) consider(col, group, item, matchDir(item.path))
         }
       }
       return best;
@@ -515,7 +513,7 @@
     /* 面包屑 parts 构建 */
     _breadcrumbParts(col, item, data, extra) {
       const parts = [col.path ? { text: col.label, href: makeHref(col.path), expand: col.id } : { text: col.label, expand: col.id }];
-      if (item && item !== col) parts.push({ text: item.label || item.title || (data?.title) || 'Contents', href: makeHref(item.path || (this.currentVol?.dir + '/index.html')) });
+      if (item && item !== col) parts.push({ text: item.label || item.title || (data?.title) || 'Contents', href: makeHref(item.path ? item.path : (this.currentVol?.dir + '/index.html')) });
       if (extra) parts.push(extra);
       parts.push({ id: 'page-breadcrumb-link', isPageBadge: window.__PAGE_BAR__?.hasPageAnchors });
       return parts;

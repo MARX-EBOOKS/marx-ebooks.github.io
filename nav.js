@@ -362,22 +362,20 @@
     /*  卷册检测 (unified 算法) */
     detectVolume() {
       const cur = normPath(PathResolver.stripRoot(location.pathname)), curL = cur.toLowerCase();
-      const matchPath = p => {
+      const matchDir = p => {
         if (!p || /^https?:/i.test(p)) return null;
-        const ip = normPath(p); 
-        if (!/\/(?:index|nav)\.x?html?$/i.test(ip)) return null;
-        const d = ip.replace(/\/(?:index|nav)\.x?html?$/i, ''), dl = d.toLowerCase();
-        return (curL === ip.toLowerCase() || curL === dl || curL.startsWith(dl + '/')) ? d : null;
+        const ip = normPath(p).replace(/\/[^/]*$/i, ''); 
+        return (curL === ip.toLowerCase() || curL.startsWith(ip.toLowerCase() + '/')) ? ip : null;
       };
       let best = null;
       const consider = (col, group, item, dir) => {
         if (dir && (!best || dir.length > best.dir.length)) best = { col, group, item, dir }
       };
       for (const col of window.LIBRARY_CONFIG || []) {
-        consider(col, null, col, matchPath(col.path));
+        consider(col, null, col, matchDir(col.path));
         for (const g of col.groups || []) {
-          consider(col, g, g, matchPath(g.path))
-          for (const it of g.items || []) consider(col, g, it, matchPath(it.path))
+          consider(col, g, g, matchDir(g.path))
+          for (const it of g.items || []) consider(col, g, it, matchDir(it.path))
         }
       }
       return best;

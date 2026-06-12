@@ -11,10 +11,11 @@ from pathlib import Path
 from typing import Optional
 import httpx
 from unpackpdf import ImageCache
-import MEWbrief
+import MEWbrief1 as MEWbrief
 import argparse
 import uuid
-from bs4 import BeautifulSoup
+import usepic
+
 # ==================== 配置类 ====================
 class Config:
     """
@@ -112,9 +113,8 @@ class VLMClient:
         self._headers   = {
             "Content-Type":  "application/json",
             "Authorization": f"Bearer {cfg.API_KEY}",
-            #"User-Agent":    "RooCode/3.51.0",
+            "User-Agent":    "RooCode/3.51.0",
             #"User-Agent":    "claude-code/2.1.87",
-            "User-Agent":    "opencode/1.14.31",
         }
         self.prompt_usage = 0
         self._usage_lock  = threading.Lock()
@@ -441,7 +441,7 @@ class VLMClient:
 
             if not tool_calls and not msg.get("content"):
                 empty_retry += 1
-                if empty_retry <= self.cfg.MAX_RETRIES:
+                if empty_retry <= 5:
                     wait = random.uniform(self.cfg.RETRY_WAIT, self.cfg.RETRY_WAIT+empty_retry)
                     self._sleep_interruptible(wait)
                     continue
@@ -484,7 +484,7 @@ class VLMClient:
                     messages.append({
             "role": "tool",
             "tool_call_id": tc.get("id", ""),
-            "content": "Successfully retrieved and upload requested images. See in following user's message."
+            "content": f"[已返回 {len(result)-1} 张页面图像，见下方]"
         })
                     messages.append({
             "role": "user",
@@ -513,66 +513,22 @@ class ToolHandler:
 
     ALL_TOOLS = [
         {"type": "function", "function": {
-            "name": "check_read_html",
-            "description": (
-                "读取已生成的 HTML 文件文本，由你直接审阅。"
-                "适合纯文本层面校对：拼写、标签闭合、脚注编号、双向链接、跨页合并、标题层级等。"
-                "如发现错误请告知用户，经同意后调用 save_html 保存修改结果。"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "html_path": {"type": "string", "description": "HTML 文件路径，为空则按 pages[0] 自动推断",
-                                  "default": ""},
-                    "pages": {"type": "array", "items": {"type": "integer"},
-                              "description": "对应的原始页码列表，用于自动推断路径"},
-                    "check": {"type": "boolean", "description": "是否进行检查，默认不检查即False。","default":False},
-                    "merge_html":{"type": "boolean", "description": "同时阅读多个 HTML 开关，默认 False，需要同时阅读多个 HTML 则填 True。","default":False}
-                },
-                "required": ["pages"]
-            }
-        }},
-        {"type": "function", "function": {
             "name": "get_page_images",
-            "description": "获取指定 PDF 页面的原始图片，由你直接查看。用于直接转换PDF页面，也可配合 check_read_html 对照校对。如果你是MiniMax、Stepfun等LLM，不要用这个函数！",
+            "description": "获取指定 PDF 页面的原始图片，由你直接查看。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "pages": {"type": "array", "items": {"type": "integer"},
-                              "description": "要查看的页码列表，不要超过 8 个页面！分批读取时务必按批次分析版面！"}
+                              "description": "要查看的页码列表，不要超过 30 个页面！分批读取时务必按批次分析版面！"}
                 },
                 "required": ["pages"]
             }
         }},
-        {"type": "function", "function": {
-            "name": "save_html",
-            "description": "保存 HTML 文件（用于保存校对后的修正结果）。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "html_path": {"type": "string", "description": "HTML 文件路径"},
-                    "content":   {"type": "string", "description": "待保存的 HTML 内容"}
-                },
-                "required": ["html_path", "content"]
-            }
-        }},
-        {"type": "function", "function": {
-            "name":"save_html_by_page_num",
-            "description": "按首页页码保存 HTML 文件（用于保存转换结果）。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "pages": {"type": "array", "items": {"type": "integer"},
-                              "description": "要保存的页码列表"},
-                    "content":   {"type": "string", "description": "待保存的 HTML 内容"},
-                    "temp":{"type": "boolean", "description": "是否将文件保存到临时目录以待之后合并，默认 False 即不保存临时文件。","default":False}
-                },
-                "required": ["pages", "content"]
-            }
-        }},
+
+
         {"type": "function", "function": {
             "name": "add_notice",
-            "description": "记录转换中发现的问题。",
+            "description": "记录检查过程中发现的问题。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -588,139 +544,20 @@ class ToolHandler:
             "type": "object", 
             "properties": {}
             }
-        }}
-        ,
-        {"type": "function", "function": {
-            "name": "get_requirements",
-            "description": "在用户反馈异常时查看重新对照转换要求",
-            "parameters": {
-            "type": "object", 
-            "properties": {}
-            }
         }},
         {"type": "function", "function": {
-            "name": "regex_edit_html",
-            "description": (
-                "对指定 HTML 文件执行一次或多次正则替换，替换完成后自动保存。"
-                "适合批量修正重复性错误，如错误标签、连字符、多余空格、错误编号前缀等。"
-                "每条规则的 pattern 为 Python re 正则，flags 支持 'I'/'DOTALL'/'M' 等，"
-                "可用 r'\\1' 风格的反向引用。"
-            ),
+            "name": "open_pic",
+            "description": "按用户要求打开特定页面图片",
             "parameters": {
-                "type": "object",
+            "type": "object", 
                 "properties": {
-                    "html_path": {"type": "string",
-                                  "description": "HTML 文件路径，为空则按 pages[0] 自动推断",
-                                  "default": ""},
                     "pages": {"type": "array", "items": {"type": "integer"},
-                              "description": "对应页码（用于自动推断路径）",
-                              "default": []},
-                    "merge_html": {"type": "boolean",
-                                   "description": "是否在 merge 目录中操作",
-                                   "default": False},
-                    "rules": {
-                        "type": "array",
-                        "description": "替换规则列表，按顺序执行",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "pattern":     {"type": "string", "description": "Python 中有效的正则表达式，如有捕获组应写作\1、\2等"},
-                                "replacement": {"type": "string", "description": "替换字符串，可含反向引用"},
-                                "flags":       {"type": "string",
-                                                "description": "可选标志，逗号分隔：I, M, DOTALL, S",
-                                                "default": ""}
-                            },
-                            "required": ["pattern", "replacement"]
-                        }
-                    }
+                              "description": "要打开的页面图片列表，不要超过 30 个页面！"}
                 },
-                "required": ["rules"]
-            }
-        }},
-        {"type": "function", "function": {
-            "name": "str_replace_html",
-            "description": (
-                "对 HTML 文件精准字符串替换（非正则）。"
-                "先用 check_read_html 读取文件内容，找到要修改的原文，"
-                "再调用本工具将 old_str 精确替换为 new_str 并保存。"
-                "old_str 必须在文件中唯一出现，否则返回错误。"
-                "在确定段落、标签、属性等精确定位的内容后可使用本函数。"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "html_path": {"type": "string", "description": "要替换的文件路径","default": ""},
-                    "pages":     {"type": "array", "items": {"type": "integer"}, "description": "要替换的页码", "default": []},
-                    "merge_html":{"type": "boolean", "default": False},
-                    "old_str":   {"type": "string", "description": "要替换的原始字符串，必须与文件内容完全一致"},
-                    "new_str":   {"type": "string", "description": "替换后的新字符串"}
-                },
-                "required": ["old_str", "new_str"]
-            }
-        }},
-        {"type": "function", "function": {
-            "name": "grep_files",
-            "description": (
-                "内容检索工具，支持全字匹配与正则检索。可按页码搜索转换后的 HTML 文本以供修改。正则检索时 is_regex 务必设为 True。"
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "keyword": {
-                        "type": "string",
-                        "description": ("要搜索的关键词。\n"
-                                        "除全字匹配外，还可设为 python 中有效的正则表达式。")
-                    },
-                    "pages": {
-                        "type": "array", "items": {"type": "integer"},
-                        "description": "要搜索的转换后文件页码列表，取需检索组每组的第一个页码即可。"
-                    },
-                    "html_paths": {
-                        "type": "array", "items": {"type": "string"},
-                        "description": "显式指定的 HTML 路径列表（优先于 pages 自动推断）",
-                        "default": []
-                    },
-                    "max_hits": {
-                        "type": "integer",
-                        "description": "最大匹配数",
-                        "default": 50
-                    },
-                    "CONTEXT_CHARS":{
-                        "type": "integer",
-                        "description": "单条匹配的上下文字符长度，默认100",
-                        "default": 100
-                    },
-                    "is_regex":{
-                        "type": "boolean",
-                        "description": "keyword 为正则表达式时开启正则，默认False",
-                        "default": False
-                    },
-                    "page_index":{
-                        "type": "integer",
-                        "description": "搜索结果分页查看，需要看那一分页就填什么数字",
-                        "default": 0
-                    },
-                    "SEARCH_PAGE_SIZE":{
-                        "type": "integer",
-                        "description": "搜索结果分页的每页条数",
-                        "default": 10
-                    }
+                "required": ["pages"]
 
-                },
-                "required": ["keyword"]
-            }
+        }
         }},
-        {"type": "function", "function": {
-            "name": "table_content",
-            "description": (
-                "调用目录表数组，字符串为应转换的标题文本及层级标签，整数为对应页码。"
-            ),
-            "parameters": {
-            "type": "object", 
-            "properties": {}
-            }
-        }
-        }
     ]
 
     def __init__(self, cache: ImageCache,cfg: Config,
@@ -730,33 +567,25 @@ class ToolHandler:
         self.tools       = use_tools if use_tools is not None else self.ALL_TOOLS
         self.pg=MEWbrief.page_group[cfg.VOL]
         self._dispatch = {
-            "check_read_html":self._check_read_html,
             "get_page_images": self._get_page_images,
-            "save_html":      self._save_html,
-            "save_html_by_page_num":      self._save_html_by_page_num,
             "add_notice":     self._add_notice,
             "page_group":self._page_group,
-            "get_requirements":self._get_requirements,
-            "regex_edit_html": self._regex_edit_html,
-            "str_replace_html": self._str_replace_html,
-            "grep_files":self._grep_files,
-            "table_content":self._table_content,
+            "open_pic":self._open_pic,
         }
-        self.FORMAT_REQUIREMENTS = self.get_format_requirements(cfg.VOL)
-        self._page_to_group_start: dict[int, int] = {
-    pg: group[0]
-    for group in self.pg
-    if isinstance(group, (list, tuple))
-    for pg in group
-}
-    def _table_content(self):
-        vol=self.cfg.VOL
-        return "请按用户要求与指示核对标题！字符串为应转换的标题文本及层级标签，整数为对应页码。\n目录表："+str(MEWbrief.inhalt[vol]) if MEWbrief.inhalt[vol] else "目录为空，请用户检查目录！"
-    def get_format_requirements(self,vol):
-        FORMAT_REQUIREMENTS=Path("./prompts/convert2.md").read_text(encoding="utf-8")
-        if vol in range(23,26):
-            FORMAT_REQUIREMENTS=Path("./prompts/convert23.md").read_text(encoding="utf-8")
-        return FORMAT_REQUIREMENTS
+        self.FORMAT_REQUIREMENTS = Path("./prompts/convert.md").read_text(encoding="utf-8")
+    def _open_pic(self, pages: list[int]=None):
+        if pages:
+            pic_opened=""
+            for i,p in enumerate(pages):
+                pic_opened+=usepic.read_pic_simp(self.cfg.VOL,p)+"\n"
+                if i==30:
+                    pic_opened+="一次只打开 30 个，目前仅打开前 30 个！"
+                    break
+            return pic_opened
+        else:
+            return "请确认页码"
+
+
     def call(self, fn_name: str, fn_args: dict) ->str | list:
         fn = self._dispatch.get(fn_name)
         if not fn:
@@ -773,40 +602,18 @@ class ToolHandler:
         result = fn(**fn_args)
         return result if isinstance(result, list) else str(result)
     
-    def _resolve_page_path(self, pg: int) -> Path | None:
-        """按页码推断文件路径，找不到时返回 None。"""
-        p = self._resolve_html_path(pages=[pg])
-        return p if p.exists() else None
-
-    def _resolve_html_path(self, html_path: str = "", pages: list[int] = None,
-                            merge_html: bool = False) -> Path:
+    def _resolve_html_path(self, html_path: str="", pages: list[int]=None,merge_html:bool=False) -> Path:
         if html_path:
             if not Path(html_path).parent.exists() and not merge_html:
                 Path(html_path).parent.mkdir(parents=True, exist_ok=True)
             return Path(html_path)
-
-        prefix = f"ME{self.cfg.VOL:02d}-"
-        if self.cfg.VOL in range(261, 264):
-            prefix = f"ME26-{self.cfg.VOL - 260}"
-
-        #if merge_html:
-        #    Path(self.cfg.HTML_MERGE_DIR).mkdir(parents=True, exist_ok=True)
-        #    return Path(self.cfg.HTML_MERGE_DIR) / f"{prefix}{pages[0]:03d}.html"
-
-        base_dir = Path(self.cfg.OUTPUT_DIR)
-        direct   = base_dir / f"{prefix}{pages[0]:03d}.html"
-        if direct.exists():
-            return direct
-
-        # ── 回退：在页码组里找包含该页码的组，取其首页 ──────────
-        pg = pages[0]
-        group_start = self._page_to_group_start.get(pg)
-        if group_start is not None:
-            fallback = base_dir / f"{prefix}{group_start:03d}.html"
-            if fallback.exists():
-                return fallback
-        return direct
-
+        prefix=f"ME{self.cfg.VOL:02d}-"
+        if self.cfg.VOL in range(261,264):
+            prefix = f"ME26-{self.cfg.VOL-260}"
+        if merge_html:
+            Path(self.cfg.HTML_MERGE_DIR).mkdir(parents=True, exist_ok=True)
+            return Path(self.cfg.HTML_MERGE_DIR) / f"{prefix}{pages[0]:03d}.html"
+        return Path(self.cfg.OUTPUT_DIR) / f"{prefix}{pages[0]:03d}.html"
     def _read_html_text(self, html_path: str, pages: list[int], merge_html: bool) -> tuple[Path, str]:
         """共用 helper：解析路径并读取 HTML 文本。"""
         path = self._resolve_html_path(html_path, pages, merge_html=merge_html)
@@ -838,15 +645,18 @@ class ToolHandler:
             HTML=""
             for p in pages:
                 _, htmlp = self._read_html_text("",[p],merge_html)
-                HTML+=f"\n\n<!-- Page {p}: {self._resolve_html_path(html_path, pages,merge_html)} -->\n\n"+htmlp
-            return ( "请按要求批量处理或检查 HTML\n\n"
-
-            f"各 HTML:\n{HTML}"
+                HTML+=f"\n\n<!-- Page {p} -->\n\n"+htmlp
+            return ( "合并、重排时请注意：\n\n"
+  "- 务必保证脚注链接样式符合转换格式要求，脚注id编号统一计数、连续、上下文一致。作者注与编者注的计数、编号体系相互独立，如果作者注（M1、L1、E1等）与编者注（F1等）未分栏则应分到两个aside内输出，保证作者注栏放在上，编者注栏在下。\n"
+  "- 合并各页 HTML 的跨页段落<p>标签时，务必删去多余连字符或加回空格使原段落完整。合并段落时可根据上下文即语句是否完成判断，如无法判断务必参考图片，一次调用图片不要超过两个。\n"
+  "- 务必同时根据语义和页面图像修正标题标签的层级，特别是前期各页 HTML 分页转换时误将标题识别为普通 p 标签的文本，应修复为正确的标题标签、标题层级。\n"
+  "- 应注意检查其他文本内容、样式、排版的问题，如有严重错误影响可读性时，则应向用户反馈，由用户决定是否修改、重新转换。\n"
+  "- 对 Marx 的手稿，应留意手稿页码格式是否正确，如发现手稿页码被[]包裹，不要将其误认为书末注释编号！可根据图像修正格式。\n\n"""
+            f"待合并 HTML:\n{HTML}"
             )
 
-        """
+
         if check:
-            
             return ("请检查 HTML 转换结果是否有以下问题：\n"
                 "1. 拼写错误\n"   
                 "2. 跨页段落转换错误，尤其是本应都是引用blockquote中的内容却被分到不同段落，或在语义连续却突然分段的情况，乃至完整单词出现连字符后突然换段\n"
@@ -856,13 +666,11 @@ class ToolHandler:
                 "6. HTML 代码格式错误，如标签未闭合、嵌套错误等\n"
             
             "如有错误请反馈给用户，在用户明确指出修改后请调用 get_page_images 查对页面图像修复拼写、标题层级、方括号书末注释编号、段落错误划分等问题，一次调用不超过两个图片。\n\n"
-            f"当前文件 HTML:\n{html}"
+            f"当前 HTML:\n{html}"
             )
-            """
-
         return (
-            "按要求对照原 PDF 图像处理或检查转换后的HTML！\n"
-            f"当前文件 {self._resolve_html_path(html_path, pages,merge_html)}:\n{html}"         
+            "请按要求处理转换后的HTML！\n"
+            f"当前 HTML:\n{html}"         
         )
 
     def _get_page_images(self, pages: list[int]) -> list:
@@ -871,9 +679,10 @@ class ToolHandler:
         for pnum,p in enumerate(pages):
             image_need.append( {"type": "image_url","image_url": {"url": f"data:image/png;base64,{self.cache.get_image_b64(p)}"}})
             if pnum==8:
-                text_4="一次请求的页数不要超过8页！目前返回前8页！查看后续页码请另行调用本函数！"
+                text_4="（一次请求的页数不要超过8页！目前返回前8页！查看后续页码请另行调用本函数！）"
                 break
-        image_need.append({"type":"text","text":f"请按要求转换该组页面，转换后务必自动调用 _save_html_by_page_num 保存，如忘记转换要求务必调用 _check_read_html 和 _get_requirements 重新对照要求检查！{text_4}"})
+
+        image_need.append({"type":"text","text":f"""请按用户要求，记录每页正文开头部分（页眉下方）的十个单词，或查找图片中除单词连字符外标点符号出现在页面最底部的语句（形如 The sentence has finished[,.?":!“]|页面正文最底端边缘），同时也记录作者注释（短横线下各条目）或编者注释（长横线下各条目）跨页的情况。最后将跨页注释和句子在页尾结束的段落所在页面以及其后一页返回为 python 数组，并向用户反馈具体上下文。{text_4}"""})
         return image_need
     def _save_html_by_page_num(self,pages: list[int], content: str = "",temp:bool=False) -> str:
         corrected = re.sub(r'^.*?```html\s*', '', content, flags=re.IGNORECASE | re.DOTALL)
@@ -890,153 +699,8 @@ class ToolHandler:
         return f"已保存：{html_path}"
     def _page_group(self)  -> str:
         return f"篇目页码组：{self.pg}"
-    def _grep_files(
-        self, keyword: str = "",
-        pages: list[int] = None, html_paths: list[str] = None,
-        max_hits: int = 50, is_regex: bool = False,
-        CONTEXT_CHARS: int = 100, page_index: int = 0,SEARCH_PAGE_SIZE:int=10
-    ) -> str:
-        if not keyword:
-            return "请提供搜索关键词。"
-        if CONTEXT_CHARS > 250:
-            return "上下文字符数不能超过 250。"
 
-        # ── 文件列表解析 ──────────────────────────────────────────
-        if html_paths:
-            file_iter = []
-            for hp in html_paths:
-                p = Path(hp)
-                if not p.exists():
-                    return f"文件不存在：{hp}"
-                file_iter.append(p)
-        elif pages:
-            file_iter = []
-            for pg in pages:
-                candidate = self._resolve_page_path(pg)
-                if candidate is None:
-                    return f"找不到页码 {pg} 对应的文件"
-                file_iter.append(candidate)
-        else:
-            out = Path(self.cfg.OUTPUT_DIR)
-            if not out.exists():
-                return f"输出目录不存在：{out}"
-            file_iter = sorted(out.glob("*.html"))
 
-        effective_max = float("inf") if (pages or html_paths) else max_hits
-
-        # ── 编译正则 ──────────────────────────────────────────────
-        try:
-            pattern = re.compile(
-                keyword if is_regex else re.escape(keyword), re.IGNORECASE|re.DOTALL
-            )
-        except re.error as exc:
-            return f"正则语法错误：{exc}"
-        # ── 搜索 ──────────────────────────────────────────────────
-        hits, collected = [], 0
-        for html_file in file_iter:
-            title="title标签：空"
-            if collected >= effective_max:
-                break
-            try:
-                text = html_file.read_text(encoding="utf-8", errors="ignore")
-                soup = BeautifulSoup(text, "html.parser")
-                t    = soup.find("title")
-                title = "title：" + t.get_text(strip=True) if t else ""
-            except Exception:
-                continue
-
-            file_hits = []
-            for m in pattern.finditer(text):
-                start = max(0, m.start() - CONTEXT_CHARS // 2)
-                end   = min(len(text), m.end() + CONTEXT_CHARS // 2)
-                file_hits.append(text[start:end].strip())
-                collected += 1
-                if collected >= effective_max:
-                    break
-
-            if file_hits:
-                header = "["+str(html_file)+" "+title + f" {len(file_hits)}处]"
-                hits.append(header + "\n" + "\n···\n".join(file_hits))
-
-        if not hits:
-            scope = (f"「{', '.join(Path(h).name for h in html_paths)}」" if html_paths
-                     else f"页码{pages}" if pages
-                     else f"全卷({Path(self.cfg.OUTPUT_DIR).name})")
-            return f"{scope}未找到「{keyword}」，请调整关键词。"
-
-        # ── 分页输出 ──────────────────────────────────────────────
-        PAGE_SIZE   = SEARCH_PAGE_SIZE 
-        total_pages = max(1, (len(hits) + PAGE_SIZE - 1) // PAGE_SIZE)
-        page_index  = max(0, min(page_index, total_pages - 1))
-        sliced      = hits[page_index * PAGE_SIZE : (page_index + 1) * PAGE_SIZE]
-
-        header = f"共 {collected} 处命中 / {len(hits)} 个文件"
-        if total_pages > 1:
-            header += f" | 第 {page_index + 1}/{total_pages} 页（page_index={page_index}）"
-
-        return header + "\n===\n" + "\n---\n".join(sliced)
-    def _str_replace_html(self, old_str: str, new_str: str,
-                          html_path: str = "", pages: list[int] = None,
-                          merge_html: bool = False) -> str:
-        pages = pages or []
-        if not pages and not html_path:
-            return "请明确要修改的页码或 HTML 文件！"
-        path, html = self._read_html_text(html_path, pages, merge_html)
-        if html is None:
-            return f"文件不存在：{path}"
-
-        count = html.count(old_str)
-        if count == 0:
-            # 给模型看截断的上下文，方便它自查
-            return (f"❌ 未找到 old_str，替换取消。\n"
-                    f"old_str 前20字符：{old_str[:20]!r}\n"
-                    f"请重新调用 check_read_html 确认原文后再试。")
-        if count > 1:
-            return (f"❌ old_str 在文件中出现 {count} 次，替换取消（存在歧义）。\n"
-                    f"请在 old_str 中加入更多上下文使其唯一。")
-
-        html = html.replace(old_str, new_str, 1)
-        path.write_text(html, encoding="utf-8")
-        return f"✅ 已替换并保存：{path}"
-    def _regex_edit_html(self, rules: list,
-                         html_path: str = "", pages: list[int] = None,
-                         merge_html: bool = False) -> str:
-        pages = pages or []
-        path, html = self._read_html_text(html_path, pages, merge_html)
-        if html is None:
-            return f"文件不存在：{path}"
-
-        _flag_map = {
-            "I": re.IGNORECASE, "IGNORECASE": re.IGNORECASE,
-            "M": re.MULTILINE,  "MULTILINE":  re.MULTILINE,
-            "S": re.DOTALL,     "DOTALL":     re.DOTALL,
-        }
-
-        results = []
-        for i, rule in enumerate(rules):
-            # ── 兜底：模型有时把 rule 序列化成 JSON 字符串 ──
-            if isinstance(rule, str):
-                try:
-                    rule = json.loads(rule)
-                except json.JSONDecodeError as e:
-                    return f"规则{i+1} 无法解析为对象：{e}\n原始内容：{rule!r}"
-
-            pattern     = rule["pattern"]
-            replacement = rule["replacement"]
-            raw_flags   = rule.get("flags", "") or ""
-            flag_val    = 0
-            for f in re.split(r"[,| ]+", raw_flags.upper()):
-                flag_val |= _flag_map.get(f.strip(), 0)
-
-            try:
-                new_html, n = re.subn(pattern, replacement, html, flags=flag_val)
-                html = new_html
-                results.append(f"规则{i+1} /{pattern}/ → {n} 处替换")
-            except re.error as e:
-                return f"规则{i+1} 正则错误：{e}"
-
-        path.write_text(html, encoding="utf-8")
-        return f"已保存：{path}\n" + "\n".join(results)
 
     def _add_notice(self, note: str) -> str:
         with self.cfg.NOTICE_FILE.open("a", encoding="utf-8") as f:
@@ -1045,121 +709,28 @@ class ToolHandler:
 
 # ==================== 系统提示 ====================
 def get_system_prompt(vol: int,Model:str) -> str:
-    FORMAT_REQUIREMENTS = Path("./prompts/convert2.md").read_text(encoding="utf-8")
-    if "gemma" in Model.lower():
-        FORMAT_REQUIREMENTS = Path("./prompts/convert2en.md").read_text(encoding="utf-8")
-    if vol in range(23,26):
-        FORMAT_REQUIREMENTS =Path("./prompts/convert23.md").read_text(encoding="utf-8")
-        if "gemma" in Model.lower():
-            FORMAT_REQUIREMENTS = Path("./prompts/convert23en.md").read_text(encoding="utf-8")
-    
     pageg=MEWbrief.page_group[vol]
-    vol26=""
-    """
-    #checkh=  - 如发现本页页眉下的第一个单词为上一页单词的延续时，请在对应 HTML 中找到该单词，然后在该单词后插入页码锚点（非连字符后）。
-  - 如发现本页页眉下第一行为上一页内容的延续时，请在对应 HTML 中找到该段落，以及本页页眉下的头 10 个单词，然后在 HTML 的对应段落中将页码锚点插在这 10 个单词前。"""
-    insertpg="""
-- 用户要求插入页码锚点时，请对照 PDF 页面，按如下要求插入：
-  - 页码锚点的格式为 <a id="S页码"></a>。
-  - 仅对多页组插入页码锚点，单页组不插入。
-  - 默认将页码锚点插在对应页页眉下方第一行的第一个完整单词前，注意不要插在跨页单词内（不要插在连字符前后）。
-  - 运用替换工具快速插入锚点。"""
-    checkh="""- 用户也可要求批量更正标题层级，此时应首先调用 table_content 查看目录表及正确标题层级，然后调用 grep_file 检索需修改的标题，检索后调用有关替换工具对内容进行替换。被错误转换的标题，可能在 <h[1-6] 中，也可能在 <p align="center"> 内，还可能分成多行在多个块级标签中，搜索时应注意随情况调整，未查到时阅读全文。更正时，如标题保留脚注、锚点等标签，保留换行，保留方括号，都不要删去，仅修改标题标签！"""
-    if "gemma" in Model.lower():
-        checkh="""- User can also ask you to revise headings in converted files. You should first call tool table_content to check the table of contents to see the correct heading levels on relevant pages, then use grep_file to check the specific context and code in the related converted files. The headings that need revision may be in <h[1-6] tags with the wrong level, or in ordinary <p align="center"> tags, or even in multiple mixed tags. Therefore, you should adjust the keyword to patch the headings correctly. Read the whole file only after you are unable to find what you need through search. When you find anchors and footnotes links in the needed revise headings, please perserve them. And do not change line breaks in the converted headings while revising only the level of a whole heading."""
-    check=""
-    #if vol in range(261,264):
-    #    vol26="注意页码组页码的重叠，如有重叠请按要求仅输出对应的内容。"
+    requireback=f"""按用户要求分析一个 PDF 文件版面、探查特定格式的内容。PDF 文件已经按页码拆分成各个图像，同时也有现成的页码组。当用户下达“查找某个页码范围”或“查找某几组”的指令时，你就首先按照篇目页码组用 get_page_images 调用对应页面图片查找图片中正文句号、感叹号、括号、引号、冒号等出现在页面最底部的语句（形如 The sentence has finished[.?":!“]|页面正文最底端边缘），同时也记录作者注释（短横线下各条目）或编者注释（长横线下各条目）跨页的情况。最后将跨页注释和句子在页尾结束的段落所在页面以及其后一页返回为 python 数组，同时帮用户打开图片，向用户反馈具体上下文。"""
+    return f"""按用户要求完成对 PDF 电子书页面的分析任务。
 
-    if Model.lower() not in ["qwen3.5-plus"]:
-        check="""- 用户也可要求将多页已转换的 HTML 合并为一个 HTML 或重排某几个 HTML，此时也应参考转换要求合并。默认按照页码组合并。合并后的文件调用 save_html_by_page_num 即按合并页码组的首页页码保存。与前后组有页码重叠的组同样仅转换页码组中完整出现的一节，即本组页面中第一个出现的标题到本组最后一个标题前的内容。
-- 用户如有明确待合并文件的目录，则应在 check_read_html 中填入对应路径，而非只填页码。"""
+# 默认状态：
+- 用户下达搜索某几个页面或页面组的指令后，直接按页码组或页码打开页面图片，直接查看页面底部。
+- 如页面正文最底部的边缘处出现：
+  - 标点符号而非空格或字母或单词未完成时的连字符；
+  - 页脚注释区注释内容不完整、延续到后页注释区的注释，
+  那么就记录相关页面的页码，最后将有关页码的本页和后一页返回为 PYTHON 数组，并帮用户打开图片。
+- 用户下达打开某几个页面或某几组页面或按组打开页面的指令后，则直接帮用户打开页面图片，其余什么都不用做。
+- 用户也可以要求查看某几页正文开头部分的文本。此时应调用 get_page_images 查看图片，同时为用户打开对应图片，仅返回每页正文开头部分（页眉正下方）的 10 个单词（包括十个单词之间的标点，各注释上标视为一个单词），如果正文开头（页眉正下方）是某个标题则返回标题内容即可。其余什么都不用做！用户用 “check fl...” 下达指令时照此办理。
 
-        FORMAT_REQUIREMENTS2="""
-## 合并或重排 HTML 注意事项
+# 可用工具：
 
-在上述转换要求的基础上，还应注意以下细节：
-  - 务必保证脚注链接样式符合转换格式要求，脚注id编号统一计数、连续、上下文一致。作者注与编者注的计数、编号体系相互独立，如果作者注（M1、L1、E1等）与编者注（F1等）未分栏则应分到两个aside内输出，保证作者注栏放在上，编者注栏在下。
-  - 合并各页 HTML 的跨页段落<p>标签时，务必删去多余连字符或加回空格使原段落完整。合并跨页段落时首先根据上下文判断，如页尾有连字符或语句未完成时则明显应合并，如页尾段落后有空格则不应合并。仅在句子刚好在页尾完成且段末无空格时调用 get_page_images 参考图片判断是否合并，因此一次调用图片不要超过两个。
-  - 务必同时根据语义和页面图像修正标题标签的层级，特别是前期各页 HTML 分页转换时误将标题识别为普通 p 标签的文本，应修复为正确的标题标签、标题层级。
-  - 合并或重排的过程中还应注意检查其他文本内容、样式、排版的问题，如有严重错误影响可读性时，则应向用户反馈，由用户决定是否修改、重新转换。
-  - 对 Marx 的手稿，应留意手稿页码格式是否正确，如发现手稿页码被[]包裹，不要将其误认为书末注释编号！可根据图像修正格式。
-  - 用户也可要求你在查看每页图片后，给多页组按组转换后的文件加入页码锚点，格式为<a id="S页码"></a>，位置在文本中对应的 每页第一段段前或每页第一个完整单词后，在相应文本内容中添加页码，从第二个页码开始。
-用户也可以要求你帮忙确认某组内或某页码范围内哪些页面有跨页段落，此时你仅需调用 get_page_images 对图片分批探查即可，仅需将跨页段落的所在页码输出为数组即可，格式为 [跨页段落开始页码,跨页段落结束页码]。如一个段落跨3个及以上页面，则输出该段落的所在的所有页码。特别留意语句在某一页最末尾处结束（行末与页边无留白）、即后一页首行无缩进的段落（行首与页边无留白）的跨页段落，不要误判！如需确认的页面超12个以上，可分批输出页码。"""
-    if "gemma" not in Model.lower():
-        return f"""你是一个专业的电子出版物编辑，有着丰富的网页编辑和出版物校排的经验，正在协助用户完成书籍数字化、网页化的工作，可以根据用户提供的书籍扫描件各页面的图像，在网页中还原原书的排版布局。
-
-# 🛠️ 可用工具：
-- add_notice: 记录转换过程中的问题
-- check_read_html：获取转换后的 HTML 文本
+- add_notice: 记录用户反馈的与分组有关的问题，也可以直接记录页码组等信息
 - get_page_images：查看特定页码的原始PDF页面以供对照或检查
-- save_html：保存修改后的HTML
-- save_html_by_page_num：按页码保存修改后的HTML
 - page_group：查看PDF各篇目的页码组
-- get_requirements：用户反馈异常时重新查看转换要求
-- grep_files：检索工具，支持正则表达式
-
-# 📌 使用策略：
-- 用户说"把第 2 到 5 页转成 HTML"，则调用 get_page_images(pages=[2,3,4,5])。
-- 用户输入多个页码或页码范围，务必严格对照下述篇目的页码组检查，如用户输入页码与分组不符时应询问用户，确认是否跳过部分页面，如用户同意则跳过。
-- 发现用户要求的页码组与其他组有重叠时，除明确询问确认用户有其他要求外，仅可转换页码组中完整出现的一节：第一个页码与前一组最后一个页码重叠时，就从页码重叠组的第一个出现的标题开始转换；最后一个页码与后一组第一个页码重叠时，则在最后一个标题前结束，不要多余，不要缺漏。检查相应文件时也应注意文件内容范围是否正确，如有超出或缺失请修改。
-- 在确定用户要求的页码范围的篇目划分后，务必调用 get_page_images 按组查看各篇目的相应页面，不确定页码组的时候应调用函数page_group。
-- 用户要求从某页的某个标题开始到其他页某个标题结束，则应严格按照用户要求，仅识别并转换某个标题开始至另个标题结束前的内容，不可缺漏，不可多余。
-- 检查注释时可通过以下几个特征判断异常：
-  - 各类注释编号不连续，如 A/F/M/E 为前缀的 id 数字在同一文件中出现一个异常大的编号数字插在小编号之前
-  - F 后数字 2 位数以上，A 后数字 4 位数以上
-  - aside 栏中脚注内容在语义上不完整，如仅以单词结尾或逗号结尾等
-  有异常时务必查对原图。
-- 转换后调用 save_html_by_page_num 保存结果。
-- get_page_images 读图一次不超过 8 个页面！
-{checkh}
-{insertpg}
-- 如需根据图片通过替换修改内容，务必按照以下方式调用工具：
-  - 首先根据图片内容确定关键词/替换表达式，通过 grep_files 确认关键词或替换表达式的有效性、正确性，不正确则应根据检索结果更换关键词/表达式。
-  - 再调用有关工具，对该关键词/表达式进行替换。
-  - 仅应在 grep_files 未找到内容时，才使用check_read_html 查看全文确认关键词/表达式的正确性.
-  - 如要替换多个文件，则应同时调用多个工具完成检索与替换，避免轮次过多、导致上下文过长。
-
-# 转换要求：
-{FORMAT_REQUIREMENTS}
 
 # 各篇目页码组：
+
 {pageg}
-除用户要求按标题层级输出或用户同意跳过部分页面外，严格按照页码组划分转换！{vol26}
-"""
-    else:
-        return f"""You are a professional internet publishing editor. You can assist users in restoring the layout of PDF pages by skillfully using HTML syntax.
-
-# 🛠️ Available Tools:
-- add_notice: Record issues encountered during the conversion process
-- check_read_html: Retrieve the converted HTML text
-- get_page_images: View the original PDF pages of specific page numbers for reference or inspection
-- save_html: Save the modified HTML
-- save_html_by_page_num: Save the modified HTML by page number
-- page_group: View the page groups for each section of the PDF
-- get_requirements: Re-check the conversion requirements when user reports an anomaly
-
-# 📌 Usage Strategy:
-- If the user says "convert pages 2 to 5 into HTML", call get_page_images(pages=[2,3,4,5]).
-- When the user inputs multiple page numbers or page ranges, strictly cross-check against the page groups of the sections listed below. If the user's input does not match the grouping, ask the user for confirmation. If the user agrees, skip those pages.
-- If you find that the page group requested by the user overlaps with other groups, unless explicitly confirmed by the user for other requirements, only convert the section that appears completely within the page group: if the first page overlaps with the last page of the previous group, start from the first heading that appears in the overlapping group; if the last page overlaps with the first page of the next group, end before the last heading. Do not include excess or miss any content. When checking the corresponding files, also ensure the content range is correct; if there is overflow or omission, please correct it.
-- After determining the section division for the page range requested by the user, be sure to call get_page_images to view the pages of each section by group. If unsure about the page groups, call the function page_group.
-- If the user requests starting from a specific heading on a certain page and ending at a specific heading on another page, strictly follow the user's request: only recognize and convert the content from that starting heading to just before the ending heading, without omission or excess.
-- After conversion, call save_html_by_page_num to save the result.
-- Do not read more than 8 pages at a time with get_page_images!
-- You can judge the abnormal notes (number) by:
-  - Discontinutiy of notes' ids number, like extra large numbers after A/M/E/F's prefix lies before the small numbers.
-  - F with 2-digit id number, A with 4-digit id number
-  - Incompleteness of sentences inside the aside column which might end with letters or commas.
-  You should check pictures if you find these mistakes.
-{checkh}
-
-# Conversion Requirements:
-{FORMAT_REQUIREMENTS}
-
-# Page Groups for Each Section:
-{pageg}
-Unless the user requests output by heading level or agrees to skip certain pages, strictly follow the page groups for conversion! 
 """
 
 # ==================== Agent ====================
@@ -1298,20 +869,14 @@ def main():
     if not notice_file.exists():
         notice_file.write_text("", encoding="utf-8")
     MAX_CONCURRENT=args.MAX_CONCURRENT if args.MAX_CONCURRENT else 2
-    MS=API_SERVERICE("https://api-inference.modelscope.cn/v1/chat/completions","")
-    NIM=API_SERVERICE("https://integrate.api.nvidia.com/v1/chat/completions","")
-    NIM2=API_SERVERICE("https://integrate.api.nvidia.com/v1/chat/completions","")
-    BL=API_SERVERICE("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions","")
-    CT=API_SERVERICE("https://wishub-x6.ctyun.cn/v1/chat/completions","")
-    MM=API_SERVERICE("https://api.minimaxi.com/v1/text/chatcompletion_v2","")
-    MIS=API_SERVERICE("https://api.mistral.ai/v1/chat/completions","")
-    GLM=API_SERVERICE("https://open.bigmodel.cn/api/paas/v4/chat/completions","")
-    MI=API_SERVERICE("https://api.xiaomimimo.com/v1/chat/completions","")
-    OR=API_SERVERICE("https://openrouter.ai/api/v1/chat/completions","")
-    MON=API_SERVERICE("https://api.kimi.com/coding/v1/chat/completions","")
-    DS=API_SERVERICE("https://api.deepseek.com/chat/completions","")
-    GOG=API_SERVERICE("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions","")
-    CFG=API_SERVERICE("https://gateway.ai.cloudflare.com/v1/.../private/google-ai-studio/v1beta/openai/chat/completions","")
+    MS=API_SERVERICE("https://api-inference.modelscope.cn/v1/chat/completions","ms-...")
+    NIM=API_SERVERICE("https://integrate.api.nvidia.com/v1/chat/completions","nvapi-...")
+    BL=API_SERVERICE("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions","sk-...")
+    CT=API_SERVERICE("https://wishub-x6.ctyun.cn/v1/chat/completions","...")
+    MM=API_SERVERICE("https://api.minimaxi.com/v1/text/chatcompletion_v2","sk-cp-...")
+    GOG=API_SERVERICE("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions","...")
+    CFG=API_SERVERICE("https://gateway.ai.cloudflare.com/v1/.../private/google-ai-studio/v1beta/openai/chat/completions","...")
+    cfg.DEFAULT_CHAT_THINK=True
     page_cfg=Config(BL,cfg,True,MAX_CONCURRENT,"enable_thinking")
     page_cfg.MODEL= "qwen3.5-plus"
     # ── 💬 聊天调度模型（负责解析用户指令、调用工具）──────────
@@ -1325,22 +890,18 @@ def main():
     #chat_cfg=Config(MM,cfg,False,MAX_CONCURRENT,"thinking")
     #chat_cfg=Config(GOG,cfg,False,MAX_CONCURRENT,"reasoning_effort")
     #chat_cfg=Config(CFG,cfg,False,MAX_CONCURRENT,"reasoning_effort")
-    #chat_cfg=Config(OR,cfg,False,MAX_CONCURRENT,"reasoning_effort")
-    #chat_cfg=Config(DS,cfg,False,MAX_CONCURRENT,"thinking")
     #chat_cfg.MODEL= "qwen/qwen3.5-397b-a17b"
     #chat_cfg.MODEL= "qwen/qwen3.5-122b-a10b"
+    chat_cfg.MODEL= "qwen/qwen3.5-35b-a3b"
     #chat_cfg.MODEL="qwen3.5-plus"
     #chat_cfg.MODEL="qwen3.6-plus"
-    chat_cfg.MODEL="qwen/qwen3.5-27b"
-    #chat_cfg.MODEL="deepseek-v4-flash"
     #chat_cfg.MODEL="google/gemma-4-31b-it"
     #chat_cfg.MODEL="gemma-4-31b-it"
     #chat_cfg.MODEL="gemini-3.1-flash-lite-preview"
-    #chat_cfg.MODEL="gemini-3-flash-preview"
     #chat_cfg.MODEL="google/gemini-3.1-flash-lite-preview"
     #chat_cfg.MODEL="Kimi-K2.5"
-    if chat_cfg.MODEL.lower() in ["kimi-k2.5","qwen3.5-plus","qwen3.6-plus","gemma-4-31b-it"]:
-        chat_cfg.TIMEOUT=httpx.Timeout(connect=10.0, read=900.0, write=1800.0, pool=10.0)
+    if chat_cfg.MODEL.lower() in ["kimi-k2.5","qwen3.5-plus","qwen3.6-plus"]:
+        chat_cfg.TIMEOUT=httpx.Timeout(connect=10.0, read=3600.0, write=120.0, pool=10.0)
     #chat_cfg.MODEL="kimi-code/kimi-for-coding"
     #chat_cfg.MODEL= "Qwen3.5-397B-A17B"
     #chat_cfg.THINK_TYPE= "chat_template_kwargs"
@@ -1349,9 +910,7 @@ def main():
     #chat_cfg.MODEL="nvidia/nemotron-3-super-120b-a12b"
     #chat_cfg.MODEL="MiniMax-M2.7"
     #chat_cfg.THINK_TYPE= "thinking"
-    chat_cfg.MAX_RETRIES=20
     chat_cfg.TEMPERATURE=1
-    chat_cfg.TOP_P=0.95
     interrupt = threading.Event()
 
     # ── 创建两个独立客户端，各持自己的 cfg ────────────────────

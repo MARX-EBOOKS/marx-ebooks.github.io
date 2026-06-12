@@ -515,7 +515,7 @@ def main():
     # 配置参数
     book_title = "KARL MARX FRIEDRICH ENGELS WERKE"  # 修改为你的书名
     book_author = "Karl Marx & Friedrich Engels & 中共中央马克思、恩格斯、列宁、斯大林著作编译局"      # 修改为作者名
-    #output_dirs = [r"./MEW10"]  # 输出目录名
+    #output_dirs = [r"./de/MEW"]  # 输出目录名
     output_dirs = [r"./mlread/docs/MEW",r"./MARX-ZH-CN-node/MEW"] 
     #output_dirs = [r"./MARX-ZH-CN.github.io1/MEW"] 
 
