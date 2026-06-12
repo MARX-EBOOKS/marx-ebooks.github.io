@@ -948,7 +948,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 /* 文档头部路径栏 */
 .doc-header {
   line-height: 1.5;
-  padding: 0.75rem 0 clamp(0.75rem, calc(1.5 * var(--fs-user)), 2rem) 0;
+  padding: 1.5rem 0 clamp(0.75rem, calc(1.5 * var(--fs-user)), 2rem) 0;
 }
 
 .doc-header__pathbar {
