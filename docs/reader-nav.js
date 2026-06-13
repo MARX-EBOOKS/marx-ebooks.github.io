@@ -503,7 +503,7 @@
     }
     /* SPA 文档信息 (unified with nav.js _volInfo, adapted for SPA) */
     _volInfo() {
-      const c = normPath(currentDoc()), v = this.currentVol;
+      const c = normPath(currentDoc()).toLowerCase(), v = this.currentVol.toLowerCase();
       const path = (v && c === v.dir) ? v.dir + '/index.html' : c;
       const file = path.split('/').pop().replace(/\.x?html?$/i, '') || 'index';
       const isVol = v ? (c === v.dir || c === v.dir + '/index.html') : false;

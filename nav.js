@@ -282,7 +282,7 @@
 
     /*  SSG 文档信息 */
     _volInfo() {
-      const c = normPath(PathResolver.stripRoot(location.pathname)), v = this.currentVol;
+      const c = normPath(PathResolver.stripRoot(location.pathname)).toLowerCase(), v = this.currentVol.toLowerCase();
       const path = (v && c === v.dir) ? v.dir + '/index.html' : c;
       const file = path.split('/').pop().replace(/\.x?html?$/i, '') || 'index';
       const isVol = v ? (c === v.dir || c === v.dir + '/index.html') : false;
