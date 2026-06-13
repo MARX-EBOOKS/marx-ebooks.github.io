@@ -503,10 +503,10 @@
     }
     /* SPA 文档信息 (unified with nav.js _volInfo, adapted for SPA) */
     _volInfo() {
-      const c = normPath(currentDoc()).toLowerCase(), v = this.currentVol.toLowerCase();
+      const c = normPath(currentDoc()), v = this.currentVol;
       const path = (v && c === v.dir) ? v.dir + '/index.html' : c;
       const file = path.split('/').pop().replace(/\.x?html?$/i, '') || 'index';
-      const isVol = v ? (c === v.dir || c === v.dir + '/index.html') : false;
+      const isVol = v ? (c.toLowerCase() === v.dir.toLowerCase() || c.toLowerCase() === v.dir.toLowerCase() + '/index.html') : false;
       return { path, dir: v?.dir || '', file, isVol };
     }
 
