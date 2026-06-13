@@ -25,6 +25,7 @@ span.cq,span.rt,span.ct {display: block;}
 .src,.add  {max-width:60%;margin:1.5em 0 1.5em auto;}
 div.quote[align="right"] {line-height:150%;}
 .rt td,.sign td {text-align:left;padding: 0;}
+em {text-emphasis: dot; text-emphasis-position: under;}
 a,a:focus-visible {color:#2563EB;text-decoration: none;}
 a:visited {color:#4B6CB7}
 a:active {color:#1E40AF;text-decoration: underline;}

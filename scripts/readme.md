@@ -6,7 +6,7 @@
 
 用户也可以自行打开python文件优化代码、prompts，提升运行效率。运行py文件前请确保系统安装python及所需运行库（httpx、bs4）。
 
-除在api_key固定存储参数外，运行前也可以在命令行：usezaisearch6.py --xxx中根据需要自行调整配置参数，选项如下：
+除在api_key固定存储参数外，运行前也可以在命令行：drawer_agent.py --xxx中根据需要自行调整配置参数，选项如下：
 
 &#x20; -h, --help            帮助
 
@@ -40,7 +40,7 @@
 
 &#x20; --deep-read           启动时开启深度阅读
 
-# 照排 agent 说明
+# 照排 agent 工作流说明
 
 主要由以下几个脚本构成：
 - PDF 解包脚本 unpackpdf.py，图片查阅脚本 usepic.py，图片打开 agent useaipdf2pa.py
@@ -75,4 +75,5 @@
 主要分两个方向：
 1. SPA：docs/reader.html 及 docs/reader-nav.js, docs/reader-ui.js, docs/reader-pagebar.js, docs/reader-nav.js。
 2. SSG: 根目录的 build11.js, nav.js, reader.js。
-两者均通过 libmap.js 渲染菜单路径及引用内容。如果要加入卷册，注意libmap中的 path 属性，应按照对应站点根目录计算的绝对路径（以 / 开头供浏览器打开）赋值，以供 nav.js / docs/reader-nav.js 正确处理。各卷目录页最好以 index.html 命名，以供 js 正确生成面包屑、服务器正确导航。如需引用信息功能，可以在 reader-pagebar.js 各全集、各组、各卷的 citation 中录入引用信息前缀： prefix 为全集或书籍的固定信息, year 为出版年份, publisher 为出版社。目前暂支持德语的 S 开头的页码锚点。目前仅 SPA 支持页面信息引用，SSG 为保持纯净文档站架构，暂不计划支持。
+
+两者均通过 libmap.js 渲染菜单路径及引用内容。如果要加入卷册，注意libmap中的 path 属性，应按照对应站点根目录计算的绝对路径（以 / 开头供浏览器打开）赋值，以供 nav.js / docs/reader-nav.js 正确处理。各卷目录页最好以 index.html 命名，以供 js 正确生成面包屑、服务器正确路由。如需引用信息功能，可以在libmap.js 各全集、各组、各卷的 citation中为 reader-pagebar.js  中录入引用信息前缀： prefix 为全集或书籍的固定信息, year 为出版年份, publisher 为出版社。暂仅支持德语 S 开头的页码锚点<a id="Sxxx"></a>。目前仅 SPA 支持页面信息引用，SSG 为保持纯净文档站架构，暂不计划支持。
