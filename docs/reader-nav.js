@@ -107,6 +107,46 @@
   const sameDoc = (a, b) => PathUtils.sameDoc(a, b);
   const makeHref = (dp, h) => PathResolver.makeSpa(dp, h);
   const resolveDocHref = (h, b) => PathResolver.resolve(b || '', h);
+  const libraryIndexKey = dir => normPath(String(dir || '').replace(/^\/+/, '')).toLowerCase();
+  const parentDir = dir => String(dir || '').replace(/\/[^/]+$/, '');
+  const startLookupDir = value => {
+    const clean = normPath(String(value || '').replace(/[?#].*$/, '').replace(/^\/+/, ''));
+    if (!clean) return '';
+    return /\.[^/]+$/.test(clean.split('/').pop() || '') ? clean.replace(/\/[^/]+$/, '') : clean;
+  };
+  const joinUrlPath = (...parts) => {
+    const raw = parts.filter(v => v != null && String(v) !== '').join('/');
+    return raw.replace(/([^:]\/)\/+/g, '$1').replace(/\/+$/, '');
+  };
+  const resolveLibraryPath = (col, group, item) => {
+    const raw = String(item?.path || '').trim();
+    if (raw) return raw;
+    const base = group?.basePath || col?.basePath || '';
+    const name = item?.dir ?? item?.id;
+    if (name == null || name === '') return '';
+    if (String(name).startsWith('/')) return joinUrlPath(name, item?.homeName || 'index.html');
+    if (!base) return raw;
+    return joinUrlPath(base, name, item?.homeName || 'index.html');
+  };
+  const resolveLibraryEntry = (col, group, item) => {
+    const raw = resolveLibraryPath(col, group, item);
+    if (!raw || /^https?:/i.test(raw)) return null;
+    const path = normPath(String(raw).replace(/[?#].*$/, '').replace(/^\/+/, ''));
+    const dir = path.replace(/\/[^/]+$/i, '');
+    return dir ? { path, dir } : null;
+  };
+  const volumeName = (col, group, item) => {
+    if (item?.volume) return item.volume;
+    const kind = item?.kind || (typeof item?.id === 'number' ? 'volume' : 'book');
+    const fmt = group?.volumeFormat || col?.volumeFormat || '';
+    return kind === 'volume' && fmt ? fmt.replace(/\{id\}/g, item.id) : '';
+  };
+  const libraryLabel = (item, col = null, group = null) => {
+    const label = item?.label || item?.title || '';
+    const volume = volumeName(col, group, item);
+    if (!volume || !label || String(label).startsWith(volume)) return label || volume || String(item?.id ?? '');
+    return volume + (/^[\s(:：,，.;]/.test(label) ? ' ' : ': ') + label;
+  };
 
   /* 卷册检测 (SPA: 带 docPath 参数) */
   class VolumeIndex {
@@ -122,14 +162,11 @@
       const entries = [];
       const byDir = new Map();
       const add = (col, group, item) => {
-        const raw = item?.path || '';
-        if (!raw || /^https?:/i.test(raw)) return;
-        const clean = normPath(raw), dir = clean.replace(/\/[^/]+$/i, '');
-        if (!dir) return;
-        const entry = { col, group, item, dir };
+        const resolved = resolveLibraryEntry(col, group, item);
+        if (!resolved) return;
+        const entry = { col, group, item, dir: resolved.dir };
         entries.push(entry);
-        byDir.set(dir.toLowerCase(), entry);
-        byDir.set(normDoc(dir).toLowerCase(), entry);
+        byDir.set(libraryIndexKey(resolved.dir), entry);
       };
       for (const col of source) {
         add(col, null, col);
@@ -139,25 +176,26 @@
         }
       }
       this.source = source;
-      this.entries = entries.sort((a, b) => b.dir.length - a.dir.length);
+      this.entries = entries;
       this.byDir = byDir;
       return this.entries;
     }
 
     detectVolume(docPath, findcol = false) {
-      const pn = normPath(docPath);
-      if (!pn) return null;
+      let dir = startLookupDir(docPath);
+      if (!dir) return null;
       this.ensure();
-      const clean = normDoc(pn);
-      const pieces = clean.split('/').filter(Boolean);
-      let cur = '', best = null;
-      for (const piece of pieces) {
-        cur = cur ? cur + '/' + piece : piece;
-        const entry = this.byDir.get(cur.toLowerCase());
-        const basepathcom = normPath(entry?.col?.basePath)?.toLowerCase() || ''; 
-        if (entry?.col && !(basepathcom && pn.toLowerCase().startsWith(basepathcom))) entry.col = null;
-        if (findcol) return entry.col;
-        if (entry) best = entry;
+      let best = null;
+      for (;;) {
+        const entry = this.byDir.get(libraryIndexKey(dir));
+        if (entry) {
+          if (findcol && entry.col) return entry.col;
+          best = entry;
+          break;
+        }
+        const next = parentDir(dir);
+        if (!next || next === dir) break;
+        dir = next;
       }
       return best;
     }
@@ -506,7 +544,7 @@
     }
     loadSection(item) {
       const col = (window.LIBRARY_CONFIG || []).find(c => c.id === item.dataset.section); if (!col) return;
-      const html = (col.groups || []).map(g => this.renderGroup(g)).join(''); if (!html) return;
+      const html = (col.groups || []).map(g => this.renderGroup(g, col)).join(''); if (!html) return;
       const ul = document.createElement('ul'); ul.className = 'sidebar-menu sidebar-menu--nested'; ul.innerHTML = html;
       item.appendChild(ul); item.dataset.loaded = 'true';
     }
@@ -541,8 +579,9 @@
 
     /* 面包屑 parts 构建 */
     _breadcrumbParts(col, item, data, extra) {
-      const parts = [col.path ? { text: col.label, href: makeHref(col.path), expand: col.id } : { text: col.label, expand: col.id }];
-      if (item && item !== col) parts.push({ text: item.label || item.title || (data?.title) || 'Contents', href: makeHref(item.path ? item.path : (this.currentVol?.dir + '/index.html')) });
+      const colPath = resolveLibraryPath(col, null, col);
+      const parts = [colPath ? { text: col.label, href: makeHref(colPath), expand: col.id } : { text: col.label, expand: col.id }];
+      if (item && item !== col) parts.push({ text: libraryLabel(item, col, this.currentVol?.group) || (data?.title) || 'Contents', href: makeHref(resolveLibraryPath(col, this.currentVol?.group, item) || (this.currentVol?.dir + '/index.html')) });
       if (extra) parts.push(extra);
       parts.push({ id: 'page-breadcrumb-link', isPageBadge: window.__PAGE_BAR__?.hasPageAnchors });
       return parts;
@@ -574,7 +613,8 @@
       const col = this.currentVol.col;
       const curFile = normPath(docPath).split('/').pop();
       const nodes = headings.map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id, file: curFile }));
-      const parts = [col?.path ? { text: col.label || 'Library', href: makeHref(col.path), expand: col.id } : { text: col?.label || 'Library', expand: col?.id }, { text: nodes[0]?.text || document.title }];
+      const colPath = resolveLibraryPath(col, null, col);
+      const parts = [colPath ? { text: col.label || 'Library', href: makeHref(colPath), expand: col.id } : { text: col?.label || 'Library', expand: col?.id }, { text: nodes[0]?.text || document.title }];
       this.navTree.innerHTML = this.renderBreadcrumb(parts) + this.renderTree(buildTree(nodes), 'page-toc', docPath) + '<div class="section-divider"><span>All works</span></div>' + this.buildLibmap();
       this.afterRender(docPath);
     }
@@ -626,21 +666,22 @@
     renderSection(col) {
       const label = esc(col.label || col.title || col.id || ''), badge = col.badge ? ` <span class="sidebar-badge">${esc(col.badge)}</span>` : '';
       const groups = col.groups || [];
-      if (!groups.length && col.path) return `<li class="sidebar-item">${this._renderLink({ path: col.path, text: col.label || col.title || col.id || '', badge })}</li>`;
+      const colPath = resolveLibraryPath(col, null, col);
+      if (!groups.length && colPath) return `<li class="sidebar-item">${this._renderLink({ path: colPath, text: col.label || col.title || col.id || '', badge })}</li>`;
       if (groups.length) {
         const direct = groups.every(g => g.path && !(g.items || []).length);
-        const nested = direct ? `<ul class="sidebar-menu sidebar-menu--nested">${groups.map(g => this.renderGroup(g)).join('')}</ul>` : '';
+        const nested = direct ? `<ul class="sidebar-menu sidebar-menu--nested">${groups.map(g => this.renderGroup(g, col)).join('')}</ul>` : '';
         const head = `<span class="sidebar-category-label">${label}${badge}</span>`;
         return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-section="${esc(col.id)}" data-collapsed="true"${direct ? ' data-loaded="true"' : ''}><div class="sidebar-item-row">${head}<button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div>${nested}</li>`;
       }
       return `<li class="sidebar-item"><span class="sidebar-category-label">${label}${badge}</span></li>`;
     }
 
-    renderGroup(group) {
-      const label = esc(group.label || ''), items = group.items || [], raw = String(group.path || '').trim(), gp = normPath(group.path);
-      if (!items.length) return raw ? `<li class="sidebar-item">${this._renderLink({ path: group.path, text: group.label || '' })}</li>` : `<li class="sidebar-item"><span class="sidebar-category-label">${label}</span></li>`;
-      const head = raw ? this._renderLink({ path: group.path, text: group.label || '' }) : `<span class="sidebar-category-label">${label}</span>`;
-      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-group-path="${esc(gp)}" data-collapsed="true"><div class="sidebar-item-row">${head}<button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(item => `<li class="sidebar-item">${this._renderLink({ path: item.path || '', text: item.label || item.title || '' })}</li>`).join('')}</ul></li>`;
+    renderGroup(group, col = null) {
+      const label = esc(group.label || ''), items = group.items || [], groupPath = resolveLibraryPath(null, null, group), gp = normPath(groupPath);
+      if (!items.length) return groupPath ? `<li class="sidebar-item">${this._renderLink({ path: groupPath, text: group.label || '' })}</li>` : `<li class="sidebar-item"><span class="sidebar-category-label">${label}</span></li>`;
+      const head = groupPath ? this._renderLink({ path: groupPath, text: group.label || '' }) : `<span class="sidebar-category-label">${label}</span>`;
+      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-group-path="${esc(gp)}" data-collapsed="true"><div class="sidebar-item-row">${head}<button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(item => `<li class="sidebar-item">${this._renderLink({ path: resolveLibraryPath(col, group, item), text: libraryLabel(item, col, group) })}</li>`).join('')}</ul></li>`;
     }
 
     /* TOC */
@@ -804,7 +845,7 @@
     normalizePath: normPath, normalizeDoc: normDoc, sameDocValue: PathUtils.sameDoc.bind(PathUtils),
     samePathValue: PathUtils.samePath.bind(PathUtils), startsWithPathValue: PathUtils.startsWithPath.bind(PathUtils),
     fetchReaderResource, hasSelection: hasSel, resolveUrl: PathUtils.resolveUrl.bind(PathUtils),
-    resolveDocHref, readerHref: makeHref, findCollection,
+    resolveDocHref, readerHref: makeHref, findCollection, resolveLibraryPath, resolveLibraryEntry, libraryLabel, volumeName,
     detectVolume, scrollToEl, syncFill, onScrollFrame,
     getDomHeadings: getHeadings, getActiveHeadingId: (headings, t = 200) => {
       for (let i = (headings || []).length - 1; i >= 0; i--) if (headings[i].getBoundingClientRect().top <= t) return headings[i].id

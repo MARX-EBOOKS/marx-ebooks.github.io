@@ -32,6 +32,13 @@
   const normPath = v => String(v || '').replace(/^https?:\/\/[^/]+/i, '').replace(/[?#].*$/, '').replace(/^\/+/, '').replace(/\/+$/, '');
   const normDoc = v => normPath(v).replace(/\.x?html?$/i, '');
   const resolveUrl = h => { try { return new URL(h, location.href).href; } catch { return h; } };
+  const libraryIndexKey = dir => normPath(String(dir || '').replace(/^\/+/, '')).toLowerCase();
+  const parentDir = dir => String(dir || '').replace(/\/[^/]+$/, '');
+  const startLookupDir = value => {
+    const clean = normPath(String(value || '').replace(/[?#].*$/, '').replace(/^\/+/, ''));
+    if (!clean) return '';
+    return /\.[^/]+$/.test(clean.split('/').pop() || '') ? clean.replace(/\/[^/]+$/, '') : clean;
+  };
 
   /* SSG 链接生成 */
   const PathResolver = {
@@ -201,27 +208,58 @@
   };
   Object.assign(window, { ReaderCore, $, $$, esc, syncFill, onScrollFrame });
 
+  const joinUrlPath = (...parts) => {
+    const raw = parts.filter(v => v != null && String(v) !== '').join('/');
+    return raw.replace(/([^:]\/)\/+/g, '$1').replace(/\/+$/, '');
+  };
+  const resolveLibraryPath = (col, group, item) => {
+    const raw = String(item?.path || '').trim();
+    if (raw) return raw;
+    const base = group?.basePath || col?.basePath || '';
+    const name = item?.dir ?? item?.id;
+    if (name == null || name === '') return '';
+    if (String(name).startsWith('/')) return joinUrlPath(name, item?.homeName || 'index.html');
+    if (!base) return raw;
+    return joinUrlPath(base, name, item?.homeName || 'index.html');
+  };
+  const volumeName = (col, group, item) => {
+    if (item?.volume) return item.volume;
+    const kind = item?.kind || (typeof item?.id === 'number' ? 'volume' : 'book');
+    const fmt = group?.volumeFormat || col?.volumeFormat || '';
+    return kind === 'volume' && fmt ? fmt.replace(/\{id\}/g, item.id) : '';
+  };
+  const libraryLabel = (item, col = null, group = null) => {
+    const label = item?.label || item?.title || '';
+    const volume = volumeName(col, group, item);
+    if (!volume || !label || String(label).startsWith(volume)) return label || volume || String(item?.id ?? '');
+    return volume + (/^[\s(:：,，.;]/.test(label) ? ' ' : ': ') + label;
+  };
+  Object.assign(ReaderCore, { resolveLibraryPath, libraryLabel, volumeName });
+
   const detectVolume = (path, findcol = false) => {
-    const pn = normPath(path);
-    if (!pn) return null;
+    let dir = startLookupDir(path);
+    if (!dir) return null;
     const source = window.LIBRARY_CONFIG || [];
     const indexed = window.LIBRARY_INDEX?.byDir;
     if (!indexed) return null;
-    const pieces = normDoc(pn).split('/').filter(Boolean);
-    let cur = '', best = null;
-    for (const piece of pieces) {
-      cur = cur ? cur + '/' + piece : piece;
-      const coord = indexed[cur.toLowerCase()];
-      if (!coord) continue;
-      const [colIndex, groupIndex, itemIndex] = Array.isArray(coord) ? coord : [];
-      let col = source[colIndex] || null;
-      const group = col?.groups?.[groupIndex] || null;
-      const item = itemIndex == null ? (group || col) : (group?.items?.[itemIndex] || null);
-      const entry = col && item ? { col, group, item, dir: cur } : null;
-      const basepathcom = normPath(entry?.col?.basePath)?.toLowerCase() || '';
-      if (entry?.col && !(basepathcom && pn.toLowerCase().startsWith(basepathcom))) entry.col = null;
-      if (findcol) return entry.col;
-      if (entry) best = entry;
+    let best = null;
+    for (;;) {
+      const coord = indexed[libraryIndexKey(dir)];
+      if (coord) {
+        const [colIndex, groupIndex, itemIndex] = Array.isArray(coord) ? coord : [];
+        let col = source[colIndex] || null;
+        const group = col?.groups?.[groupIndex] || null;
+        const item = itemIndex == null ? (group || col) : (group?.items?.[itemIndex] || null);
+        const entry = col && item ? { col, group, item, dir } : null;
+        if (findcol && entry?.col) return entry.col;
+        if (entry) {
+          best = entry;
+          break;
+        }
+      }
+      const next = parentDir(dir);
+      if (!next || next === dir) break;
+      dir = next;
     }
     return best;
   };
@@ -360,7 +398,7 @@
     }
     loadSection(item) {
       const col = (window.LIBRARY_CONFIG || []).find(c => c.id === item.dataset.section); if (!col) return;
-      const html = (col.groups || []).map(g => this.renderGroup(g)).join(''); if (!html) return;
+      const html = (col.groups || []).map(g => this.renderGroup(g, col)).join(''); if (!html) return;
       const ul = document.createElement('ul'); ul.className = 'sidebar-menu sidebar-menu--nested'; ul.innerHTML = html;
       item.appendChild(ul); item.dataset.loaded = 'true';
     }
@@ -419,8 +457,8 @@
 
     /*  面包屑 parts 构建 */
     _breadcrumbParts(col, item, data) {
-      const parts = [{ text: col.label, href: sitePath(col.path), expand: col.id }];
-      if (item && item !== col) parts.push({ text: item.label || item.title || data?.title || 'Contents', href: sitePath(item.path || (this.currentVol.dir + '/index.html')) });
+      const parts = [{ text: col.label, href: sitePath(resolveLibraryPath(col, null, col)), expand: col.id }];
+      if (item && item !== col) parts.push({ text: libraryLabel(item, col, this.currentVol.group) || data?.title || 'Contents', href: sitePath(resolveLibraryPath(col, this.currentVol.group, item) || (this.currentVol.dir + '/index.html')) });
       return parts;
     }
 
@@ -449,7 +487,8 @@
         return
       }
       const col = this.currentVol.col, nodes = headings.map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id, file: location.pathname.split('/').pop() }));
-      const parts = [{ text: col?.label || 'Library', href: col?.path ? sitePath(col.path) : '#', expand: col?.id }, { text: nodes[0]?.text || document.title }];
+      const colPath = col ? resolveLibraryPath(col, null, col) : '';
+      const parts = [{ text: col?.label || 'Library', href: colPath ? sitePath(colPath) : '#', expand: col?.id }, { text: nodes[0]?.text || document.title }];
       this.navTree.innerHTML = this.renderBreadcrumb(parts) + this.renderTree(buildTree(nodes), 'page-toc') + '<div class="section-divider"><span>All works</span></div>' + this.buildLibmap();
     }
 
@@ -497,14 +536,14 @@
     renderSection(col) {
       const label = esc(col.label || col.title || col.id || ''), badge = col.badge ? ` <span class="sidebar-badge">${esc(col.badge)}</span>` : '';
       const groups = col.groups || [];
-      if (!groups.length && col.path) return `<li class="sidebar-item">${this._renderLink(col.path, col.label || col.title || col.id || '', badge)}</li>`;
+      if (!groups.length && resolveLibraryPath(col, null, col)) return `<li class="sidebar-item">${this._renderLink(resolveLibraryPath(col, null, col), col.label || col.title || col.id || '', badge)}</li>`;
       if (groups.length) return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-section="${esc(col.id)}" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}${badge}</span><button class="sidebar-caret" tabindex="0">\u25b8</button></div></li>`;
       return `<li class="sidebar-item"><span class="sidebar-category-label">${label}${badge}</span></li>`;
     }
-    renderGroup(g) {
+    renderGroup(g, col = null) {
       const label = esc(g.label || ''), items = g.items || [];
-      if (!items.length) return `<li class="sidebar-item">${this._renderLink(g.path, label)}</li>`;
-      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}</span><button class="sidebar-caret" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(it => `<li class="sidebar-item">${this._renderLink(it.path, it.label || it.title || '')}</li>`).join('')}</ul></li>`;
+      if (!items.length) return `<li class="sidebar-item">${this._renderLink(resolveLibraryPath(null, null, g), label)}</li>`;
+      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}</span><button class="sidebar-caret" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(it => `<li class="sidebar-item">${this._renderLink(resolveLibraryPath(col, g, it), libraryLabel(it, col, g))}</li>`).join('')}</ul></li>`;
     }
 
     /*  TOC (unified) */

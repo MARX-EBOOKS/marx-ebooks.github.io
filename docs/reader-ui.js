@@ -1,5 +1,5 @@
 const C = window.ReaderCore;
-const { $, $$, esc, cssEsc, syncFill, detectVolume, scrollToEl, onScrollFrame, PathResolver } = C;
+const { $, $$, esc, cssEsc, syncFill, detectVolume, scrollToEl, onScrollFrame, PathResolver, resolveLibraryPath } = C;
 const sameDoc = C.sameDocValue;
 const fetchReaderResource = C.fetchReaderResource;
 
@@ -259,7 +259,7 @@ class ReaderApp {
             card.className = 'card';
             card.href = '#';
             card.dataset.section = col.id || '';
-            card.dataset.path = col.path || '';
+            card.dataset.path = resolveLibraryPath?.(col, null, col) || '';
             card.innerHTML = `<div class="card__tag">${esc(col.label)}${col.badge ? ' &middot; ' + esc(col.badge) : ''}</div><div class="card__heading">${esc(col.title || col.label)}</div><div class="card__body">${esc(col.desc || '\u70b9\u51fb\u67e5\u770b\u76ee\u5f55')}</div>`;
             grid.appendChild(card);
         });
@@ -531,12 +531,13 @@ class ReaderApp {
         const displayPath = path.replace(/^\/+/, '').replace(/[?#].*$/, '');
         const pieces = displayPath.split('/').filter(Boolean);
         const currentVol = window.__NAV__?.currentVol || null;
-        const currentVolPath = C.normalizePath(currentVol?.item?.path?.replace(/[?#].*$/, '')) || '';
+        const currentVolPath = currentVol ? C.normalizePath(resolveLibraryPath(currentVol.col, currentVol.group, currentVol.item).replace(/[?#].*$/, '')) : '';
         for (let i = 0; i < pieces.length - 1; i++) {
             const sub = (path.startsWith('/') ? '/' : '') + pieces.slice(0, i + 1).join('/');
             // 目录层级面包屑：中间层级链接到对应目录
             const subDir = C.normalizePath(sub) + '/index.html';
-            const final = (currentVolPath && subDir === currentVolPath) ? (sub + '/') : (detectVolume(sub)?.item?.path?.replace(/[?#].*$/, '') || '');
+            const hit = detectVolume(sub);
+            const final = (currentVolPath && subDir === currentVolPath) ? (sub + '/') : (hit ? resolveLibraryPath(hit.col, hit.group, hit.item).replace(/[?#].*$/, '') : '');
             if (parts.length) parts.push('<span class="crumb-sep">/</span>');
             parts.push(`<a class="crumb" href="${esc(PathResolver.makeSpa(final))}">${esc(pieces[i])}</a>`);
         }
@@ -567,7 +568,7 @@ class ReaderApp {
 
     async findManifest(path, dir) {
         const col = window.__NAV__.currentVol?.col || null;
-        const candidates = [...new Set([dir, (col?.path || '').replace(/^\/+|\/+$/g, ''), location.pathname.split('/').slice(1, -1).join('/')].filter(Boolean))];
+        const candidates = [...new Set([dir, resolveLibraryPath?.(col, null, col)?.replace(/^\/+|\/+$/g, ''), location.pathname.split('/').slice(1, -1).join('/')].filter(Boolean))];
         for (const c of candidates) {
             try {
                 const raw = await C.VolDataStore.fetchVolData(c);
