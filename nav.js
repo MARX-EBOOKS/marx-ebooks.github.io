@@ -201,6 +201,31 @@
   };
   Object.assign(window, { ReaderCore, $, $$, esc, syncFill, onScrollFrame });
 
+  const detectVolume = (path, findcol = false) => {
+    const pn = normPath(path);
+    if (!pn) return null;
+    const source = window.LIBRARY_CONFIG || [];
+    const indexed = window.LIBRARY_INDEX?.byDir;
+    if (!indexed) return null;
+    const pieces = normDoc(pn).split('/').filter(Boolean);
+    let cur = '', best = null;
+    for (const piece of pieces) {
+      cur = cur ? cur + '/' + piece : piece;
+      const coord = indexed[cur.toLowerCase()];
+      if (!coord) continue;
+      const [colIndex, groupIndex, itemIndex] = Array.isArray(coord) ? coord : [];
+      let col = source[colIndex] || null;
+      const group = col?.groups?.[groupIndex] || null;
+      const item = itemIndex == null ? (group || col) : (group?.items?.[itemIndex] || null);
+      const entry = col && item ? { col, group, item, dir: cur } : null;
+      const basepathcom = normPath(entry?.col?.basePath)?.toLowerCase() || '';
+      if (entry?.col && !(basepathcom && pn.toLowerCase().startsWith(basepathcom))) entry.col = null;
+      if (findcol) return entry.col;
+      if (entry) best = entry;
+    }
+    return best;
+  };
+
   /* MenuManager — SSG 版 */
   class MenuManager {
     constructor() {
@@ -360,25 +385,8 @@
     }
 
     /*  卷册检测 (unified 算法) */
-    detectVolume() {
-      const cur = normPath(PathResolver.stripRoot(location.pathname)), curL = cur.toLowerCase();
-      const matchDir = p => {
-        if (!p || /^https?:/i.test(p)) return null;
-        const ip = normPath(p).replace(/\/[^/]*$/i, ''); 
-        return (curL === ip.toLowerCase() || curL.startsWith(ip.toLowerCase() + '/')) ? ip : null;
-      };
-      let best = null;
-      const consider = (col, group, item, dir) => {
-        if (dir && (!best || dir.length > best.dir.length)) best = { col, group, item, dir }
-      };
-      for (const col of window.LIBRARY_CONFIG || []) {
-        consider(col, null, col, matchDir(col.path));
-        for (const g of col.groups || []) {
-          consider(col, g, g, matchDir(g.path))
-          for (const it of g.items || []) consider(col, g, it, matchDir(it.path))
-        }
-      }
-      return best;
+    detectVolume(path = PathResolver.stripRoot(location.pathname), findcol = false) {
+      return detectVolume(path, findcol);
     }
 
     /*  数据加载 (SSG: import only) */
@@ -440,7 +448,7 @@
         this.navTree.innerHTML = this.buildLibmap(); 
         return
       }
-      const col = this._findCollection(), nodes = headings.map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id, file: location.pathname.split('/').pop() }));
+      const col = this.currentVol.col, nodes = headings.map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id, file: location.pathname.split('/').pop() }));
       const parts = [{ text: col?.label || 'Library', href: col?.path ? sitePath(col.path) : '#', expand: col?.id }, { text: nodes[0]?.text || document.title }];
       this.navTree.innerHTML = this.renderBreadcrumb(parts) + this.renderTree(buildTree(nodes), 'page-toc') + '<div class="section-divider"><span>All works</span></div>' + this.buildLibmap();
     }
@@ -641,15 +649,6 @@
         item.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
         caret.textContent = collapsed ? '\u25be' : '\u25b8';
       });
-    }
-
-    /*  SSG 特有：合集查找 */
-    _findCollection() {
-      const path = normPath(PathResolver.stripRoot(location.pathname));
-      return (window.LIBRARY_CONFIG || []).find(c => {
-        const b = normPath(c.basePath || '');
-        return b && (path.startsWith(b) || path.toLowerCase().startsWith(b.toLowerCase()));
-      }) || null;
     }
 
     /*  SSG 特有：侧边栏开关 */

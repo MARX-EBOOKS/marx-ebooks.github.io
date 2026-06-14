@@ -13,7 +13,7 @@
   const hasSel = () => {
     const s = document.getSelection();
     return !!(s && !s.isCollapsed && s.rangeCount);
-  };
+  }
   const scrollToEl = (el, off, b = 'smooth') => {
     if (!el) return;
     const offset = off != null ? off : (document.querySelector('.navbar')?.offsetHeight || 80);
@@ -73,12 +73,6 @@
     }
   }
 
-  /* 合集查找 */
-  const findCollection = path => {
-    const norm = PathUtils.normalizePath(path);
-    return (window.LIBRARY_CONFIG || []).find(c => PathUtils.startsWithPath(norm, c?.path || '')) || null;
-  };
-
   /* 路径处理 (SPA 专用，统一收口到 PathUtils) */
   const PathUtils = {
     specRe: /^(?:mailto|tel|javascript|data|blob):/i,
@@ -113,6 +107,64 @@
   const sameDoc = (a, b) => PathUtils.sameDoc(a, b);
   const makeHref = (dp, h) => PathResolver.makeSpa(dp, h);
   const resolveDocHref = (h, b) => PathResolver.resolve(b || '', h);
+
+  /* 卷册检测 (SPA: 带 docPath 参数) */
+  class VolumeIndex {
+    constructor() {
+      this.source = null;
+      this.entries = [];
+      this.byDir = new Map();
+    }
+
+    ensure() {
+      const source = window.LIBRARY_CONFIG || [];
+      if (this.source === source) return this.entries;
+      const entries = [];
+      const byDir = new Map();
+      const add = (col, group, item) => {
+        const raw = item?.path || '';
+        if (!raw || /^https?:/i.test(raw)) return;
+        const clean = normPath(raw), dir = clean.replace(/\/[^/]+$/i, '');
+        if (!dir) return;
+        const entry = { col, group, item, dir };
+        entries.push(entry);
+        byDir.set(dir.toLowerCase(), entry);
+        byDir.set(normDoc(dir).toLowerCase(), entry);
+      };
+      for (const col of source) {
+        add(col, null, col);
+        for (const group of col.groups || []) {
+          add(col, group, group);
+          for (const item of group.items || []) add(col, group, item);
+        }
+      }
+      this.source = source;
+      this.entries = entries.sort((a, b) => b.dir.length - a.dir.length);
+      this.byDir = byDir;
+      return this.entries;
+    }
+
+    detectVolume(docPath, findcol = false) {
+      const pn = normPath(docPath);
+      if (!pn) return null;
+      this.ensure();
+      const clean = normDoc(pn);
+      const pieces = clean.split('/').filter(Boolean);
+      let cur = '', best = null;
+      for (const piece of pieces) {
+        cur = cur ? cur + '/' + piece : piece;
+        const entry = this.byDir.get(cur.toLowerCase());
+        const basepathcom = normPath(entry?.col?.basePath)?.toLowerCase() || ''; 
+        if (entry?.col && !(basepathcom && pn.toLowerCase().startsWith(basepathcom))) entry.col = null;
+        if (findcol) return entry.col;
+        if (entry) best = entry;
+      }
+      return best;
+    }
+  }
+  const volumeIndex = new VolumeIndex();
+  const detectVolume = docPath => volumeIndex.detectVolume(docPath, false);
+  const findCollection = path => volumeIndex.detectVolume(path, true);
 
   const PathResolver = {
     special: /^(?:mailto|tel|javascript|data|blob):/i,
@@ -337,7 +389,7 @@
 
     reinit(docPath) {
       this.cleanup(); this.navTree.innerHTML = '';
-      this.currentVol = docPath ? this.detectVolume(docPath) : null;
+      this.currentVol = docPath ? detectVolume(docPath) : null;
       if (!docPath) {
         this.mode = 'libmap'
         this.navTree.innerHTML = this.buildLibmap()
@@ -473,29 +525,6 @@
       this.updateTrack(hash);
     }
 
-    /* 卷册检测 (SPA: 带 docPath 参数) */
-    detectVolume(docPath) {
-      const pn = normPath(docPath), dn = normDoc(pn), dd = pn.replace(/\/[^/]+$/, '');
-      const dl = dn.toLowerCase(), drl = dd.toLowerCase();
-      const matchDir = p => {
-        if (!p || /^https?:/i.test(p)) return null;
-        const ip = normPath(p).replace(/\/[^/]*$/i, ''); 
-        return (dl === normDoc(ip).toLowerCase() || dl === normDoc(ip).toLowerCase() || drl === ip.toLowerCase() || pn.toLowerCase().startsWith(ip.toLowerCase() + '/')) ? ip : null;
-      };
-      let best = null;
-      const consider = (col, group, item, dir) => {
-        if (dir && (!best || dir.length > best.dir.length)) best = { col, group, item, dir }
-      };
-      for (const col of window.LIBRARY_CONFIG || []) {
-        consider(col, null, col, matchDir(col.path));
-        for (const group of col.groups || []) {
-          consider(col, group, group, matchDir(group.path))
-          for (const item of group.items || []) consider(col, group, item, matchDir(item.path))
-        }
-      }
-      return best;
-    }
-
     /* SPA 文档路径辅助 */
     volumeDocPath(dp = currentDoc()) {
       const p = normPath(dp)
@@ -542,7 +571,8 @@
         this.afterRender(docPath)
         return
       }
-      const col = this.currentVol?.col || findCollection(docPath), curFile = normPath(docPath).split('/').pop();
+      const col = this.currentVol.col;
+      const curFile = normPath(docPath).split('/').pop();
       const nodes = headings.map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id, file: curFile }));
       const parts = [col?.path ? { text: col.label || 'Library', href: makeHref(col.path), expand: col.id } : { text: col?.label || 'Library', expand: col?.id }, { text: nodes[0]?.text || document.title }];
       this.navTree.innerHTML = this.renderBreadcrumb(parts) + this.renderTree(buildTree(nodes), 'page-toc', docPath) + '<div class="section-divider"><span>All works</span></div>' + this.buildLibmap();
@@ -774,8 +804,8 @@
     normalizePath: normPath, normalizeDoc: normDoc, sameDocValue: PathUtils.sameDoc.bind(PathUtils),
     samePathValue: PathUtils.samePath.bind(PathUtils), startsWithPathValue: PathUtils.startsWithPath.bind(PathUtils),
     fetchReaderResource, hasSelection: hasSel, resolveUrl: PathUtils.resolveUrl.bind(PathUtils),
-    resolveDocHref, readerHref: makeHref,
-    findCollection, scrollToEl, syncFill, onScrollFrame,
+    resolveDocHref, readerHref: makeHref, findCollection,
+    detectVolume, scrollToEl, syncFill, onScrollFrame,
     getDomHeadings: getHeadings, getActiveHeadingId: (headings, t = 200) => {
       for (let i = (headings || []).length - 1; i >= 0; i--) if (headings[i].getBoundingClientRect().top <= t) return headings[i].id
       return headings[0]?.id || null
@@ -786,7 +816,7 @@
   Object.assign(window, {
     ReaderCore: Core, $, $$, on: (t, e, h, o) => t && t.addEventListener(e, h, o || false),
     esc, syncFill: Core.syncFill, resolveUrl: Core.resolveUrl,
-    fetchReaderResource, findCollection, scrollToEl, getDomHeadings: getHeadings,
+    fetchReaderResource, findCollection, detectVolume: Core.detectVolume, scrollToEl, getDomHeadings: getHeadings,
     getActiveHeadingId: Core.getActiveHeadingId, hasActiveTextSelection: hasSel,
     buildHeadingTree: buildTree, expandTo, VolDataStore, onScrollFrame
   });

@@ -18,7 +18,7 @@ window.LIBRARY_CONFIG = [
         label: 'MEW-ZENO',
         title: 'KARL MARX FRIEDRICH ENGELS WERKE',
         desc: 'Marx-Engels-Werke (auf dem Zeno.org)',
-        basepath: '/MEW-ZENO/',
+        basePath: '/MEW-ZENO/',
         stylesheets: ['/MEW-ZENO/mewde.css'],
         badge: 'DE',
         citation: { prefix: 'MEW', title: 'Marx-Engels-Werke', publisher: 'Berlin: Dietz Verlag' },
@@ -570,6 +570,7 @@ window.LIBRARY_CONFIG = [
         label: 'Github',
         title: 'Github仓库',
         desc: 'Github仓库地址',
+        basePath: null,
         path: 'https://github.com/MARX-ZH-CN/marx-zh-cn.github.io'
     },
     {

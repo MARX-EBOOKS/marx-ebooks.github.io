@@ -1,5 +1,5 @@
 const C = window.ReaderCore;
-const { $, $$, esc, cssEsc, syncFill, findCollection, scrollToEl, onScrollFrame, PathResolver } = C;
+const { $, $$, esc, cssEsc, syncFill, detectVolume, scrollToEl, onScrollFrame, PathResolver } = C;
 const sameDoc = C.sameDocValue;
 const fetchReaderResource = C.fetchReaderResource;
 
@@ -431,11 +431,12 @@ class ReaderApp {
         state.doc = docPath;
         const title = parsed.querySelector('title')?.textContent?.trim();
         document.title = title ? title + ' - ' + this.siteTitle : this.siteTitle;
+        window.__NAV__?.reinit(docPath);
         this.updateBreadcrumb(docPath, title);
         this.fixOverflow(content);
         this.updatePrevNext(docPath);
         window.__PAGE_BAR__?.scanContent(content);
-        window.__NAV__?.reinit(docPath);
+
         $('#toc-desktop').style.display = '';
     }
 
@@ -529,10 +530,13 @@ class ReaderApp {
         const parts = [];
         const displayPath = path.replace(/^\/+/, '').replace(/[?#].*$/, '');
         const pieces = displayPath.split('/').filter(Boolean);
+        const currentVol = window.__NAV__?.currentVol || null;
+        const currentVolPath = C.normalizePath(currentVol?.item?.path?.replace(/[?#].*$/, '')) || '';
         for (let i = 0; i < pieces.length - 1; i++) {
             const sub = (path.startsWith('/') ? '/' : '') + pieces.slice(0, i + 1).join('/');
             // 目录层级面包屑：中间层级链接到对应目录
-            const final = (i < pieces.length - 1) ? sub + '/' : sub;
+            const subDir = C.normalizePath(sub) + '/index.html';
+            const final = (currentVolPath && subDir === currentVolPath) ? (sub + '/') : (detectVolume(sub)?.item?.path?.replace(/[?#].*$/, '') || '');
             if (parts.length) parts.push('<span class="crumb-sep">/</span>');
             parts.push(`<a class="crumb" href="${esc(PathResolver.makeSpa(final))}">${esc(pieces[i])}</a>`);
         }
@@ -562,7 +566,7 @@ class ReaderApp {
     }
 
     async findManifest(path, dir) {
-        const col = findCollection(path);
+        const col = window.__NAV__.currentVol?.col || null;
         const candidates = [...new Set([dir, (col?.path || '').replace(/^\/+|\/+$/g, ''), location.pathname.split('/').slice(1, -1).join('/')].filter(Boolean))];
         for (const c of candidates) {
             try {

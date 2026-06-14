@@ -868,7 +868,6 @@ input[type="range"]:focus::-webkit-slider-thumb {
 
 .prose th, .prose td {
   padding: 8px 12px;
-  border: 1px solid var(--border);
   text-align: left;
 }
 
