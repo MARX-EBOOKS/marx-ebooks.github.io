@@ -492,9 +492,9 @@
       }).join('') + '</div>';
     }
     _renderLink(path, label, badge = '') {
-      const ext = /^https?:/i.test(path || ''), p = normPath(path);
-      const href = ext ? esc(path) : sitePath(p);
-      const attrs = ext ? ' target="_blank" rel="noopener"' : ` data-path="${esc('/' + p)}"`;
+      const ext = /^https?:/i.test(path || '');
+      const href = ext ? esc(path) : sitePath(path);
+      const attrs = ext ? ' target="_blank" rel="noopener"' : ` data-path="${href}"`;
       return `<a href="${href}" class="sidebar-link"${attrs}>${esc(label || '')}${badge}</a>`;
     }
 
