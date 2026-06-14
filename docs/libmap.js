@@ -6,12 +6,12 @@ window.LIBRARY_CONFIG = [
     title: "说明/About/Impressum",
     desc: "首次访问必读",
     basePath: null,
-    stylesheets: ["/styles.css"],
-    path: "/readme.html",
+    stylesheets: ["styles.css"],
+    path: "readme.html",
     groups: [
-      { label: "说明", path: "/readme.html" },
-      { label: "Impressum", path: "/impressum.html" },
-      { label: "Introduction of MECW", path: "/en/index.html" }
+      { label: "说明", path: "readme.html" },
+      { label: "Impressum", path: "impressum.html" },
+      { label: "Introduction of MECW", path: "../en/index.html" }
     ]
   },
   {
@@ -19,11 +19,11 @@ window.LIBRARY_CONFIG = [
     label: "MEW-ZENO",
     title: "KARL MARX FRIEDRICH ENGELS WERKE",
     desc: "Marx-Engels-Werke (auf dem Zeno.org)",
-    basePath: "/MEW-ZENO/",
-    stylesheets: ["/MEW-ZENO/mewde.css"],
+    basePath: "MEW-ZENO/",
+    stylesheets: ["MEW-ZENO/mewde.css"],
     badge: "DE",
     citation: { prefix: "MEW", title: "Marx-Engels-Werke", publisher: "Berlin: Dietz Verlag" },
-    path: "/MEW-ZENO/index.html",
+    path: "MEW-ZENO/index.html",
     groups: [
       {
         label: "Werke auf Zeno.org",
@@ -62,11 +62,11 @@ window.LIBRARY_CONFIG = [
     label: "MEW",
     title: "KARL MARX FRIEDRICH ENGELS WERKE",
     desc: "Marx-Engels-Werke (von AI konvertiert und auf dem mlwerke.de)",
-    basePath: "/MEW/",
-    stylesheets: ["/MEW/mewde.css"],
+    basePath: "MEW/",
+    stylesheets: ["MEW/mewde.css"],
     badge: "DE",
     citation: { prefix: "MEW", publisher: "Berlin: Dietz Verlag" },
-    path: "/MEW/index.html",
+    path: "MEW/index.html",
     groups: [
       {
         label: "Werke (Bände 1-22)",
@@ -136,10 +136,10 @@ window.LIBRARY_CONFIG = [
     label: "MECW",
     title: "Marx & Engels Collected Works (From wikirouge.net)",
     desc: "Marx & Engels Collected Works English edition, Vol.1–50 (From wikirouge.net)",
-    basePath: "/en/MECW/",
-    stylesheets: ["/en/MECW/MECW.css"],
+    basePath: "../en/MECW/",
+    stylesheets: ["../en/MECW/MECW.css"],
     badge: "EN",
-    path: "/en/index.html#MECW",
+    path: "../en/index.html#MECW",
     groups: [
       {
         label: "Works (Vol.1–27)",
@@ -206,7 +206,7 @@ window.LIBRARY_CONFIG = [
           { id: 50, label: "Volume 50: Letters, 1892-1895", volume: "Volume 50", dir: "/en/MECW/50/" }
         ]
       },
-      { label: "Mirror of MIA", path: "/en/archive/marx/works/index.html" }
+      { label: "Mirror of MIA", path: "../en/archive/marx/works/index.html" }
     ]
   },
   {
@@ -214,18 +214,18 @@ window.LIBRARY_CONFIG = [
     label: "MEGA2",
     title: "KARL MARX FRIEDRICH ENGELS GESAMTAUSGABE",
     desc: "ZWEITE ABTEILUNG (von BBAW)",
-    basePath: "/MEGA/",
+    basePath: "MEGA/",
     badge: "DE",
-    path: "/MEGA/index.html",
-    stylesheets: ["/MEGA/II/MEGA.css"],
+    path: "MEGA/index.html",
+    stylesheets: ["MEGA/II/MEGA.css"],
     citation: { prefix: "MEGA²" },
     groups: [
-      { label: "Digitalisierung „Neue Rheinische Zeitung“", path: "/MEGA/nrhz/index.html" },
+      { label: "Digitalisierung „Neue Rheinische Zeitung“", path: "MEGA/nrhz/index.html" },
       {
         label: "II. Abteilung: \"DAS KAPITAL\" UND VORARBEITEN",
-        stylesheets: ["/MEGA/II/MEGA.css"],
-        basePath: "/MEGA/II/",
-        path: "/MEGA/II/index.html",
+        stylesheets: ["MEGA/II/MEGA.css"],
+        basePath: "MEGA/II/",
+        path: "MEGA/II/index.html",
         items: [
           { id: 1, label: "II/1: Ökonomische Manuskripte 1857/58 (Grundrisse der Kritik der politischen Ökonomie)", volume: "II/1", dir: "/MEGA/II/1/", citation: { year: 1981, publisher: "Berlin: Dietz Verlag" } },
           { id: 5, label: "II/5: Das Kapital. Kritik der Politischen Ökonomie, Erster Band Hamburg 1867", volume: "II/5", dir: "/MEGA/II/5/", citation: { year: 1983, publisher: "Berlin: Dietz Verlag" } },
@@ -241,10 +241,10 @@ window.LIBRARY_CONFIG = [
     label: "马恩全集",
     title: "马克思恩格斯全集（中文第一版）",
     desc: "1-50卷",
-    basePath: "/MEW-ZH/",
-    stylesheets: ["/styles.css"],
+    basePath: "MEW-ZH/",
+    stylesheets: ["styles.css"],
     badge: "ZH",
-    path: "/MEW-ZH/index.html#TOC",
+    path: "MEW-ZH/index.html#TOC",
     groups: [
       {
         label: "著作（1-22卷）",
@@ -323,10 +323,10 @@ window.LIBRARY_CONFIG = [
     label: "马恩文集",
     title: "马克思恩格斯文集",
     desc: "1-10卷，附马恩全集第二版30卷",
-    basePath: "/MEA/",
-    stylesheets: ["/styles.css"],
+    basePath: "MEA/",
+    stylesheets: ["styles.css"],
     badge: "ZH",
-    path: "/MEA/index.html#TOC",
+    path: "MEA/index.html#TOC",
     groups: [
       {
         label: "著作（1-4卷）",
@@ -361,15 +361,15 @@ window.LIBRARY_CONFIG = [
     label: "Ленин ПСС",
     title: "ПОЛНОЕ СОБРАНИЕ СОЧИНЕНИЙ ЛЕНИН ИЗДАНИЕ ПЯТОЕ",
     desc: "ПОЛНОЕ СОБРАНИЕ СОЧИНЕНИЙ ЛЕНИН ИЗДАНИЕ ПЯТОЕ",
-    basePath: "/ru/",
+    basePath: "../ru/",
     stylesheets: ["/vil.css"],
     badge: "RU",
-    path: "/ru/index.html",
+    path: "../ru/index.html",
     groups: [
-      { label: "Разделить HTML с uaio.ru по главам", path: "/ru/VIL-UAIO/index.html" },
+      { label: "Разделить HTML с uaio.ru по главам", path: "../ru/VIL-UAIO/index.html" },
       {
         label: "Том 1–27",
-        basePath: "/ru/VIL-FB2/",
+        basePath: "../ru/VIL-FB2/",
         items: [
           { id: 1, label: "Том 1: 1893-1894", volume: "Том 1", dir: "/ru/VIL-FB2/1/" },
           { id: 2, label: "Том 2: 1895-1897", volume: "Том 2", dir: "/ru/VIL-FB2/2/" },
@@ -402,7 +402,7 @@ window.LIBRARY_CONFIG = [
       },
       {
         label: "Том 28–29",
-        basePath: "/ru/VIL-UAIO/",
+        basePath: "../ru/VIL-UAIO/",
         items: [
           { id: 28, label: "Том 28: ТЕТРАДИ ПО ИМПЕРИАЛИЗМУ（帝国主义笔记）", volume: "Том 28", dir: "/ru/VIL-UAIO/28/" },
           { id: 29, label: "Том 29: ФИЛОСОФСКИЕ ТЕТРАДИ（哲学笔记）", volume: "Том 29", dir: "/ru/VIL-UAIO/29/" }
@@ -410,7 +410,7 @@ window.LIBRARY_CONFIG = [
       },
       {
         label: "Том 30–45",
-        basePath: "/ru/VIL-FB2/",
+        basePath: "../ru/VIL-FB2/",
         items: [
           { id: 30, label: "Том 30: Июль 1916 - февраль 1917", volume: "Том 30", dir: "/ru/VIL-FB2/VIL-FB2/30/" },
           { id: 31, label: "Том 31: Март - апрель 1917", volume: "Том 31", dir: "/ru/VIL-FB2/VIL-FB2/31/" },
@@ -425,25 +425,25 @@ window.LIBRARY_CONFIG = [
           { id: 40, label: "Том 40: Декабрь 1919 - апрель 1920", volume: "Том 40", dir: "/ru/VIL-FB2/VIL-FB2/40/" },
           { id: 41, label: "Том 41: Май - ноябрь 1920", volume: "Том 41", dir: "/ru/VIL-FB2/VIL-FB2/41/" },
           { id: 42, label: "Том 42: Ноябрь 1920 - март 1921", volume: "Том 42", dir: "/ru/VIL-FB2/VIL-FB2/42/" },
-          { id: 43, label: "Том 43: Март - июнь 1921", volume: "Том 43", dir: "/ru/VIL-FB2/VIL-UAIO/43/" },
-          { id: 44, label: "Том 44: Июнь 1921 - март 1922", volume: "Том 44", dir: "/ru/VIL-FB2/VIL-UAIO/44/" },
-          { id: 45, label: "Том 45: Март 1922 - март 1923", volume: "Том 45", dir: "/ru/VIL-FB2/VIL-UAIO/45/" }
+          { id: 43, reldir: "/VIL-UAIO/43", label: "Том 43: Март - июнь 1921", volume: "Том 43", dir: "/ru/VIL-FB2/VIL-UAIO/43/" },
+          { id: 44, reldir: "/VIL-UAIO/44", label: "Том 44: Июнь 1921 - март 1922", volume: "Том 44", dir: "/ru/VIL-FB2/VIL-UAIO/44/" },
+          { id: 45, reldir: "/VIL-UAIO/45", label: "Том 45: Март 1922 - март 1923", volume: "Том 45", dir: "/ru/VIL-FB2/VIL-UAIO/45/" }
         ]
       },
       {
         label: "Том 46–55 (Письма)",
-        basePath: "/ru/VIL - UAIO ",
+        basePath: "../ru/VIL-UAIO/",
         items: [
-          { id: 46, label: "Том 46: Письма 1893 - 1904", volume: "Том 46", dir: "/ru/VIL - UAIO /46/" },
-          { id: 47, label: "Том 47: Письма 1905 - ноябрь 1910", volume: "Том 47", dir: "/ru/VIL - UAIO /47/" },
-          { id: 48, label: "Том 48: Письма ноябрь 1910 - июль 1914", volume: "Том 48", dir: "/ru/VIL - UAIO /48/" },
-          { id: 49, label: "Том 49: Письма август 1914 - октябрь 1917", volume: "Том 49", dir: "/ru/VIL - UAIO /49/" },
-          { id: 50, label: "Том 50: Письма Октябрь 1917 - июнь 1919", volume: "Том 50", dir: "/ru/VIL - UAIO /50/" },
-          { id: 51, label: "Том 51: Письма Июль 1919 - ноябрь 1920", volume: "Том 51", dir: "/ru/VIL - UAIO /51/" },
-          { id: 52, label: "Том 52: Письма Ноябрь 1920 - июнь 1921", volume: "Том 52", dir: "/ru/VIL - UAIO /52/" },
-          { id: 53, label: "Том 53: Письма Июнь - ноябрь 1921", volume: "Том 53", dir: "/ru/VIL - UAIO /53/" },
-          { id: 54, label: "Том 54: Письма Ноябрь 1921 - март 1923", volume: "Том 54", dir: "/ru/VIL - UAIO /54/" },
-          { id: 55, label: "Том 55: Письма к родным 1893 - 1922", volume: "Том 55", dir: "/ru/VIL - UAIO /55/" }
+          { id: 46, label: "Том 46: Письма 1893 - 1904", volume: "Том 46", dir: "/ru/VIL-UAIO/46/" },
+          { id: 47, label: "Том 47: Письма 1905 - ноябрь 1910", volume: "Том 47", dir: "/ru/VIL-UAIO/47/" },
+          { id: 48, label: "Том 48: Письма ноябрь 1910 - июль 1914", volume: "Том 48", dir: "/ru/VIL-UAIO/48/" },
+          { id: 49, label: "Том 49: Письма август 1914 - октябрь 1917", volume: "Том 49", dir: "/ru/VIL-UAIO/49/" },
+          { id: 50, label: "Том 50: Письма Октябрь 1917 - июнь 1919", volume: "Том 50", dir: "/ru/VIL-UAIO/50/" },
+          { id: 51, label: "Том 51: Письма Июль 1919 - ноябрь 1920", volume: "Том 51", dir: "/ru/VIL-UAIO/51/" },
+          { id: 52, label: "Том 52: Письма Ноябрь 1920 - июнь 1921", volume: "Том 52", dir: "/ru/VIL-UAIO/52/" },
+          { id: 53, label: "Том 53: Письма Июнь - ноябрь 1921", volume: "Том 53", dir: "/ru/VIL-UAIO/53/" },
+          { id: 54, label: "Том 54: Письма Ноябрь 1921 - март 1923", volume: "Том 54", dir: "/ru/VIL-UAIO/54/" },
+          { id: 55, label: "Том 55: Письма к родным 1893 - 1922", volume: "Том 55", dir: "/ru/VIL-UAIO/55/" }
         ]
       }
     ]
@@ -453,10 +453,10 @@ window.LIBRARY_CONFIG = [
     label: "列宁全集",
     title: "列宁全集（中文第二版）",
     desc: "1-60卷",
-    basePath: "/LENIN/",
-    stylesheets: ["/styles.css"],
+    basePath: "LENIN/",
+    stylesheets: ["styles.css"],
     badge: "ZH",
-    path: "/LENIN/index.html#TOC",
+    path: "LENIN/index.html#TOC",
     groups: [
       {
         label: "著作（1-43卷）",
@@ -539,10 +539,10 @@ window.LIBRARY_CONFIG = [
     label: "HEGEL",
     title: "黑格尔著作集1-20卷",
     desc: "Hegel Werke 1-20 (Suhrkamp)",
-    basePath: "/HEGEL/",
-    stylesheets: ["/HEGEL/hegel.css"],
+    basePath: "HEGEL/",
+    stylesheets: ["HEGEL/hegel.css"],
     badge: "DE",
-    path: "/HEGEL/index.html#de",
+    path: "HEGEL/index.html#de",
     citation: { prefix: "G.W.F. Hegel: Werke in zwanzig Bänden", publisher: "Frankfurt am Main: Suhrkamp", year: "1979ff" },
     groups: [
       {
@@ -552,31 +552,31 @@ window.LIBRARY_CONFIG = [
           { id: 2, label: "Werke 2: Jenaer Schriften", volume: "Werke 2", dir: "/HEGEL/2/" },
           { id: 3, label: "Werke 3: Phänomenologie des Geistes", volume: "Werke 3", dir: "/HEGEL/3/" },
           { id: 4, label: "Werke 4: Nürnberger und Heidelberger Schriften", volume: "Werke 4", dir: "/HEGEL/4/" },
-          { id: 5, label: "Werke 5: -6 (Wissenschaft der Logik)", volume: "Werke 5", dir: "/HEGEL/5/" },
+          { id: 5, label: "Werke 5-6: (Wissenschaft der Logik)", volume: "Werke 5", dir: "/HEGEL/5/" },
           { id: 7, label: "Werke 7: Grundlinien der Philosophie des Rechts", volume: "Werke 7", dir: "/HEGEL/7/" },
-          { id: 10, label: "Werke 10: Werke 8-10 (Enzyklopädie der philosophischen Wissenschaften im Grundrisse)", volume: "Werke 10", dir: "/HEGEL/10/" },
+          { id: 10, label: "Werke 8-10: (Enzyklopädie der philosophischen Wissenschaften im Grundrisse)", volume: "Werke 10", dir: "/HEGEL/10/" },
           { id: 11, label: "Werke 11: Berliner Schriften", volume: "Werke 11", dir: "/HEGEL/11/" },
           { id: 12, label: "Werke 12: Vorlesungen über die Philosophie der Geschichte", volume: "Werke 12", dir: "/HEGEL/12/" },
-          { id: 13, label: "Werke 13: -15 (Vorlesungen über die Ästhetik)", volume: "Werke 13", dir: "/HEGEL/13/" },
-          { id: 16, label: "Werke 16: -17 (Vorlesungen über die Philosophie der Religion)", volume: "Werke 16", dir: "/HEGEL/16/" },
-          { id: 18, label: "Werke 18: -20 (Vorlesungen über die Geschichte der Philosophie)", volume: "Werke 18", dir: "/HEGEL/18/" }
+          { id: 13, label: "Werke 13-15:  (Vorlesungen über die Ästhetik)", volume: "Werke 13", dir: "/HEGEL/13/" },
+          { id: 16, label: "Werke 16-17:  (Vorlesungen über die Philosophie der Religion)", volume: "Werke 16", dir: "/HEGEL/16/" },
+          { id: 18, label: "Werke 18-20:  (Vorlesungen über die Geschichte der Philosophie)", volume: "Werke 18", dir: "/HEGEL/18/" }
         ]
       },
       {
         label: "English Translations",
         items: [
-          { id: "ps", kind: "book", label: "Phenomenology of Spirit (by Terry Pinkard)", dir: "/HEGEL/HGPS/" },
-          { id: "gl", kind: "book", label: "Science of Logic (Greater Logic, by A.V.Miller)", dir: "/HEGEL/HGSL/" },
-          { id: "sl", kind: "book", label: "Shorter Logic (by K.Brinkmann & D.O. Dahlstrom)", dir: "/HEGEL/HEPL/" }
+          { id: "ps", kind: "book", reldir: "/HGPS", label: "Phenomenology of Spirit (by Terry Pinkard)", dir: "/HEGEL/HGPS/" },
+          { id: "gl", kind: "book", reldir: "/HGSL", label: "Science of Logic (Greater Logic, by A.V.Miller)", dir: "/HEGEL/HGSL/" },
+          { id: "sl", kind: "book", reldir: "/HEPL", label: "Shorter Logic (by K.Brinkmann & D.O. Dahlstrom)", dir: "/HEGEL/HEPL/" }
         ]
       },
       {
         label: "中译本",
         items: [
-          { id: "helin", kind: "book", label: "贺麟（黑格尔译本）全集", dir: "/HEGEL/shorter-logic/", homePage: "part0000.html" },
-          { id: "logic-i", kind: "book", label: "大逻辑第一册 （杨一之译）", dir: "/HEGEL/SCIENCE-OF-LOGIC-I/", homePage: "part0003.html" },
-          { id: "logic-ii", kind: "book", label: "大逻辑第二册 （杨一之译）", dir: "/HEGEL/SCIENCE-OF-LOGIC-II/" },
-          { id: "right", kind: "book", label: "法哲学原理 （范扬、张企泰译）", dir: "/HEGEL/philosophy-of-right/", homePage: "nav.html" }
+          { id: "helin", kind: "book", reldir: "/shorter-logic", label: "贺麟（黑格尔译本）全集", dir: "/HEGEL/shorter-logic/", homePage: "part0000.html" },
+          { id: "logic-i", kind: "book", reldir: "/SCIENCE-OF-LOGIC-I", label: "大逻辑第一册 （杨一之译）", dir: "/HEGEL/SCIENCE-OF-LOGIC-I/", homePage: "part0003.html" },
+          { id: "logic-ii", kind: "book", reldir: "/SCIENCE-OF-LOGIC-II", label: "大逻辑第二册 （杨一之译）", dir: "/HEGEL/SCIENCE-OF-LOGIC-II/" },
+          { id: "right", kind: "book", reldir: "/philosophy-of-right", label: "法哲学原理 （范扬、张企泰译）", dir: "/HEGEL/philosophy-of-right/", homePage: "nav.html" }
         ]
       }
     ]
@@ -595,7 +595,7 @@ window.LIBRARY_CONFIG = [
     title: "Source links",
     desc: "友情链接",
     basePath: null,
-    path: "/index.html",
+    path: "index.html",
     groups: [
       { label: "Gesamtausgabe (MEGA) - De Gruyter Brill", path: "https://www.degruyterbrill.com/serial/mega-b/html" },
       { label: "MEGAdigital", path: "https://megadigital.bbaw.de/" },

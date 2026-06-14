@@ -94,6 +94,41 @@
       return i >= 0 ? { path: raw.slice(0, i), hash: raw.slice(i + 1) } : { path: raw, hash: '' };
     },
     isSpecial(raw) { return this.specRe.test(String(raw || '')) || /^[a-z][a-z0-9+.-]*:/i.test(String(raw || '')); },
+    libmapBase() {
+      if (this._libmapBase) return this._libmapBase;
+      const scripts = Array.from(document.scripts || []);
+      const script = scripts.find(s => /(?:^|\/)libmap\.js(?:[?#].*)?$/i.test(s.getAttribute('src') || s.src || ''));
+      try {
+        this._libmapBase = new URL('.', script?.src || location.href).href;
+      } catch {
+        this._libmapBase = location.href.replace(/[^/]*$/, '');
+      }
+      return this._libmapBase;
+    },
+    libmapPath(path) {
+      const raw = String(path || '').trim();
+      if (!raw || raw.startsWith('?') || this.isSpecial(raw) || /^(?:https?:)?\/\//i.test(raw)) return raw;
+      if (raw.startsWith('/')) return raw;
+      try {
+        const url = new URL(raw, this.libmapBase());
+        return url.pathname + url.search + url.hash;
+      } catch {
+        return this.rootPath(raw);
+      }
+    },
+    joinLibmapPath(base, rel, homePage) {
+      const b = this.libmapPath(base || '/');
+      const isIndex = !homePage || homePage === 'index.html';
+      const tail = isIndex
+        ? String(rel || '').replace(/\/?$/, '/')
+        : [rel, homePage].filter(v => v != null && String(v) !== '').join('/');
+      try {
+        const url = new URL(tail || '.', location.origin + (String(b || '/').replace(/\/?$/, '/')));
+        return url.pathname + url.search + url.hash;
+      } catch {
+        return isIndex ? joinUrlPath(b, rel) + '/' : joinUrlPath(b, rel, homePage);
+      }
+    },
     rootPath(path) {
       const raw = String(path || '').trim();
       if (!raw || raw.startsWith('/') || raw.startsWith('?') || this.isSpecial(raw)) return raw;
@@ -118,29 +153,40 @@
     const raw = parts.filter(v => v != null && String(v) !== '').join('/');
     return raw.replace(/([^:]\/)\/+/g, '$1').replace(/\/+$/, '');
   };
+  const isDirectoryHref = value => {
+    const path = PathUtils.splitHash(value).path.replace(/[?#].*$/, '');
+    return /\/$/.test(path);
+  };
+  const libraryEntryDir = value => {
+    const path = normPath(PathUtils.splitHash(value).path.replace(/[?#].*$/, '').replace(/^\/+/, ''));
+    if (!path) return '';
+    return isDirectoryHref(value) ? path : path.replace(/\/[^/]+$/, '');
+  };
   const resolveLibraryPath = (col, group, item) => {
     const raw = String(item?.path || '').trim();
-    if (raw) return raw;
-    const base = group?.basePath || col?.basePath || '';
+    if (raw) return PathUtils.libmapPath(raw);
+    const base = PathUtils.libmapPath(item?.basePath || group?.basePath || col?.basePath || '');
     const dir = String(item?.dir || '').trim();
-    const homePage = item?.homePage || 'index.html';
-    if (dir) return homePage === 'index.html' ? dir : joinUrlPath(dir, homePage);
+    const homePage = item?.homePage || item?.homeName || 'index.html';
     const id = item?.id;
+    const relDir = item?.reldir != null
+      ? String(item.reldir).trim()
+      : (typeof id === 'number' || (typeof id === 'string' && /^\d+$/.test(id)) ? String(id) : '');
+    if (base && relDir) return PathUtils.joinLibmapPath(base, relDir, homePage);
+    if (dir) {
+      const resolvedDir = PathUtils.libmapPath(dir);
+      return homePage === 'index.html' ? resolvedDir : joinUrlPath(resolvedDir, homePage);
+    }
     if (id == null || id === '') return '';
     if (!base) return raw;
-    return joinUrlPath(base, id, homePage);
+    return PathUtils.joinLibmapPath(base, id, homePage);
   };
   const itemLabel = item => item?.label || item?.title || String(item?.id ?? '');
   const resolveLibraryEntry = (col, group, item) => {
-    const rawDir = String(item?.dir || '').trim();
-    if (rawDir && !/^https?:/i.test(rawDir)) {
-      const dir = normPath(rawDir.replace(/^\/+/, ''));
-      if (dir) return { path: joinUrlPath(rawDir, item?.homePage || 'index.html').replace(/^\/+/, ''), dir };
-    }
     const raw = resolveLibraryPath(col, group, item);
-    if (!raw || /^https?:/i.test(raw)) return null;
+    if (!raw || /^https?:/i.test(raw) || PathUtils.isSpecial(raw)) return null;
     const path = normPath(String(raw).replace(/[?#].*$/, '').replace(/^\/+/, ''));
-    const dir = path.replace(/\/[^/]+$/i, '');
+    const dir = libraryEntryDir(raw);
     return dir ? { path, dir } : null;
   };
   /* 卷册检测 (SPA: 带 docPath 参数) */
@@ -156,18 +202,21 @@
       if (this.source === source) return this.entries;
       const entries = [];
       const byDir = new Map();
-      const add = (col, group, item) => {
+      const rank = entry => entry.kind === 'collection' ? 3 : entry.kind === 'group' ? 2 : 1;
+      const add = (col, group, item, kind) => {
         const resolved = resolveLibraryEntry(col, group, item);
         if (!resolved) return;
-        const entry = { col, group, item, dir: resolved.dir };
+        const entry = { col, group, item, dir: resolved.dir, kind };
         entries.push(entry);
-        byDir.set(libraryIndexKey(resolved.dir), entry);
+        const key = libraryIndexKey(resolved.dir);
+        const previous = byDir.get(key);
+        if (!previous || rank(entry) > rank(previous)) byDir.set(key, entry);
       };
       for (const col of source) {
-        add(col, null, col);
+        add(col, null, col, 'collection');
         for (const group of col.groups || []) {
-          add(col, group, group);
-          for (const item of group.items || []) add(col, group, item);
+          add(col, group, group, 'group');
+          for (const item of group.items || []) add(col, group, item, 'item');
         }
       }
       this.source = source;
@@ -249,7 +298,7 @@
     makeSpa(path, hash = '') {
       const p = this.split(this.doc(path));
       const h = hash || p.hash;
-      const spaPath = location.pathname + '?doc=' + this.path('', p.path) + (h ? '#' + h : '');
+      let spaPath = location.pathname + '?doc=' + this.path('', p.path) + (h ? '#' + h : '');
       return spaPath;
     },
 

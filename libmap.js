@@ -19,7 +19,7 @@ window.LIBRARY_CONFIG = [
     label: "MEW-ZENO",
     title: "KARL MARX FRIEDRICH ENGELS WERKE",
     desc: "Marx-Engels-Werke (auf dem Zeno.org)",
-    basePath: "/docs/MEW-ZENO/",
+    basePath: "docs/MEW-ZENO/",
     stylesheets: ["/docs/MEW-ZENO/mewde.css"],
     badge: "DE",
     citation: { prefix: "MEW", title: "Marx-Engels-Werke", publisher: "Berlin: Dietz Verlag" },
@@ -62,7 +62,7 @@ window.LIBRARY_CONFIG = [
     label: "MEW",
     title: "KARL MARX FRIEDRICH ENGELS WERKE",
     desc: "Marx-Engels-Werke (von AI konvertiert und auf dem mlwerke.de)",
-    basePath: "/MEW/",
+    basePath: "MEW/",
     stylesheets: ["/MEW/mewde.css"],
     badge: "DE",
     citation: { prefix: "MEW", publisher: "Berlin: Dietz Verlag" },
@@ -136,7 +136,7 @@ window.LIBRARY_CONFIG = [
     label: "MECW",
     title: "Marx & Engels Collected Works (From wikirouge.net)",
     desc: "Marx & Engels Collected Works English edition, Vol.1–50 (From wikirouge.net)",
-    basePath: "/en/MECW/",
+    basePath: "en/MECW/",
     stylesheets: ["/en/MECW/MECW.css"],
     badge: "EN",
     path: "/en/index.html#MECW",
@@ -214,7 +214,7 @@ window.LIBRARY_CONFIG = [
     label: "MEGA2",
     title: "KARL MARX FRIEDRICH ENGELS GESAMTAUSGABE",
     desc: "ZWEITE ABTEILUNG (von BBAW)",
-    basePath: "/MEGA/",
+    basePath: "MEGA/",
     badge: "DE",
     path: "/MEGA/index.html",
     stylesheets: ["/MEGA/II/MEGA.css"],
@@ -224,7 +224,7 @@ window.LIBRARY_CONFIG = [
       {
         label: "II. Abteilung: \"DAS KAPITAL\" UND VORARBEITEN",
         stylesheets: ["/MEGA/II/MEGA.css"],
-        basePath: "/MEGA/II/",
+        basePath: "MEGA/II/",
         path: "/MEGA/II/index.html",
         items: [
           { id: 1, label: "II/1: Ökonomische Manuskripte 1857/58 (Grundrisse der Kritik der politischen Ökonomie)", volume: "II/1", dir: "/MEGA/II/1/", citation: { year: "1981ff", publisher: "Berlin: Dietz Verlag" } },
@@ -241,7 +241,7 @@ window.LIBRARY_CONFIG = [
     label: "马恩全集",
     title: "马克思恩格斯全集（中文第一版）",
     desc: "1-50卷",
-    basePath: "/docs/MEW-ZH/",
+    basePath: "docs/MEW-ZH/",
     stylesheets: ["/docs/styles.css"],
     badge: "ZH",
     path: "/docs/MEW-ZH/index.html#TOC",
@@ -323,7 +323,7 @@ window.LIBRARY_CONFIG = [
     label: "马恩文集",
     title: "马克思恩格斯文集",
     desc: "1-10卷，附马恩全集第二版30卷",
-    basePath: "/docs/MEA/",
+    basePath: "docs/MEA/",
     stylesheets: ["/docs/styles.css"],
     badge: "ZH",
     path: "/docs/MEA/index.html#TOC",
@@ -361,7 +361,7 @@ window.LIBRARY_CONFIG = [
     label: "Ленин ПСС",
     title: "ПОЛНОЕ СОБРАНИЕ СОЧИНЕНИЙ ЛЕНИН ИЗДАНИЕ ПЯТОЕ",
     desc: "ПОЛНОЕ СОБРАНИЕ СОЧИНЕНИЙ ЛЕНИН ИЗДАНИЕ ПЯТОЕ",
-    basePath: "/ru/",
+    basePath: "ru/",
     stylesheets: ["/vil.css"],
     badge: "RU",
     path: "/ru/index.html",
@@ -369,7 +369,7 @@ window.LIBRARY_CONFIG = [
       { label: "Разделить HTML с uaio.ru по главам", path: "/ru/VIL-UAIO/index.html" },
       {
         label: "Том 1–27",
-        basePath: "/ru/VIL-FB2/",
+        basePath: "ru/VIL-FB2/",
         items: [
           { id: 1, label: "Том 1: 1893-1894", volume: "Том 1", dir: "/ru/VIL-FB2/1/" },
           { id: 2, label: "Том 2: 1895-1897", volume: "Том 2", dir: "/ru/VIL-FB2/2/" },
@@ -402,7 +402,7 @@ window.LIBRARY_CONFIG = [
       },
       {
         label: "Том 28–29",
-        basePath: "/ru/VIL-UAIO/",
+        basePath: "ru/VIL-UAIO/",
         items: [
           { id: 28, label: "Том 28: ТЕТРАДИ ПО ИМПЕРИАЛИЗМУ（帝国主义笔记）", volume: "Том 28", dir: "/ru/VIL-UAIO/28/" },
           { id: 29, label: "Том 29: ФИЛОСОФСКИЕ ТЕТРАДИ（哲学笔记）", volume: "Том 29", dir: "/ru/VIL-UAIO/29/" }
@@ -431,7 +431,7 @@ window.LIBRARY_CONFIG = [
       },
       {
         label: "Том 46–55 (Письма)",
-        basePath: "/ru/VIL-UAIO/",
+        basePath: "ru/VIL-UAIO/",
         items: [
           { id: 46, label: "Том 46: Письма 1893 - 1904", volume: "Том 46", dir: "/ru/VIL-UAIO/46/" },
           { id: 47, label: "Том 47: Письма 1905 - ноябрь 1910", volume: "Том 47", dir: "/ru/VIL-UAIO/47/" },
@@ -452,7 +452,7 @@ window.LIBRARY_CONFIG = [
     label: "列宁全集",
     title: "列宁全集（中文第二版）",
     desc: "1-60卷",
-    basePath: "/docs/LENIN/",
+    basePath: "docs/LENIN/",
     stylesheets: ["/docs/styles.css"],
     badge: "ZH",
     path: "/docs/LENIN/index.html#TOC",
@@ -538,7 +538,7 @@ window.LIBRARY_CONFIG = [
     label: "HEGEL",
     title: "黑格尔著作集1-20卷",
     desc: "Hegel Werke 1-20 (Suhrkamp)",
-    basePath: "/docs/HEGEL/",
+    basePath: "docs/HEGEL/",
     stylesheets: ["/docs/HEGEL/hegel.css"],
     badge: "DE",
     path: "/docs/HEGEL/index.html#de ",
@@ -551,14 +551,14 @@ window.LIBRARY_CONFIG = [
           { id: 2, label: "Werke 2: Jenaer Schriften", volume: "Werke 2", dir: "/docs/HEGEL/2/" },
           { id: 3, label: "Werke 3: Phänomenologie des Geistes", volume: "Werke 3", dir: "/docs/HEGEL/3/" },
           { id: 4, label: "Werke 4: Nürnberger und Heidelberger Schriften", volume: "Werke 4", dir: "/docs/HEGEL/4/" },
-          { id: 5, label: "Werke 5: -6 (Wissenschaft der Logik)", volume: "Werke 5", dir: "/docs/HEGEL/5/" },
+          { id: 5, label: "Werke 5-6: (Wissenschaft der Logik)", volume: "Werke 5", dir: "/docs/HEGEL/5/" },
           { id: 7, label: "Werke 7: Grundlinien der Philosophie des Rechts", volume: "Werke 7", dir: "/docs/HEGEL/7/" },
           { id: 10, label: "Werke 10: Werke 8-10 (Enzyklopädie der philosophischen Wissenschaften im Grundrisse)", volume: "Werke 10", dir: "/docs/HEGEL/10/" },
           { id: 11, label: "Werke 11: Berliner Schriften", volume: "Werke 11", dir: "/docs/HEGEL/11/" },
           { id: 12, label: "Werke 12: Vorlesungen über die Philosophie der Geschichte", volume: "Werke 12", dir: "/docs/HEGEL/12/" },
-          { id: 13, label: "Werke 13: -15 (Vorlesungen über die Ästhetik)", volume: "Werke 13", dir: "/docs/HEGEL/13/" },
-          { id: 16, label: "Werke 16: -17 (Vorlesungen über die Philosophie der Religion)", volume: "Werke 16", dir: "/docs/HEGEL/16/" },
-          { id: 18, label: "Werke 18: -20 (Vorlesungen über die Geschichte der Philosophie)", volume: "Werke 18", dir: "/docs/HEGEL/18/" }
+          { id: 13, label: "Werke 13-15: (Vorlesungen über die Ästhetik)", volume: "Werke 13", dir: "/docs/HEGEL/13/" },
+          { id: 16, label: "Werke 16-17: (Vorlesungen über die Philosophie der Religion)", volume: "Werke 16", dir: "/docs/HEGEL/16/" },
+          { id: 18, label: "Werke 18-20: (Vorlesungen über die Geschichte der Philosophie)", volume: "Werke 18", dir: "/docs/HEGEL/18/" }
         ]
       },
       {
