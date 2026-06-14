@@ -122,32 +122,27 @@
     const raw = String(item?.path || '').trim();
     if (raw) return raw;
     const base = group?.basePath || col?.basePath || '';
-    const name = item?.dir ?? item?.id;
-    if (name == null || name === '') return '';
-    if (String(name).startsWith('/')) return joinUrlPath(name, item?.homeName || 'index.html');
+    const dir = String(item?.dir || '').trim();
+    const homePage = item?.homePage || 'index.html';
+    if (dir) return homePage === 'index.html' ? dir : joinUrlPath(dir, homePage);
+    const id = item?.id;
+    if (id == null || id === '') return '';
     if (!base) return raw;
-    return joinUrlPath(base, name, item?.homeName || 'index.html');
+    return joinUrlPath(base, id, homePage);
   };
+  const itemLabel = item => item?.label || item?.title || String(item?.id ?? '');
   const resolveLibraryEntry = (col, group, item) => {
+    const rawDir = String(item?.dir || '').trim();
+    if (rawDir && !/^https?:/i.test(rawDir)) {
+      const dir = normPath(rawDir.replace(/^\/+/, ''));
+      if (dir) return { path: joinUrlPath(rawDir, item?.homePage || 'index.html').replace(/^\/+/, ''), dir };
+    }
     const raw = resolveLibraryPath(col, group, item);
     if (!raw || /^https?:/i.test(raw)) return null;
     const path = normPath(String(raw).replace(/[?#].*$/, '').replace(/^\/+/, ''));
     const dir = path.replace(/\/[^/]+$/i, '');
     return dir ? { path, dir } : null;
   };
-  const volumeName = (col, group, item) => {
-    if (item?.volume) return item.volume;
-    const kind = item?.kind || (typeof item?.id === 'number' ? 'volume' : 'book');
-    const fmt = group?.volumeFormat || col?.volumeFormat || '';
-    return kind === 'volume' && fmt ? fmt.replace(/\{id\}/g, item.id) : '';
-  };
-  const libraryLabel = (item, col = null, group = null) => {
-    const label = item?.label || item?.title || '';
-    const volume = volumeName(col, group, item);
-    if (!volume || !label || String(label).startsWith(volume)) return label || volume || String(item?.id ?? '');
-    return volume + (/^[\s(:：,，.;]/.test(label) ? ' ' : ': ') + label;
-  };
-
   /* 卷册检测 (SPA: 带 docPath 参数) */
   class VolumeIndex {
     constructor() {
@@ -581,7 +576,7 @@
     _breadcrumbParts(col, item, data, extra) {
       const colPath = resolveLibraryPath(col, null, col);
       const parts = [colPath ? { text: col.label, href: makeHref(colPath), expand: col.id } : { text: col.label, expand: col.id }];
-      if (item && item !== col) parts.push({ text: libraryLabel(item, col, this.currentVol?.group) || (data?.title) || 'Contents', href: makeHref(resolveLibraryPath(col, this.currentVol?.group, item) || (this.currentVol?.dir + '/index.html')) });
+      if (item && item !== col) parts.push({ text: itemLabel(item) || (data?.title) || 'Contents', href: makeHref(resolveLibraryPath(col, this.currentVol?.group, item) || (this.currentVol?.dir + '/index.html')) });
       if (extra) parts.push(extra);
       parts.push({ id: 'page-breadcrumb-link', isPageBadge: window.__PAGE_BAR__?.hasPageAnchors });
       return parts;
@@ -681,7 +676,7 @@
       const label = esc(group.label || ''), items = group.items || [], groupPath = resolveLibraryPath(null, null, group), gp = normPath(groupPath);
       if (!items.length) return groupPath ? `<li class="sidebar-item">${this._renderLink({ path: groupPath, text: group.label || '' })}</li>` : `<li class="sidebar-item"><span class="sidebar-category-label">${label}</span></li>`;
       const head = groupPath ? this._renderLink({ path: groupPath, text: group.label || '' }) : `<span class="sidebar-category-label">${label}</span>`;
-      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-group-path="${esc(gp)}" data-collapsed="true"><div class="sidebar-item-row">${head}<button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(item => `<li class="sidebar-item">${this._renderLink({ path: resolveLibraryPath(col, group, item), text: libraryLabel(item, col, group) })}</li>`).join('')}</ul></li>`;
+      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-group-path="${esc(gp)}" data-collapsed="true"><div class="sidebar-item-row">${head}<button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(item => `<li class="sidebar-item">${this._renderLink({ path: resolveLibraryPath(col, group, item), text: itemLabel(item) })}</li>`).join('')}</ul></li>`;
     }
 
     /* TOC */
@@ -845,7 +840,7 @@
     normalizePath: normPath, normalizeDoc: normDoc, sameDocValue: PathUtils.sameDoc.bind(PathUtils),
     samePathValue: PathUtils.samePath.bind(PathUtils), startsWithPathValue: PathUtils.startsWithPath.bind(PathUtils),
     fetchReaderResource, hasSelection: hasSel, resolveUrl: PathUtils.resolveUrl.bind(PathUtils),
-    resolveDocHref, readerHref: makeHref, findCollection, resolveLibraryPath, resolveLibraryEntry, libraryLabel, volumeName,
+    resolveDocHref, readerHref: makeHref, findCollection, resolveLibraryPath, resolveLibraryEntry,
     detectVolume, scrollToEl, syncFill, onScrollFrame,
     getDomHeadings: getHeadings, getActiveHeadingId: (headings, t = 200) => {
       for (let i = (headings || []).length - 1; i >= 0; i--) if (headings[i].getBoundingClientRect().top <= t) return headings[i].id

@@ -20,14 +20,27 @@ const joinUrlPath = (...parts) => {
 const resolveLibraryPath = (col, group, item) => {
   const raw = String(item?.path || '').trim();
   if (raw) return raw;
+  const dir = String(item?.dir || '').trim();
+  const homePage = item?.homePage || 'index.html';
+  if (dir) return homePage === 'index.html' ? dir : joinUrlPath(dir, homePage);
+  const id = item?.id;
+  if (id == null || id === '') return '';
   const base = group?.basePath || col?.basePath || '';
-  const name = item?.dir ?? item?.id;
-  if (name == null || name === '') return '';
-  if (String(name).startsWith('/')) return joinUrlPath(name, item?.homeName || 'index.html');
   if (!base) return raw;
-  return joinUrlPath(base, name, item?.homeName || 'index.html');
+  return joinUrlPath(base, id, homePage);
+};
+const itemLabel = item => item?.label || item?.title || String(item?.id ?? '');
+const isIndexHome = item => {
+  const raw = String(item?.path || '').trim().replace(/[?#].*$/, '');
+  if (raw) return /\/index\.x?html?$/i.test(raw);
+  return /^index\.x?html?$/i.test(item?.homePage || 'index.html');
 };
 const resolveLibraryEntry = (col, group, item) => {
+  const rawDir = String(item?.dir || '').trim();
+  if (rawDir && !/^https?:/i.test(rawDir)) {
+    const dir = normPath(rawDir.replace(/^\/+/, ''));
+    if (dir) return { path: joinUrlPath(rawDir, item?.homePage || 'index.html').replace(/^\/+/, ''), dir };
+  }
   const raw = resolveLibraryPath(col, group, item);
   if (!raw || /^https?:/i.test(raw)) return null;
   const path = normPath(String(raw).replace(/[?#].*$/, '').replace(/^\/+/, ''));
@@ -41,19 +54,6 @@ const startLookupDir = value => {
   if (!clean) return '';
   return /\.[^/]+$/.test(clean.split('/').pop() || '') ? clean.replace(/\/[^/]+$/, '') : clean;
 };
-const volumeName = (col, group, item) => {
-  if (item?.volume) return item.volume;
-  const kind = item?.kind || (typeof item?.id === 'number' ? 'volume' : 'book');
-  const fmt = group?.volumeFormat || col?.volumeFormat || '';
-  return kind === 'volume' && fmt ? fmt.replace(/\{id\}/g, item.id) : '';
-};
-const libraryLabel = (item, col = null, group = null) => {
-  const label = item?.label || item?.title || '';
-  const volume = volumeName(col, group, item);
-  if (!volume || !label || String(label).startsWith(volume)) return label || volume || String(item?.id ?? '');
-  return volume + (/^[\s(:：,，.;]/.test(label) ? ' ' : ': ') + label;
-};
-
 // ── ConfigLoader ────────────────────────────────────────────────
 class ConfigLoader {
   constructor() {
@@ -451,7 +451,7 @@ class LibraryIndex {
       const rawHit = this.byDir.get(key);
       const hit = rawHit && (!context || rawHit.col === context.col) ? rawHit : null;
       const labelSource = hit?.itemIndex != null ? hit.item : hit?.groupIndex != null ? hit.group : hit?.col;
-      const label = currentLabel && i === parts.length - 1 ? currentLabel : (libraryLabel(labelSource, hit?.col, hit?.group) || part);
+      const label = currentLabel && i === parts.length - 1 ? currentLabel : (itemLabel(labelSource) || part);
 
       if (i === parts.length - 1) {
         crumbs.push(`<span class="crumb current">${esc(label)}</span>`);
@@ -495,7 +495,7 @@ class VolumeIndexBuilder {
 
   _collectVolumeEntries() {
     return this.libraryIndex.ensure()
-      .filter(entry => entry.itemIndex != null && /\/index\.x?html?$/i.test(resolveLibraryPath(entry.col, entry.group, entry.item)))
+      .filter(entry => entry.itemIndex != null && isIndexHome(entry.item))
       .sort((a, b) =>
         (a.colIndex - b.colIndex) ||
         ((a.groupIndex ?? -1) - (b.groupIndex ?? -1)) ||
@@ -543,7 +543,7 @@ class VolumeIndexBuilder {
     const outputJs = path.join(dist, entry.dir, 'index.js');
     const outputHtml = path.join(dist, entry.dir, 'index.html');
 
-    let files = [], title = libraryLabel(entry.item, entry.col, entry.group), preNavHtml = '', lang = 'zh', headExtras = '';
+    let files = [], title = itemLabel(entry.item), preNavHtml = '', lang = 'zh', headExtras = '';
 
     const jsonPath = path.join(sourceDir, 'index.json');
     let jsonSuccess = false;
@@ -652,13 +652,13 @@ class PageRenderer {
     const dir = path.dirname(itemPath).replace(/\\/g, '/');
     if (this._volCache.has(dir)) return this._volCache.get(dir);
 
-    const hit = this.libraryIndex.detectVolume(dir, false, h => h.item && /\/index\.html$/i.test(resolveLibraryPath(h.col, h.group, h.item)));
+    const hit = this.libraryIndex.detectVolume(dir, false, h => h.item && isIndexHome(h.item));
     let bestJs = null, bestLabel = null, bestDir = null;
     if (hit) {
       bestDir = hit.dir;
       const depth = dir.split('/').length - bestDir.split('/').length;
       bestJs = depth === 0 ? './index.js' : '../'.repeat(depth) + 'index.js';
-      bestLabel = libraryLabel(hit.item, hit.col, hit.group) || null;
+      bestLabel = itemLabel(hit.item) || null;
     }
 
     const info = { jsPath: bestJs, label: bestLabel || 'Contents', volDir: bestDir };

@@ -535,7 +535,7 @@ class ReaderApp {
         for (let i = 0; i < pieces.length - 1; i++) {
             const sub = (path.startsWith('/') ? '/' : '') + pieces.slice(0, i + 1).join('/');
             // 目录层级面包屑：中间层级链接到对应目录
-            const subDir = C.normalizePath(sub) + '/index.html';
+            const subDir = C.normalizePath(sub);
             const hit = detectVolume(sub);
             const final = (currentVolPath && subDir === currentVolPath) ? (sub + '/') : (hit ? resolveLibraryPath(hit.col, hit.group, hit.item).replace(/[?#].*$/, '') : '');
             if (parts.length) parts.push('<span class="crumb-sep">/</span>');

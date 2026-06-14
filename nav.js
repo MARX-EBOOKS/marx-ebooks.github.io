@@ -215,26 +215,17 @@
   const resolveLibraryPath = (col, group, item) => {
     const raw = String(item?.path || '').trim();
     if (raw) return raw;
+    const dir = String(item?.dir || '').trim();
+    const homePage = item?.homePage || 'index.html';
+    if (dir) return homePage === 'index.html' ? dir : joinUrlPath(dir, homePage);
+    const id = item?.id;
+    if (id == null || id === '') return '';
     const base = group?.basePath || col?.basePath || '';
-    const name = item?.dir ?? item?.id;
-    if (name == null || name === '') return '';
-    if (String(name).startsWith('/')) return joinUrlPath(name, item?.homeName || 'index.html');
     if (!base) return raw;
-    return joinUrlPath(base, name, item?.homeName || 'index.html');
+    return joinUrlPath(base, id, homePage);
   };
-  const volumeName = (col, group, item) => {
-    if (item?.volume) return item.volume;
-    const kind = item?.kind || (typeof item?.id === 'number' ? 'volume' : 'book');
-    const fmt = group?.volumeFormat || col?.volumeFormat || '';
-    return kind === 'volume' && fmt ? fmt.replace(/\{id\}/g, item.id) : '';
-  };
-  const libraryLabel = (item, col = null, group = null) => {
-    const label = item?.label || item?.title || '';
-    const volume = volumeName(col, group, item);
-    if (!volume || !label || String(label).startsWith(volume)) return label || volume || String(item?.id ?? '');
-    return volume + (/^[\s(:：,，.;]/.test(label) ? ' ' : ': ') + label;
-  };
-  Object.assign(ReaderCore, { resolveLibraryPath, libraryLabel, volumeName });
+  const itemLabel = item => item?.label || item?.title || String(item?.id ?? '');
+  Object.assign(ReaderCore, { resolveLibraryPath });
 
   const detectVolume = (path, findcol = false) => {
     let dir = startLookupDir(path);
@@ -458,7 +449,7 @@
     /*  面包屑 parts 构建 */
     _breadcrumbParts(col, item, data) {
       const parts = [{ text: col.label, href: sitePath(resolveLibraryPath(col, null, col)), expand: col.id }];
-      if (item && item !== col) parts.push({ text: libraryLabel(item, col, this.currentVol.group) || data?.title || 'Contents', href: sitePath(resolveLibraryPath(col, this.currentVol.group, item) || (this.currentVol.dir + '/index.html')) });
+      if (item && item !== col) parts.push({ text: itemLabel(item) || data?.title || 'Contents', href: sitePath(resolveLibraryPath(col, this.currentVol.group, item) || (this.currentVol.dir + '/index.html')) });
       return parts;
     }
 
@@ -543,7 +534,7 @@
     renderGroup(g, col = null) {
       const label = esc(g.label || ''), items = g.items || [];
       if (!items.length) return `<li class="sidebar-item">${this._renderLink(resolveLibraryPath(null, null, g), label)}</li>`;
-      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}</span><button class="sidebar-caret" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(it => `<li class="sidebar-item">${this._renderLink(resolveLibraryPath(col, g, it), libraryLabel(it, col, g))}</li>`).join('')}</ul></li>`;
+      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-collapsed="true"><div class="sidebar-item-row"><span class="sidebar-category-label">${label}</span><button class="sidebar-caret" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(it => `<li class="sidebar-item">${this._renderLink(resolveLibraryPath(col, g, it), itemLabel(it))}</li>`).join('')}</ul></li>`;
     }
 
     /*  TOC (unified) */
