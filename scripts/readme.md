@@ -69,11 +69,16 @@
 - 5. 转换后打开拼接脚本，如 mewmergebygroup.py 进行拼接。在 main 中也可以指定要拼接的 volumes 单独拼接。
   - 如有多页组，在拼接之前应先插入对应页码锚点。这对拼接无作用，但影响后续 JS 对页码锚点的读取。
   - 在插入页码锚点的过程中也可以同时检查多页转换的正误、缺漏，如有错漏也可重新转换。
-- 6. 拼接后打开最终 HTML 和数据生成器脚本 MEWmede.py 生成 HTML 目录。MEW-o1.py 是为了对 MLwerke.de 中的90年代网页进行大量繁杂的正则处理而从 MEWmede.py 中剥离的 HTML 生成器的入口，目前仍负责对各路 HTML，包括 AI 生成的 HTML 进行最终的正则处理。
+- 6. 拼接后打开最终 HTML 和数据生成器脚本 MEWmede.py 生成 HTML 目录。MEW-o1.py 是为了对 MLwerke.de 中的 90 年代网页进行大量繁杂的正则处理而从 MEWmede.py 中剥离的 HTML 生成器的入口，目前仍负责对各路 HTML，包括 AI 生成的 HTML 进行最终的正则处理。
   - 可以根据最终生成的目录页判断 AI 转换的标题层级是否正确，如不正确，可以手动修改标题层级后，再进行拼接、重新转换。
 # 阅读器 JS 应用说明
 主要分两个方向：
 1. SPA：docs/reader.html 及 docs/reader-nav.js, docs/reader-ui.js, docs/reader-pagebar.js, docs/reader-nav.js。
 2. SSG: 根目录的 build11.js, nav.js, reader.js。
 
-两者均通过 libmap.js 渲染菜单路径及引用内容。如果要加入卷册，注意libmap中的 path 属性，应按照对应站点根目录计算的绝对路径（以 / 开头供浏览器打开）赋值，以供 nav.js / docs/reader-nav.js 正确处理。各卷目录页最好以 index.html 命名，以供 js 正确生成面包屑、服务器正确路由。如需引用信息功能，可以在libmap.js 各全集、各组、各卷的 citation中为 reader-pagebar.js  中录入引用信息前缀： prefix 为全集或书籍的固定信息, year 为出版年份, publisher 为出版社。暂仅支持德语 S 开头的页码锚点<a id="Sxxx"></a>。目前仅 SPA 支持页面信息引用，SSG 为保持纯净文档站架构，暂不计划支持。
+两者均通过 libmap.js 渲染菜单路径及引用内容。
+- 如果要加入卷册，注意 libmap 中的 dir 属性应按照对应站点根目录计算的绝对路径（以 / 开头供浏览器打开）赋值，以供 nav.js 和构建脚本正确处理。
+- 同时，libmap 中的 basePath 也应该以libmap所在目录为基准计算相对路径，以供 reader-nav.js正确拼接 。
+- 虽然支持自定义主页（homePage 属性），但仍建议各卷目录页以 index.html 命名，以供一般服务器正确路由。
+- 如需引用信息功能，可以在 libmap.js 各全集、各组、各卷的 citation 中为 reader-pagebar.js 中录入引用信息前缀： prefix 为全集或书籍的固定信息, year 为出版年份, publisher 为出版社。暂仅支持德语 S 开头的页码锚点<a id="Sxxx"></a>。
+- 目前仅 SPA 支持页码信息引用，SSG 为保持纯净文档站架构，暂不计划支持。
