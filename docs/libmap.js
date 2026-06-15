@@ -424,7 +424,7 @@ window.LIBRARY_CONFIG = [
           { id: 40, label: "Том 40: Декабрь 1919 - апрель 1920", volume: "Том 40", reldir: "VIL-FB2/40/", dir: "/ru/VIL-FB2/40/" },
           { id: 41, label: "Том 41: Май - ноябрь 1920", volume: "Том 41", reldir: "VIL-FB2/41/", dir: "/ru/VIL-FB2/41/" },
           { id: 42, label: "Том 42: Ноябрь 1920 - март 1921", volume: "Том 42", reldir: "VIL-FB2/42/", dir: "/ru/VIL-FB2/42/" },
-          { id: 43, label: "Том 43: Март - июнь 1921", volume: "Том 43", reldir: "VIL-UAIO/43", dir: "/ru/VIL-FB2/VIL-UAIO/43/" },
+          { id: 43, label: "Том 43: Март - июнь 1921", volume: "Том 43", reldir: "VIL-UAIO/43", dir: "/ru/VIL-UAIO/43/" },
           { id: 44, label: "Том 44: Июнь 1921 - март 1922", volume: "Том 44", reldir: "VIL-UAIO/44", dir: "/ru/VIL-UAIO/44/" },
           { id: 45, label: "Том 45: Март 1922 - март 1923", volume: "Том 45", reldir: "VIL-UAIO/45", dir: "/ru/VIL-UAIO/45/" }
         ]
