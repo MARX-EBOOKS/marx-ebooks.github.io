@@ -340,18 +340,18 @@ window.LIBRARY_CONFIG = [
       {
         label: "资本论及手稿（5-8卷）",
         items: [
-          { id: 5, label: "马恩全集第二版第44卷 （《资本论》第一卷）", volume: "第5卷", dir: "/docs/MEA/5/" },
-          { id: 6, label: "第6卷: 《资本论》第二卷", volume: "第6卷", dir: "/docs/MEA/6/" },
-          { id: 7, label: "第7卷: 《资本论》第三卷", volume: "第7卷", dir: "/docs/MEA/7/" },
-          { id: 8, label: "第8卷: 《资本论》手稿选编", volume: "第8卷", dir: "/docs/MEA/8/" },
-          { id: 30, kind: "book", label: "马恩全集第二版第30卷 （1857-1858手稿上半部分）", volume: "第30卷", reldir: "30", dir: "/docs/MEA/30/" }
+          { id: 5, label: "马恩全集第二版第44卷 （《资本论》第一卷）", volume: "第5卷", dir: "/MEA/5/" },
+          { id: 6, label: "第6卷: 《资本论》第二卷", volume: "第6卷", dir: "/MEA/6/" },
+          { id: 7, label: "第7卷: 《资本论》第三卷", volume: "第7卷", dir: "/MEA/7/" },
+          { id: 8, label: "第8卷: 《资本论》手稿选编", volume: "第8卷", dir: "/MEA/8/" },
+          { id: 30, kind: "book", label: "马恩全集第二版第30卷 （1857-1858手稿上半部分）", volume: "全集第30卷", reldir: "30", dir: "/MEA/30/" }
         ]
       },
       {
         label: "其他（9、10卷）",
         items: [
-          { id: 26, label: "马恩全集第二版第26卷 （反杜林论、自然辩证法）", volume: "第9卷", dir: "/docs/MEA/26/" },
-          { id: 10, label: "第10卷: 书信选编", volume: "第10卷", dir: "/docs/MEA/10/" }
+          { id: 26, label: "马恩全集第二版第26卷 （反杜林论、自然辩证法）", volume: "全集第26卷", dir: "/MEA/26/" },
+          { id: 10, label: "第10卷: 书信选编", volume: "第10卷", dir: "/MEA/10/" }
         ]
       }
     ]
