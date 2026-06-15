@@ -425,9 +425,9 @@ window.LIBRARY_CONFIG = [
           { id: 40, label: "Том 40: Декабрь 1919 - апрель 1920", volume: "Том 40", dir: "/ru/VIL-FB2/VIL-FB2/40/" },
           { id: 41, label: "Том 41: Май - ноябрь 1920", volume: "Том 41", dir: "/ru/VIL-FB2/VIL-FB2/41/" },
           { id: 42, label: "Том 42: Ноябрь 1920 - март 1921", volume: "Том 42", dir: "/ru/VIL-FB2/VIL-FB2/42/" },
-          { id: 43, reldir: "/VIL-UAIO/43", label: "Том 43: Март - июнь 1921", volume: "Том 43", dir: "/ru/VIL-FB2/VIL-UAIO/43/" },
-          { id: 44, reldir: "/VIL-UAIO/44", label: "Том 44: Июнь 1921 - март 1922", volume: "Том 44", dir: "/ru/VIL-FB2/VIL-UAIO/44/" },
-          { id: 45, reldir: "/VIL-UAIO/45", label: "Том 45: Март 1922 - март 1923", volume: "Том 45", dir: "/ru/VIL-FB2/VIL-UAIO/45/" }
+          { id: 43, label: "Том 43: Март - июнь 1921", volume: "Том 43", reldir: "VIL-UAIO/43", dir: "/ru/VIL-FB2/VIL-UAIO/43/" },
+          { id: 44,  label: "Том 44: Июнь 1921 - март 1922", volume: "Том 44", reldir: "VIL-UAIO/44", dir: "/ru/VIL-FB2/VIL-UAIO/44/" },
+          { id: 45, label: "Том 45: Март 1922 - март 1923", volume: "Том 45", reldir: "VIL-UAIO/45", dir: "/ru/VIL-FB2/VIL-UAIO/45/" }
         ]
       },
       {
@@ -565,18 +565,18 @@ window.LIBRARY_CONFIG = [
       {
         label: "English Translations",
         items: [
-          { id: "ps", kind: "book", reldir: "/HGPS", label: "Phenomenology of Spirit (by Terry Pinkard)", dir: "/HEGEL/HGPS/" },
-          { id: "gl", kind: "book", reldir: "/HGSL", label: "Science of Logic (Greater Logic, by A.V.Miller)", dir: "/HEGEL/HGSL/" },
-          { id: "sl", kind: "book", reldir: "/HEPL", label: "Shorter Logic (by K.Brinkmann & D.O. Dahlstrom)", dir: "/HEGEL/HEPL/" }
+          { id: "ps", kind: "book", reldir: "HGPS", label: "Phenomenology of Spirit (by Terry Pinkard)", dir: "/HEGEL/HGPS/" },
+          { id: "gl", kind: "book", reldir: "HGSL", label: "Science of Logic (Greater Logic, by A.V.Miller)", dir: "/HEGEL/HGSL/" },
+          { id: "sl", kind: "book", reldir: "HEPL", label: "Shorter Logic (by K.Brinkmann & D.O. Dahlstrom)", dir: "/HEGEL/HEPL/" }
         ]
       },
       {
         label: "中译本",
         items: [
-          { id: "helin", kind: "book", reldir: "/shorter-logic", label: "贺麟（黑格尔译本）全集", dir: "/HEGEL/shorter-logic/", homePage: "part0000.html" },
-          { id: "logic-i", kind: "book", reldir: "/SCIENCE-OF-LOGIC-I", label: "大逻辑第一册 （杨一之译）", dir: "/HEGEL/SCIENCE-OF-LOGIC-I/", homePage: "part0003.html" },
-          { id: "logic-ii", kind: "book", reldir: "/SCIENCE-OF-LOGIC-II", label: "大逻辑第二册 （杨一之译）", dir: "/HEGEL/SCIENCE-OF-LOGIC-II/" },
-          { id: "right", kind: "book", reldir: "/philosophy-of-right", label: "法哲学原理 （范扬、张企泰译）", dir: "/HEGEL/philosophy-of-right/", homePage: "nav.html" }
+          { id: "helin", kind: "book", reldir: "shorter-logic", label: "贺麟（黑格尔译本）全集", dir: "/HEGEL/shorter-logic/", homePage: "part0000.html" },
+          { id: "logic-i", kind: "book", reldir: "SCIENCE-OF-LOGIC-I", label: "大逻辑第一册 （杨一之译）", dir: "/HEGEL/SCIENCE-OF-LOGIC-I/", homePage: "part0003.html" },
+          { id: "logic-ii", kind: "book", reldir: "SCIENCE-OF-LOGIC-II", label: "大逻辑第二册 （杨一之译）", dir: "/HEGEL/SCIENCE-OF-LOGIC-II/" },
+          { id: "right", kind: "book", reldir: "philosophy-of-right", label: "法哲学原理 （范扬、张企泰译）", dir: "/HEGEL/philosophy-of-right/", homePage: "nav.html" }
         ]
       }
     ]

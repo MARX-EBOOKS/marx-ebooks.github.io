@@ -74,6 +74,7 @@
   }
 
   /* 路径处理 (SPA 专用，统一收口到 PathUtils) */
+  let libmapBase = '';
   const PathUtils = {
     specRe: /^(?:mailto|tel|javascript|data|blob):/i,
     httpRe: /^https?:$/i,
@@ -94,23 +95,16 @@
       return i >= 0 ? { path: raw.slice(0, i), hash: raw.slice(i + 1) } : { path: raw, hash: '' };
     },
     isSpecial(raw) { return this.specRe.test(String(raw || '')) || /^[a-z][a-z0-9+.-]*:/i.test(String(raw || '')); },
-    libmapBase() {
-      if (this._libmapBase) return this._libmapBase;
-      const scripts = Array.from(document.scripts || []);
-      const script = scripts.find(s => /(?:^|\/)libmap\.js(?:[?#].*)?$/i.test(s.getAttribute('src') || s.src || ''));
-      try {
-        this._libmapBase = new URL('.', script?.src || location.href).href;
-      } catch {
-        this._libmapBase = location.href.replace(/[^/]*$/, '');
-      }
-      return this._libmapBase;
-    },
     libmapPath(path) {
       const raw = String(path || '').trim();
       if (!raw || raw.startsWith('?') || this.isSpecial(raw) || /^(?:https?:)?\/\//i.test(raw)) return raw;
       if (raw.startsWith('/')) return raw;
       try {
-        const url = new URL(raw, this.libmapBase());
+        if (!libmapBase) {
+          const src = Array.from(document.scripts || []).map(s => s.src).find(v => v.split(/[?#]/)[0].endsWith('/libmap.js'));
+          libmapBase = new URL('.', src || location.href).href;
+        }
+        const url = new URL(raw, libmapBase);
         return url.pathname + url.search + url.hash;
       } catch {
         return this.rootPath(raw);
@@ -153,15 +147,6 @@
     const raw = parts.filter(v => v != null && String(v) !== '').join('/');
     return raw.replace(/([^:]\/)\/+/g, '$1').replace(/\/+$/, '');
   };
-  const isDirectoryHref = value => {
-    const path = PathUtils.splitHash(value).path.replace(/[?#].*$/, '');
-    return /\/$/.test(path);
-  };
-  const libraryEntryDir = value => {
-    const path = normPath(PathUtils.splitHash(value).path.replace(/[?#].*$/, '').replace(/^\/+/, ''));
-    if (!path) return '';
-    return isDirectoryHref(value) ? path : path.replace(/\/[^/]+$/, '');
-  };
   const resolveLibraryPath = (col, group, item) => {
     const raw = String(item?.path || '').trim();
     if (raw) return PathUtils.libmapPath(raw);
@@ -185,8 +170,9 @@
   const resolveLibraryEntry = (col, group, item) => {
     const raw = resolveLibraryPath(col, group, item);
     if (!raw || /^https?:/i.test(raw) || PathUtils.isSpecial(raw)) return null;
-    const path = normPath(String(raw).replace(/[?#].*$/, '').replace(/^\/+/, ''));
-    const dir = libraryEntryDir(raw);
+    const rawPath = PathUtils.splitHash(raw).path.replace(/[?#].*$/, '');
+    const path = normPath(rawPath.replace(/^\/+/, ''));
+    const dir = /\/$/.test(rawPath) ? path : path.replace(/\/[^/]+$/, '');
     return dir ? { path, dir } : null;
   };
   /* 卷册检测 (SPA: 带 docPath 参数) */
@@ -206,7 +192,11 @@
       const add = (col, group, item, kind) => {
         const resolved = resolveLibraryEntry(col, group, item);
         if (!resolved) return;
-        const entry = { col, group, item, dir: resolved.dir, kind };
+        let entry = { col, group, item, dir: resolved.dir, kind };
+        if (entry.col && !entry.col.basePath) { 
+          if (entry.col === entry.item) entry.item = null;
+          entry.col = null;
+        };
         entries.push(entry);
         const key = libraryIndexKey(resolved.dir);
         const previous = byDir.get(key);
@@ -233,7 +223,7 @@
       for (;;) {
         const entry = this.byDir.get(libraryIndexKey(dir));
         if (entry) {
-          if (findcol && entry.col) return entry.col;
+          if (findcol && entry.col && entry.col.basePath) return entry.col;
           best = entry;
           break;
         }

@@ -52,7 +52,7 @@ window.LIBRARY_CONFIG = [
           { id: 25, label: "Band 25: Das Kapital, Dritter Band", volume: "Band 25", dir: "/docs/MEW-ZENO/25/", citation: { year: 1964 } },
           { id: 40, label: "Band 40: Ökonomisch-philosophische Manuskripte aus dem Jahre 1844", volume: "Band 40", dir: "/docs/MEW-ZENO/40/", citation: { year: 1968 } },
           { id: 42, label: "Band 42: Ökonomische Manuskripte, 1857/1858", volume: "Band 42", dir: "/docs/MEW-ZENO/42/", citation: { year: 1983 } },
-          { id: 50, kind: "book", label: "Band 50: Weitere Werke (Differenz der demokritischen und epikureischen Naturphilosophie, Betrachtung eines Jünglings bei der Wahl eines Berufes)", volume: "Band 50", dir: "/docs/MEW-ZENO/50/" }
+          { id: 50, kind: "book", label: "Band 50: Weitere Werke (Differenz der demokritischen und epikureischen Naturphilosophie, Betrachtung eines Jünglings bei der Wahl eines Berufes)", dir: "/docs/MEW-ZENO/50/" }
         ]
       }
     ]
@@ -350,7 +350,7 @@ window.LIBRARY_CONFIG = [
       {
         label: "其他（9、10卷）",
         items: [
-          { id: 26, label: "马恩全集第二版第26卷 （反杜林论、自然辩证法）", volume: "第26卷", dir: "/docs/MEA/26/" },
+          { id: 26, label: "马恩全集第二版第26卷 （反杜林论、自然辩证法）", volume: "第9卷", dir: "/docs/MEA/26/" },
           { id: 10, label: "第10卷: 书信选编", volume: "第10卷", dir: "/docs/MEA/10/" }
         ]
       }
@@ -424,9 +424,9 @@ window.LIBRARY_CONFIG = [
           { id: 40, label: "Том 40: Декабрь 1919 - апрель 1920", volume: "Том 40", dir: "/ru/VIL-FB2/40/" },
           { id: 41, label: "Том 41: Май - ноябрь 1920", volume: "Том 41", dir: "/ru/VIL-FB2/41/" },
           { id: 42, label: "Том 42: Ноябрь 1920 - март 1921", volume: "Том 42", dir: "/ru/VIL-FB2/42/" },
-          { id: 43, label: "Том 43: Март - июнь 1921", volume: "Том 43", dir: "/ru/VIL-UAIO/43/" },
-          { id: 44, label: "Том 44: Июнь 1921 - март 1922", volume: "Том 44", dir: "/ru/VIL-UAIO/44/" },
-          { id: 45, label: "Том 45: Март 1922 - март 1923", volume: "Том 45", dir: "/ru/VIL-UAIO/45/" }
+          { id: 43, label: "Том 43: Март - июнь 1921", volume: "Том 43", reldir: "VIL-UAIO/43", dir: "/ru/VIL-UAIO/43/" },
+          { id: 44, label: "Том 44: Июнь 1921 - март 1922", volume: "Том 44", reldir: "VIL-UAIO/44", dir: "/ru/VIL-UAIO/44/" },
+          { id: 45, label: "Том 45: Март 1922 - март 1923", volume: "Том 45", reldir: "VIL-UAIO/45", dir: "/ru/VIL-UAIO/45/" }
         ]
       },
       {
@@ -564,18 +564,18 @@ window.LIBRARY_CONFIG = [
       {
         label: "English Translations",
         items: [
-          { id: "ps", kind: "book", label: "Phenomenology of Spirit (by Terry Pinkard)", dir: "/docs/HEGEL/HGPS/" },
-          { id: "gl", kind: "book", label: "Science of Logic (Greater Logic, by A.V.Miller)", dir: "/docs/HEGEL/HGSL/" },
-          { id: "sl", kind: "book", label: "Shorter Logic (by K.Brinkmann & D.O. Dahlstrom)", dir: "/docs/HEGEL/HEPL/" }
+          { id: "ps", kind: "book", label: "Phenomenology of Spirit (by Terry Pinkard)", reldir: "HGPS", dir: "/docs/HEGEL/HGPS/" },
+          { id: "gl", kind: "book", label: "Science of Logic (Greater Logic, by A.V.Miller)", reldir: "HGSL", dir: "/docs/HEGEL/HGSL/" },
+          { id: "sl", kind: "book", label: "Shorter Logic (by K.Brinkmann & D.O. Dahlstrom)", reldir: "HEPL", dir: "/docs/HEGEL/HEPL/" }
         ]
       },
       {
         label: "中译本",
         items: [
-          { id: "helin", kind: "book", label: "贺麟（黑格尔译本）全集", dir: "/docs/HEGEL/shorter-logic/", homePage: "part0000.html" },
-          { id: "logic-i", kind: "book", label: "大逻辑第一册 （杨一之译）", dir: "/docs/HEGEL/SCIENCE-OF-LOGIC-I/", homePage: "part0003.html" },
-          { id: "logic-ii", kind: "book", label: "大逻辑第二册 （杨一之译）", dir: "/docs/HEGEL/SCIENCE-OF-LOGIC-II/" },
-          { id: "right", kind: "book", label: "法哲学原理 （范扬、张企泰译）", dir: "/docs/HEGEL/philosophy-of-right/", homePage: "nav.html" }
+          { id: "helin", kind: "book", label: "贺麟（黑格尔译本）全集", dir: "/docs/HEGEL/shorter-logic/", reldir: "shorter-logic", homePage: "part0000.html" },
+          { id: "logic-i", kind: "book", label: "大逻辑第一册 （杨一之译）", dir: "/docs/HEGEL/SCIENCE-OF-LOGIC-I/", reldir: "SCIENCE-OF-LOGIC-I", homePage: "part0003.html" },
+          { id: "logic-ii", kind: "book", label: "大逻辑第二册 （杨一之译）", reldir: "SCIENCE-OF-LOGIC-II", dir: "/docs/HEGEL/SCIENCE-OF-LOGIC-II/" },
+          { id: "right", kind: "book", label: "法哲学原理 （范扬、张企泰译）", reldir: "philosophy-of-right", dir: "/docs/HEGEL/philosophy-of-right/", homePage: "nav.html" }
         ]
       }
     ]

@@ -17,42 +17,11 @@ const joinUrlPath = (...parts) => {
   const raw = parts.filter(v => v != null && String(v) !== '').join('/');
   return raw.replace(/([^:]\/)\/+/g, '$1').replace(/\/+$/, '');
 };
-const resolveLibraryPath = (col, group, item) => {
-  const raw = String(item?.path || '').trim();
-  if (raw) return raw;
-  const dir = String(item?.dir || '').trim();
-  const homePage = item?.homePage || 'index.html';
-  if (dir) return homePage === 'index.html' ? dir : joinUrlPath(dir, homePage);
-  const id = item?.id;
-  if (id == null || id === '') return '';
-  const base = group?.basePath || col?.basePath || '';
-  if (!base) return raw;
-  return joinUrlPath(base, id, homePage);
-};
-const itemLabel = item => item?.label || item?.title || String(item?.id ?? '');
+const itemLabel = item => item?.volume || item?.label || item?.title || String(item?.id ?? '');
 const isIndexHome = item => {
   const raw = String(item?.path || '').trim().replace(/[?#].*$/, '');
   if (raw) return /\/index\.x?html?$/i.test(raw);
   return /^index\.x?html?$/i.test(item?.homePage || 'index.html');
-};
-const resolveLibraryEntry = (col, group, item) => {
-  const rawDir = String(item?.dir || '').trim();
-  if (rawDir && !/^https?:/i.test(rawDir)) {
-    const dir = normPath(rawDir.replace(/^\/+/, ''));
-    if (dir) return { path: joinUrlPath(rawDir, item?.homePage || 'index.html').replace(/^\/+/, ''), dir };
-  }
-  const raw = resolveLibraryPath(col, group, item);
-  if (!raw || /^https?:/i.test(raw)) return null;
-  const path = normPath(String(raw).replace(/[?#].*$/, '').replace(/^\/+/, ''));
-  const dir = path.replace(/\/[^/]+$/i, '');
-  return dir ? { path, dir } : null;
-};
-const libraryIndexKey = dir => normPath(String(dir || '').replace(/^\/+/, '')).toLowerCase();
-const parentDir = dir => String(dir || '').replace(/\/[^/]+$/, '');
-const startLookupDir = value => {
-  const clean = normPath(String(value || '').replace(/[?#].*$/, '').replace(/^\/+/, ''));
-  if (!clean) return '';
-  return /\.[^/]+$/.test(clean.split('/').pop() || '') ? clean.replace(/\/[^/]+$/, '') : clean;
 };
 // ── ConfigLoader ────────────────────────────────────────────────
 class ConfigLoader {
@@ -408,31 +377,56 @@ class LibraryIndex {
   }
 
   addIndexEntry(entries, byDir, serializableByDir, col, group, item, colIndex, groupIndex = null, itemIndex = null) {
-    const resolved = resolveLibraryEntry(col, group, item);
-    if (!resolved) return;
+    const homePage = item?.homePage || 'index.html';
+    const rawDir = String(item?.dir || '').trim();
+    let entryPath = '', dir = '';
+
+    if (rawDir && !/^https?:/i.test(rawDir)) {
+      entryPath = homePage === 'index.html' ? rawDir : joinUrlPath(rawDir, homePage);
+      dir = normPath(rawDir.replace(/^\/+/, ''));
+    } else {
+      entryPath = String(item?.path || '').trim();
+      if (!entryPath) {
+        const id = item?.id;
+        const base = group?.basePath || col?.basePath || '';
+        if (id != null && id !== '' && base) entryPath = joinUrlPath(base, id, homePage);
+      }
+      if (!entryPath || /^https?:/i.test(entryPath)) return;
+      const cleanPath = normPath(entryPath.replace(/[?#].*$/, '').replace(/^\/+/, ''));
+      dir = cleanPath.replace(/\/[^/]+$/i, '');
+    }
+    if (!dir) return;
+
     const coord = itemIndex != null ? [colIndex, groupIndex, itemIndex] : groupIndex != null ? [colIndex, groupIndex] : [colIndex];
-    const entry = { col, group, item, dir: resolved.dir, colIndex, groupIndex, itemIndex };
-    const key = libraryIndexKey(resolved.dir);
+    let entry = { col, group, item, path: entryPath, dir, colIndex, groupIndex, itemIndex };
+    if (entry.col && !entry.col.basePath) {
+      if (entry.col===entry.item) {
+        entry.item = null;
+      }
+      entry.col = null;
+    };
+    const key = dir.replace(/^\/+/, '').toLowerCase();
     entries.push(entry);
     byDir.set(key, entry);
     serializableByDir[key] = coord;
   }
 
   detectVolume(path, findcol = false, predicate = null) {
-    let dir = startLookupDir(path);
+    let dir = normPath(String(path || '').replace(/[?#].*$/, '').replace(/^\/+/, ''));
+    dir = /\.[^/]+$/.test(dir.split('/').pop() || '') ? dir.replace(/\/[^/]+$/, '') : dir;
     if (!dir) return null;
     this.ensure();
     let best = null;
     for (;;) {
-      const entry = this.byDir.get(libraryIndexKey(dir));
+      const entry = this.byDir.get(dir.replace(/^\/+/, '').toLowerCase());
       if (entry) {
-        if (findcol && entry.col) return entry.col;
+        if (findcol && entry.col && entry.col.basePath) return entry.col;
         if (!predicate || predicate(entry)) {
           best = entry;
           break;
         }
       }
-      const next = parentDir(dir);
+      const next = dir.replace(/\/[^/]+$/, '');
       if (!next || next === dir) break;
       dir = next;
     }
@@ -450,7 +444,7 @@ class LibraryIndex {
       const key = dir.replace(/\/index\.x?html?$/i, '').replace(/\.x?html?$/i, '').toLowerCase();
       const rawHit = this.byDir.get(key);
       const hit = rawHit && (!context || rawHit.col === context.col) ? rawHit : null;
-      const labelSource = hit?.itemIndex != null ? hit.item : hit?.groupIndex != null ? hit.group : hit?.col;
+      const labelSource = hit?.item;
       const label = currentLabel && i === parts.length - 1 ? currentLabel : (itemLabel(labelSource) || part);
 
       if (i === parts.length - 1) {
@@ -460,7 +454,7 @@ class LibraryIndex {
 
       const mechanicalPath = dir + '/';
       const mechanicalIndexPath = mechanicalPath + 'index.html';
-      const libmapPath = hit ? resolveLibraryPath(hit.col, hit.group, hit.item) : '';
+      const libmapPath = hit?.path || '';
       const sameAsMechanical = libmapPath.replace(/^\/+/, '').replace(/[?#].*$/, '') === mechanicalIndexPath;
       const hrefPath = libmapPath && !sameAsMechanical ? libmapPath : mechanicalPath;
       const href = /^https?:/i.test(hrefPath)
@@ -627,7 +621,7 @@ class VolumeIndexBuilder {
       await fs.writeFile(outputHtml, this.config.generateTemplate({
         title, bodyHtml,
         headExtras: headExtras ? headExtras.split('\n').filter(Boolean) : [],
-        meta: { path: resolveLibraryPath(entry.col, entry.group, entry.item), collection: entry.col?.id, title, lang, isVolumeIndex: true, indexJsPath: './index.js' },
+        meta: { path: entry.path, collection: entry.col?.id, title, lang, isVolumeIndex: true, indexJsPath: './index.js' },
         root: this.config.SITE || rootPrefix || '.',
         breadcrumb: breadcrumbHtml,
         hasToc: false, hasVolIndex: true,
@@ -702,9 +696,11 @@ class PageRenderer {
 
   generateCardIndex(libraryConfig) {
     const { esc, SITE } = this.config;
-    const cards = libraryConfig.map(col => {
+    const entries = this.libraryIndex.ensure();
+    const cards = libraryConfig.map((col, colIndex) => {
       let href;
-      const colPath = resolveLibraryPath(col, null, col);
+      const colEntry = entries.find(entry => entry.colIndex === colIndex && entry.groupIndex == null && entry.itemIndex == null);
+      const colPath = colEntry?.path || String(col.path || '').trim();
       const isExternal = colPath && /^https?:\/\//.test(colPath);
       if (isExternal) href = colPath;
       else if (colPath) {
