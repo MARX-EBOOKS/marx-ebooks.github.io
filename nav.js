@@ -475,7 +475,7 @@
         this.navTree.innerHTML = this.buildLibmap(); 
         return
       }
-      const col = this.currentVol.col, nodes = headings.map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id, file: location.pathname.split('/').pop() }));
+      const col = this.currentVol?.col || null, nodes = headings.map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id, file: location.pathname.split('/').pop() }));
       const colPath = this.currentVol?.colPath || '';
       const parts = [{ text: col?.label || 'Library', href: colPath ? sitePath(colPath) : '#', expand: col?.id }, { text: nodes[0]?.text || document.title }];
       this.navTree.innerHTML = this.renderBreadcrumb(parts) + this.renderTree(buildTree(nodes), 'page-toc') + '<div class="section-divider"><span>All works</span></div>' + this.buildLibmap();

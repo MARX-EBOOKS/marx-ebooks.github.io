@@ -191,6 +191,7 @@
       const add = (col, group, item, kind) => {
         const resolved = resolveLibraryEntry(col, group, item);
         if (!resolved) return;
+        if (!(col.basePath && resolved.dir.startsWith(normPath(col.basePath.replace(/^\/+/, ''))))) return;
         let entry = { col, group, item, path: resolved.path, dir: resolved.dir, colPath: col ? resolveLibraryPath(col, null, col) : '', kind };
         if (entry.col && !entry.col.basePath) { 
           if (entry.col === entry.item) entry.item = null;
@@ -469,7 +470,7 @@
         this.mode = 'epub';
         this.renderEpub(docPath);
       }
-      else if (innerWidth < 997 && getHeadings($('#content')).length > 1 && !(/\/(?:index|nav)\.x?html?$/i.test(docPath)) && this.currentDoc()) {
+      else if (innerWidth < 997 && getHeadings($('#content')).length > 1 && !(/\/(?:index|nav)\.x?html?$/i.test(docPath)) && currentDoc()) {
         this.mode = 'page-toc';
         this.renderPageToc(docPath);
       }
@@ -636,11 +637,11 @@
         this.afterRender(docPath)
         return
       }
-      const col = this.currentVol.col;
+      const col = this.currentVol?.col || null;
       const curFile = normPath(docPath).split('/').pop();
       const nodes = headings.map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id, file: curFile }));
       const colPath = this.currentVol?.colPath || '';
-      const parts = [colPath ? { text: col.label || 'Library', href: makeHref(colPath), expand: col.id } : { text: col?.label || 'Library', expand: col?.id }, { text: nodes[0]?.text || document.title }];
+      const parts = [colPath ? { text: col?.label || 'Library', href: makeHref(colPath), expand: col?.id } : { text: col?.label || 'Library', href: colPath ? sitePath(colPath) : '#', expand: col?.id }, { text: nodes[0]?.text || document.title }];
       this.navTree.innerHTML = this.renderBreadcrumb(parts) + this.renderTree(buildTree(nodes), 'page-toc', docPath) + '<div class="section-divider"><span>All works</span></div>' + this.buildLibmap();
       this.afterRender(docPath);
     }

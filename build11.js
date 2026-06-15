@@ -362,12 +362,7 @@ class LibraryIndex {
     const byDir = new Map();
     const serializableByDir = {};
     source.forEach((col, colIndex) => {
-      if (!col.basePath) {
-        this.addEntry(entries, byDir, serializableByDir, null, null, null, null);
-      }
-      else {
-        this.addEntry(entries, byDir, serializableByDir, col, null, col, colIndex);
-      }
+      this.addEntry(entries, byDir, serializableByDir, col, null, col, colIndex);
       (col.groups || []).forEach((group, groupIndex) => {
         this.addEntry(entries, byDir, serializableByDir, col, group, group, colIndex, groupIndex);
         (group.items || []).forEach((item, itemIndex) => this.addEntry(entries, byDir, serializableByDir, col, group, item, colIndex, groupIndex, itemIndex));
@@ -381,10 +376,10 @@ class LibraryIndex {
   }
 
   addEntry(entries, byDir, serializableByDir, col, group, item, colIndex, groupIndex = null, itemIndex = null) {
+    if (!item) return;
     const homePage = item?.homePage || 'index.html';
     const rawDir = String(item?.dir || '').trim();
     let entryPath = '', dir = '';
-
     if (rawDir && !/^https?:/i.test(rawDir)) {
       entryPath = homePage === 'index.html' ? rawDir : joinUrlPath(rawDir, homePage);
       dir = normPath(rawDir.replace(/^\/+/, ''));
@@ -400,10 +395,10 @@ class LibraryIndex {
       dir = cleanPath.replace(/\/[^/]+$/i, '');
     }
     if (!dir) return;
-
+    if (!(col.basePath && dir.startsWith(normPath(col.basePath.replace(/^\/+/, ''))))) return;
     const coord = itemIndex != null ? [colIndex, groupIndex, itemIndex] : groupIndex != null ? [colIndex, groupIndex] : [colIndex];
-    let entry = { col, group, item, path: entryPath, dir, colIndex, groupIndex, itemIndex };
     const key = dir.replace(/^\/+/, '').toLowerCase();
+    let entry = { col, group, item, path: entryPath, dir, colIndex, groupIndex, itemIndex };
     entries.push(entry);
     byDir.set(key, entry);
     serializableByDir[key] = coord;
