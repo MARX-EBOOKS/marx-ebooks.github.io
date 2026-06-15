@@ -2,7 +2,8 @@
   'use strict';
 
   const C = window.ReaderCore || {};
-  const { $, $$, onScrollFrame, hasSelection, scrollToEl, findCollection, normalizePath, samePathValue, startsWithPathValue, resolveLibraryPath } = C;
+  const { $, $$, onScrollFrame, hasSelection, scrollToEl } = C;
+  const navMenu = () => window.__NAV__?.menu || window.__NAV__ || null;
 
   class PageBarManager {
     constructor() {
@@ -382,18 +383,27 @@
     }
 
     currentDocPath() {
-      return window.ReaderState?.doc || (typeof state !== 'undefined' ? state.doc : '') || location.pathname;
+      const stateDoc = window.ReaderState?.doc || (typeof state !== 'undefined' ? state.doc : '');
+      if (stateDoc) return stateDoc;
+      const menu = navMenu();
+      if (menu?._volInfo) {
+        try { return menu._volInfo().path || location.pathname; } catch { }
+      }
+      const stripRoot = C.PathResolver?.stripRoot;
+      return typeof stripRoot === 'function' ? stripRoot(location.pathname) : location.pathname;
     }
 
     generateCitation(page) {
       const path = this.currentDocPath();
-      const cit = this.findCitation(path);
-      const format = cit?.pageParam || ((findCollection(path)?.id === 'mecw') ? 'p. ${page}' : 'S. ${page}');
+      const vol = this.detectVolume(path);
+      const cit = this.findCitation(path, vol);
+      const col = vol?.col || null;
+      const format = cit?.pageParam || (col?.id === 'mecw' ? 'p. ${page}' : 'S. ${page}');
       const pageText = this.formatCitationPage(page, format);
       if (cit && (cit.prefix || cit.title || cit.year || cit.volume || cit.publisher)) {
         return [cit.prefix, cit.title, cit.volume, cit.publisher, cit.year].filter(Boolean).join(', ') + ', ' + pageText;
       }
-      const id = findCollection(path)?.id || '';
+      const id = col?.id || '';
       if (id === 'mew') return 'MEW, ' + pageText;
       if (id === 'mega') return 'MEGA, ' + pageText;
       if (id === 'mecw') return 'MECW, ' + pageText;
@@ -406,21 +416,26 @@
       return /(^|,\s)(S|p)\.\s/i.test(value) ? value : pattern.replace('${page}', value);
     }
 
-    findCitation(path) {
-      const norm = normalizePath(path);
-      const dir = norm.replace(/\/[^/]+$/, '');
-      for (const col of window.LIBRARY_CONFIG || []) {
-        for (const group of col.groups || []) {
-          for (const item of group.items || []) {
-            const itemPath = normalizePath(resolveLibraryPath?.(col, group, item));
-            const itemDir = itemPath.replace(/\/[^/]+$/, '');
-            if (samePathValue(norm, itemPath) || samePathValue(dir, itemDir) || startsWithPathValue(norm, itemDir)) {
-              return { ...(col.citation || {}), ...(group.citation || {}), ...(item.citation || {}), volume: item.volume || group.volume || col.volume || null };
-            }
-          }
-        }
+    findCitation(path, vol = this.detectVolume(path)) {
+      if (!vol) return null;
+      return {
+        ...(vol.col?.citation || {}),
+        ...(vol.group?.citation || {}),
+        ...(vol.item?.citation || {}),
+        volume: vol.item?.volume || vol.group?.volume || vol.col?.volume || null
+      };
+    }
+
+    detectVolume(path = this.currentDocPath()) {
+      const menu = navMenu();
+      if (menu?.currentVol) return menu.currentVol;
+      if (menu?.detectVolume) {
+        try { return menu.detectVolume(path, false) || null; } catch { }
       }
-      return findCollection(path)?.citation || null;
+      if (typeof C.detectVolume === 'function') {
+        try { return C.detectVolume(path) || null; } catch { }
+      }
+      return null;
     }
 
     shouldIgnoreTarget(target) {

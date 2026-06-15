@@ -497,7 +497,7 @@
       this.startTrack(); 
       this.scrollToPendingAnchor(); 
       this.initFade();
-      if (window.__PAGE_BAR__?.currentPage != null) window.__PAGE_BAR__._updateBadge(window.__PAGE_BAR__.currentPage);
+      if (window.__PAGE_BAR__?.currentPage != null) window.__PAGE_BAR__.updateBadge(window.__PAGE_BAR__.currentPage);
     }
 
     /* 事件绑定 */
