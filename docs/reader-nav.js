@@ -106,15 +106,8 @@
   const normPath = v => PathUtils.normalizePath(v);
   const normDoc = v => PathUtils.normalizeDoc(v);
   const sameDoc = (a, b) => PathUtils.sameDoc(a, b);
-  const makeHref = (dp, h) => PathResolver.makeSpa(dp, h);
+  const makeHref = (dp, h) => PathResolver.makeHref(dp, h);
   const resolveDocHref = (h, b) => PathResolver.resolve(b || '', h);
-  const libraryIndexKey = dir => normPath(String(dir || '').replace(/^\/+/, '')).toLowerCase();
-  const parentDir = dir => String(dir || '').replace(/\/[^/]+$/, '');
-  const startLookupDir = value => {
-    const clean = normPath(String(value || '').replace(/[?#].*$/, '').replace(/^\/+/, ''));
-    if (!clean) return '';
-    return /\.[^/]+$/.test(clean.split('/').pop() || '') ? clean.replace(/\/[^/]+$/, '') : clean;
-  };
   const resolveLibraryPath = (col, group, item) => {
     if (!libmapBase) {
       const src = Array.from(document.scripts || []).map(s => s.src).find(v => v.split(/[?#]/)[0].endsWith('/libmap.js'));
@@ -181,7 +174,7 @@
           entry.col = null;
         };
         entries.push(entry);
-        const key = libraryIndexKey(resolved.dir);
+        const key = resolved.dir.replace(/^\/+/, '').toLowerCase();
         const previous = byDir.get(key);
         if (!previous || rank(entry) > rank(previous)) byDir.set(key, entry);
       };
@@ -199,18 +192,19 @@
     }
 
     detectVolume(docPath, findcol = false) {
-      let dir = startLookupDir(docPath);
+      let dir = normPath(String(docPath || '').replace(/[?#].*$/, '').replace(/^\/+/, ''));
+      dir = /\.[^/]+$/.test(dir.split('/').pop() || '') ? dir.replace(/\/[^/]+$/, '') : dir;
       if (!dir) return null;
       this.ensure();
       let best = null;
       for (;;) {
-        const entry = this.byDir.get(libraryIndexKey(dir));
+        const entry = this.byDir.get(dir.replace(/^\/+/, '').toLowerCase());
         if (entry) {
           if (findcol && entry.col && entry.col.basePath) return entry.col;
           best = entry;
           break;
         }
-        const next = parentDir(dir);
+        const next = dir.replace(/\/[^/]+$/, '');
         if (!next || next === dir) break;
         dir = next;
       }
@@ -268,7 +262,7 @@
       return result + (parts.hash ? '#' + parts.hash : '');
     },
 
-    makeSpa(path, hash = '') {
+    makeHref(path, hash = '') {
       const p = this.split(this.doc(path));
       const h = hash || p.hash;
       let spaPath = location.pathname + '?doc=' + this.path('', p.path) + (h ? '#' + h : '');
@@ -288,7 +282,7 @@
       const h = this.split(p).hash;
       return {
         type: 'doc',
-        href: this.makeSpa(p),
+        href: this.makeHref(p),
         docPath: this.split(p).path,
         hash: h,
       };
@@ -606,7 +600,7 @@
       this.currentVol.data = data;
       const { col, item, colPath, path } = this.currentVol, tree = buildTree(data.headings || []);
       let parts = [colPath ? { text: col.label, href: makeHref(colPath), expand: col.id } : { text: col.label, expand: col.id }];
-      if (item && item !== col) parts.push({ text: item.label || (data?.title) || 'Contents', href: makeHref(path || (this.currentVol?.dir + '/index.html')) });
+      if (item && item !== col) parts.push({ text: item.label || (data?.title) || 'Contents', href: makeHref(path + '/')});
       parts.push({ id: 'page-breadcrumb-link', isPageBadge: window.__PAGE_BAR__?.hasPageAnchors });
       this.navTree.innerHTML = this.renderBreadcrumb(parts) + (tree.length ? this.renderTree(tree, 'epub-toc', docPath) : '') + '<div class="section-divider"><span>All works</span></div>' + this.buildLibmap();
       this.afterRender(docPath);

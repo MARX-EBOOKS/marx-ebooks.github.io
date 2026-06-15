@@ -375,7 +375,8 @@ class ReaderApp {
             const html = await res.text();
             const hash = rawPath.includes('#') ? rawPath.split('#')[1] : '';
             const actualUrl = loaded.url || loaded.path || docPath;
-            history.replaceState(history.state || {}, '', PathResolver.makeSpa(docPath,hash));
+            if (!/\/$/i.test(docPath) && (/\/$/i.test(actualUrl))) docPath = docPath.replace(/\/([^/]+\.[^/]+|index)$/ , '') + '/';
+            history.replaceState(history.state || {}, '', PathResolver.makeHref(docPath,hash));
             await this.renderDoc(html, hash ? docPath+'#'+hash : docPath, actualUrl);
             this.revealLoadedContent();
         } catch (error) {
@@ -539,7 +540,7 @@ class ReaderApp {
             const hit = detectVolume(sub);
             const final = (currentVolPath && !(subDir === currentVolPath) && hit) ? resolveLibraryPath(hit.col, hit.group, hit.item).replace(/[?#].*$/, '') : (sub + '/');
             if (parts.length) parts.push('<span class="crumb-sep">/</span>');
-            parts.push(`<a class="crumb" href="${esc(PathResolver.makeSpa(final))}">${esc(pieces[i])}</a>`);
+            parts.push(`<a class="crumb" href="${esc(PathResolver.makeHref(final))}">${esc(pieces[i])}</a>`);
         }
         if (pieces.length) {
             if (parts.length) parts.push('<span class="crumb-sep">/</span>');
@@ -631,7 +632,7 @@ class ReaderApp {
         btn.onclick = e => {
             e.preventDefault();
             const normalized = this.normalizeDocPath(path);
-            history.pushState({}, '', PathResolver.makeSpa(normalized));
+            history.pushState({}, '', PathResolver.makeHref(normalized));
             this.loadDoc(normalized);
         };
     }
