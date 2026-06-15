@@ -537,7 +537,7 @@ class ReaderApp {
             // 目录层级面包屑：中间层级链接到对应目录
             const subDir = C.normalizePath(sub);
             const hit = detectVolume(sub);
-            const final = (currentVolPath && subDir === currentVolPath) ? (sub + '/') : (hit ? resolveLibraryPath(hit.col, hit.group, hit.item).replace(/[?#].*$/, '') : '');
+            const final = (currentVolPath && !(subDir === currentVolPath) && hit) ? resolveLibraryPath(hit.col, hit.group, hit.item).replace(/[?#].*$/, '') : (sub + '/');
             if (parts.length) parts.push('<span class="crumb-sep">/</span>');
             parts.push(`<a class="crumb" href="${esc(PathResolver.makeSpa(final))}">${esc(pieces[i])}</a>`);
         }

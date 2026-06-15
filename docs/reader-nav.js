@@ -95,34 +95,6 @@
       return i >= 0 ? { path: raw.slice(0, i), hash: raw.slice(i + 1) } : { path: raw, hash: '' };
     },
     isSpecial(raw) { return this.specRe.test(String(raw || '')) || /^[a-z][a-z0-9+.-]*:/i.test(String(raw || '')); },
-    libmapPath(path) {
-      const raw = String(path || '').trim();
-      if (!raw || raw.startsWith('?') || this.isSpecial(raw) || /^(?:https?:)?\/\//i.test(raw)) return raw;
-      if (raw.startsWith('/')) return raw;
-      try {
-        if (!libmapBase) {
-          const src = Array.from(document.scripts || []).map(s => s.src).find(v => v.split(/[?#]/)[0].endsWith('/libmap.js'));
-          libmapBase = new URL('.', src || location.href).href;
-        }
-        const url = new URL(raw, libmapBase);
-        return url.pathname + url.search + url.hash;
-      } catch {
-        return this.rootPath(raw);
-      }
-    },
-    joinLibmapPath(base, rel, homePage) {
-      const b = this.libmapPath(base || '/');
-      const isIndex = !homePage || homePage === 'index.html';
-      const tail = isIndex
-        ? String(rel || '').replace(/\/?$/, '/')
-        : [rel, homePage].filter(v => v != null && String(v) !== '').join('/');
-      try {
-        const url = new URL(tail || '.', location.origin + (String(b || '/').replace(/\/?$/, '/')));
-        return url.pathname + url.search + url.hash;
-      } catch {
-        return isIndex ? joinUrlPath(b, rel) + '/' : joinUrlPath(b, rel, homePage);
-      }
-    },
     rootPath(path) {
       const raw = String(path || '').trim();
       if (!raw || raw.startsWith('/') || raw.startsWith('?') || this.isSpecial(raw)) return raw;
@@ -143,28 +115,39 @@
     if (!clean) return '';
     return /\.[^/]+$/.test(clean.split('/').pop() || '') ? clean.replace(/\/[^/]+$/, '') : clean;
   };
-  const joinUrlPath = (...parts) => {
-    const raw = parts.filter(v => v != null && String(v) !== '').join('/');
-    return raw.replace(/([^:]\/)\/+/g, '$1').replace(/\/+$/, '');
-  };
   const resolveLibraryPath = (col, group, item) => {
+    if (!libmapBase) {
+      const src = Array.from(document.scripts || []).map(s => s.src).find(v => v.split(/[?#]/)[0].endsWith('/libmap.js'));
+      libmapBase = PathResolver.dir(src || location.href) || '/';
+    }
     const raw = String(item?.path || '').trim();
-    if (raw) return PathUtils.libmapPath(raw);
-    const base = PathUtils.libmapPath(item?.basePath || group?.basePath || col?.basePath || '');
+    if (raw) return raw.startsWith('?') || PathUtils.isSpecial(raw) || /^(?:https?:)?\/\//i.test(raw) || raw.startsWith('/') ? raw : PathResolver.path(libmapBase, raw);
+    [group, col].forEach(target => {
+      if (target && 'basePath' in target) {
+        const basePath = String(target.basePath || '').trim();
+        target.basePath = !basePath || basePath.startsWith('?') || PathUtils.isSpecial(basePath) || /^(?:https?:)?\/\//i.test(basePath) || basePath.startsWith('/') ? basePath : PathResolver.path(libmapBase, basePath);
+      }
+    });
+    const base = item?.basePath || group?.basePath || col?.basePath || '';
     const dir = String(item?.dir || '').trim();
     const homePage = item?.homePage || item?.homeName || 'index.html';
     const id = item?.id;
+    const isIndex = !homePage || homePage === 'index.html';
     const relDir = item?.reldir != null
       ? String(item.reldir).trim()
       : (typeof id === 'number' || (typeof id === 'string' && /^\d+$/.test(id)) ? String(id) : '');
-    if (base && relDir) return PathUtils.joinLibmapPath(base, relDir, homePage);
+    const rel = relDir || id;
+    const tail = isIndex ? String(rel ?? '').replace(/\/?$/, '/') : [rel, homePage].filter(v => v != null && String(v) !== '').join('/');
+    if (base && relDir) {
+      return PathResolver.path(String(base).replace(/\/?$/, '/'), tail || '.');
+    }
     if (dir) {
-      const resolvedDir = PathUtils.libmapPath(dir);
-      return homePage === 'index.html' ? resolvedDir : joinUrlPath(resolvedDir, homePage);
+      const resolvedDir = dir.startsWith('?') || PathUtils.isSpecial(dir) || /^(?:https?:)?\/\//i.test(dir) || dir.startsWith('/') ? dir : PathResolver.path(libmapBase, dir);
+      return homePage === 'index.html' ? resolvedDir : PathResolver.path(String(resolvedDir || '/').replace(/\/?$/, '/'), homePage);
     }
     if (id == null || id === '') return '';
     if (!base) return raw;
-    return PathUtils.joinLibmapPath(base, id, homePage);
+    return PathResolver.path(String(base).replace(/\/?$/, '/'), tail || '.');
   };
   const resolveLibraryEntry = (col, group, item) => {
     const raw = resolveLibraryPath(col, group, item);
@@ -191,7 +174,7 @@
       const add = (col, group, item, kind) => {
         const resolved = resolveLibraryEntry(col, group, item);
         if (!resolved) return;
-        if (!(col.basePath && resolved.dir.startsWith(normPath(col.basePath.replace(/^\/+/, ''))))) return;
+        if (!(col.basePath && resolved.dir.startsWith(normPath(col.basePath)))) return;
         let entry = { col, group, item, path: resolved.path, dir: resolved.dir, colPath: col ? resolveLibraryPath(col, null, col) : '', kind };
         if (entry.col && !entry.col.basePath) { 
           if (entry.col === entry.item) entry.item = null;
@@ -470,7 +453,7 @@
         this.mode = 'epub';
         this.renderEpub(docPath);
       }
-      else if (innerWidth < 997 && getHeadings($('#content')).length > 1 && !(/\/(?:index|nav)\.x?html?$/i.test(docPath)) && currentDoc()) {
+      else if (innerWidth < 997 && getHeadings($('#content')).length > 1 && !(/\/(?:index\.x?html?|nav\.x?html?)?$/i.test(docPath)) && currentDoc()) {
         this.mode = 'page-toc';
         this.renderPageToc(docPath);
       }

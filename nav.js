@@ -32,13 +32,6 @@
   const normPath = v => String(v || '').replace(/^https?:\/\/[^/]+/i, '').replace(/[?#].*$/, '').replace(/^\/+/, '').replace(/\/+$/, '');
   const normDoc = v => normPath(v).replace(/\.x?html?$/i, '');
   const resolveUrl = h => { try { return new URL(h, location.href).href; } catch { return h; } };
-  const libraryIndexKey = dir => normPath(String(dir || '').replace(/^\/+/, '')).toLowerCase();
-  const parentDir = dir => String(dir || '').replace(/\/[^/]+$/, '');
-  const startLookupDir = value => {
-    const clean = normPath(String(value || '').replace(/[?#].*$/, '').replace(/^\/+/, ''));
-    if (!clean) return '';
-    return /\.[^/]+$/.test(clean.split('/').pop() || '') ? clean.replace(/\/[^/]+$/, '') : clean;
-  };
 
   /* SSG 链接生成 */
   const PathResolver = {
@@ -208,42 +201,37 @@
   };
   Object.assign(window, { ReaderCore, $, $$, esc, syncFill, onScrollFrame });
 
-  const joinUrlPath = (...parts) => {
-    const raw = parts.filter(v => v != null && String(v) !== '').join('/');
-    return raw.replace(/([^:]\/)\/+/g, '$1').replace(/\/+$/, '');
-  };
   const resolveLibraryPath = (col, group, item) => {
     const raw = String(item?.path || '').trim();
     if (raw) return raw;
     const dir = String(item?.dir || '').trim();
     const homePage = item?.homePage || 'index.html';
-    if (dir) return homePage === 'index.html' ? dir : joinUrlPath(dir, homePage);
+    if (dir) return homePage === 'index.html' ? dir : PathResolver.logical(dir.replace(/\/?$/, '/'), homePage);
     const id = item?.id;
     if (id == null || id === '') return '';
     const base = group?.basePath || col?.basePath || '';
     if (!base) return raw;
-    return joinUrlPath(base, id, homePage);
+    return PathResolver.logical(PathResolver.logical(String(base).replace(/\/?$/, '/'), String(id).replace(/\/?$/, '/')), homePage);
   };
   Object.assign(ReaderCore, { resolveLibraryPath });
 
   const detectVolume = (path, findcol = false) => {
-    let dir = startLookupDir(path);
+    let dir = normPath(String(path || '').replace(/[?#].*$/, '').replace(/^\/+/, ''));
+    dir = /\.[^/]+$/.test(dir.split('/').pop() || '') ? dir.replace(/\/[^/]+$/, '') : dir;
     if (!dir) return null;
     const source = window.LIBRARY_CONFIG || [];
     const indexed = window.LIBRARY_INDEX?.byDir;
     if (!indexed) return null;
     let best = null;
     for (;;) {
-      const coord = indexed[libraryIndexKey(dir)];
+      const coord = indexed[dir.replace(/^\/+/, '').toLowerCase()];
       if (coord) {
         const [colIndex, groupIndex, itemIndex] = Array.isArray(coord) ? coord : [];
         let col = source[colIndex] || null;
         const group = col?.groups?.[groupIndex] || null;
         const item = itemIndex == null ? (group || col) : (group?.items?.[itemIndex] || null);
-        const entry = col && item ? {
-          col, group, item, dir,
-          path: resolveLibraryPath(col, group, item),
-          colPath: resolveLibraryPath(col, null, col)
+        const entry = col && item ? { 
+          col, group, item, dir, path: resolveLibraryPath(col, group, item), colPath: resolveLibraryPath(col, null, col)
         } : null;
         if (findcol && entry?.col) return entry.col;
         if (entry) {
@@ -251,7 +239,7 @@
           break;
         }
       }
-      const next = parentDir(dir);
+      const next = dir.replace(/\/[^/]+$/, '');
       if (!next || next === dir) break;
       dir = next;
     }
