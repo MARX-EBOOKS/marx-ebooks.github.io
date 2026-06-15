@@ -166,7 +166,6 @@
     if (!base) return raw;
     return PathUtils.joinLibmapPath(base, id, homePage);
   };
-  const itemLabel = item => item?.label || item?.title || String(item?.id ?? '');
   const resolveLibraryEntry = (col, group, item) => {
     const raw = resolveLibraryPath(col, group, item);
     if (!raw || /^https?:/i.test(raw) || PathUtils.isSpecial(raw)) return null;
@@ -192,7 +191,7 @@
       const add = (col, group, item, kind) => {
         const resolved = resolveLibraryEntry(col, group, item);
         if (!resolved) return;
-        let entry = { col, group, item, dir: resolved.dir, kind };
+        let entry = { col, group, item, path: resolved.path, dir: resolved.dir, colPath: col ? resolveLibraryPath(col, null, col) : '', kind };
         if (entry.col && !entry.col.basePath) { 
           if (entry.col === entry.item) entry.item = null;
           entry.col = null;
@@ -611,16 +610,6 @@
       return { path, dir: v?.dir || '', file, isVol };
     }
 
-    /* 面包屑 parts 构建 */
-    _breadcrumbParts(col, item, data, extra) {
-      const colPath = resolveLibraryPath(col, null, col);
-      const parts = [colPath ? { text: col.label, href: makeHref(colPath), expand: col.id } : { text: col.label, expand: col.id }];
-      if (item && item !== col) parts.push({ text: itemLabel(item) || (data?.title) || 'Contents', href: makeHref(resolveLibraryPath(col, this.currentVol?.group, item) || (this.currentVol?.dir + '/index.html')) });
-      if (extra) parts.push(extra);
-      parts.push({ id: 'page-breadcrumb-link', isPageBadge: window.__PAGE_BAR__?.hasPageAnchors });
-      return parts;
-    }
-
     /* 渲染入口 */
     async renderEpub(docPath) {
       const dir = this.currentVol?.dir || '', data = await VolDataStore.fetchVolume(dir, this.currentVol?.item?.label || dir);
@@ -631,7 +620,10 @@
         this.afterRender(docPath); return;
       }
       this.currentVol.data = data;
-      const { col, item } = this.currentVol, tree = buildTree(data.headings || []), parts = this._breadcrumbParts(col, item, data);
+      const { col, item, colPath, path } = this.currentVol, tree = buildTree(data.headings || []);
+      let parts = [colPath ? { text: col.label, href: makeHref(colPath), expand: col.id } : { text: col.label, expand: col.id }];
+      if (item && item !== col) parts.push({ text: item.label || (data?.title) || 'Contents', href: makeHref(path || (this.currentVol?.dir + '/index.html')) });
+      parts.push({ id: 'page-breadcrumb-link', isPageBadge: window.__PAGE_BAR__?.hasPageAnchors });
       this.navTree.innerHTML = this.renderBreadcrumb(parts) + (tree.length ? this.renderTree(tree, 'epub-toc', docPath) : '') + '<div class="section-divider"><span>All works</span></div>' + this.buildLibmap();
       this.afterRender(docPath);
     }
@@ -647,7 +639,7 @@
       const col = this.currentVol.col;
       const curFile = normPath(docPath).split('/').pop();
       const nodes = headings.map(h => ({ level: Number(h.tagName[1]) || 2, text: h.textContent.trim(), id: h.id, file: curFile }));
-      const colPath = resolveLibraryPath(col, null, col);
+      const colPath = this.currentVol?.colPath || '';
       const parts = [colPath ? { text: col.label || 'Library', href: makeHref(colPath), expand: col.id } : { text: col?.label || 'Library', expand: col?.id }, { text: nodes[0]?.text || document.title }];
       this.navTree.innerHTML = this.renderBreadcrumb(parts) + this.renderTree(buildTree(nodes), 'page-toc', docPath) + '<div class="section-divider"><span>All works</span></div>' + this.buildLibmap();
       this.afterRender(docPath);
@@ -715,7 +707,7 @@
       const label = esc(group.label || ''), items = group.items || [], groupPath = resolveLibraryPath(null, null, group), gp = normPath(groupPath);
       if (!items.length) return groupPath ? `<li class="sidebar-item">${this._renderLink({ path: groupPath, text: group.label || '' })}</li>` : `<li class="sidebar-item"><span class="sidebar-category-label">${label}</span></li>`;
       const head = groupPath ? this._renderLink({ path: groupPath, text: group.label || '' }) : `<span class="sidebar-category-label">${label}</span>`;
-      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-group-path="${esc(gp)}" data-collapsed="true"><div class="sidebar-item-row">${head}<button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(item => `<li class="sidebar-item">${this._renderLink({ path: resolveLibraryPath(col, group, item), text: itemLabel(item) })}</li>`).join('')}</ul></li>`;
+      return `<li class="sidebar-item sidebar-item--category sidebar-item--collapsible" data-group-path="${esc(gp)}" data-collapsed="true"><div class="sidebar-item-row">${head}<button class="sidebar-caret" type="button" aria-label="Expand section" tabindex="0">\u25b8</button></div><ul class="sidebar-menu sidebar-menu--nested">${items.map(item => `<li class="sidebar-item">${this._renderLink({ path: resolveLibraryPath(col, group, item), text: item.label })}</li>`).join('')}</ul></li>`;
     }
 
     /* TOC */

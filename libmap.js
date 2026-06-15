@@ -344,13 +344,13 @@ window.LIBRARY_CONFIG = [
           { id: 6, label: "第6卷: 《资本论》第二卷", volume: "第6卷", dir: "/docs/MEA/6/" },
           { id: 7, label: "第7卷: 《资本论》第三卷", volume: "第7卷", dir: "/docs/MEA/7/" },
           { id: 8, label: "第8卷: 《资本论》手稿选编", volume: "第8卷", dir: "/docs/MEA/8/" },
-          { id: 30, label: "马恩全集第二版第30卷 （1857-1858手稿上半部分）", volume: "第30卷", dir: "/docs/MEA/30/" }
+          { id: 30, kind: "book", label: "马恩全集第二版第30卷 （1857-1858手稿上半部分）", volume: "全集第30卷", reldir: "30", dir: "/docs/MEA/30/" }
         ]
       },
       {
         label: "其他（9、10卷）",
         items: [
-          { id: 26, label: "马恩全集第二版第26卷 （反杜林论、自然辩证法）", volume: "第9卷", dir: "/docs/MEA/26/" },
+          { id: 26, label: "马恩全集第二版第26卷 （反杜林论、自然辩证法）", volume: "全集第26卷", dir: "/docs/MEA/26/" },
           { id: 10, label: "第10卷: 书信选编", volume: "第10卷", dir: "/docs/MEA/10/" }
         ]
       }
@@ -411,20 +411,20 @@ window.LIBRARY_CONFIG = [
       {
         label: "Том 30–45",
         items: [
-          { id: 30, label: "Том 30: Июль 1916 - февраль 1917", volume: "Том 30", dir: "/ru/VIL-FB2/30/" },
-          { id: 31, label: "Том 31: Март - апрель 1917", volume: "Том 31", dir: "/ru/VIL-FB2/31/" },
-          { id: 32, label: "Том 32: Май - июль 1917", volume: "Том 32", dir: "/ru/VIL-FB2/32/" },
-          { id: 33, label: "Том 33: ГОСУДАРСТВО И РЕВОЛЮЦИЯ（国家与革命）", volume: "Том 33", dir: "/ru/VIL-FB2/33/" },
-          { id: 34, label: "Том 34: Июль - октябрь 1917", volume: "Том 34", dir: "/ru/VIL-FB2/34/" },
-          { id: 35, label: "Том 35: Октябрь 1917~ март 1918", volume: "Том 35", dir: "/ru/VIL-FB2/35/" },
-          { id: 36, label: "Том 36: Март - июль 1918", volume: "Том 36", dir: "/ru/VIL-FB2/36/" },
-          { id: 37, label: "Том 37: Июль 1918-март 1919", volume: "Том 37", dir: "/ru/VIL-FB2/37/" },
-          { id: 38, label: "Том 38: Март - июнь 1919", volume: "Том 38", dir: "/ru/VIL-FB2/38/" },
-          { id: 39, label: "Том 39: Июнь - декабрь 1919", volume: "Том 39", dir: "/ru/VIL-FB2/39/" },
-          { id: 40, label: "Том 40: Декабрь 1919 - апрель 1920", volume: "Том 40", dir: "/ru/VIL-FB2/40/" },
-          { id: 41, label: "Том 41: Май - ноябрь 1920", volume: "Том 41", dir: "/ru/VIL-FB2/41/" },
-          { id: 42, label: "Том 42: Ноябрь 1920 - март 1921", volume: "Том 42", dir: "/ru/VIL-FB2/42/" },
-          { id: 43, label: "Том 43: Март - июнь 1921", volume: "Том 43", reldir: "VIL-UAIO/43", dir: "/ru/VIL-UAIO/43/" },
+          { id: 30, label: "Том 30: Июль 1916 - февраль 1917", volume: "Том 30", reldir: "VIL-FB2/30/", dir: "/ru/VIL-FB2/30/" },
+          { id: 31, label: "Том 31: Март - апрель 1917", volume: "Том 31", reldir: "VIL-FB2/31/", dir: "/ru/VIL-FB2/31/" },
+          { id: 32, label: "Том 32: Май - июль 1917", volume: "Том 32", reldir: "VIL-FB2/32/", dir: "/ru/VIL-FB2/32/" },
+          { id: 33, label: "Том 33: ГОСУДАРСТВО И РЕВОЛЮЦИЯ（国家与革命）", volume: "Том 33", reldir: "VIL-FB2/33/", dir: "/ru/VIL-FB2/33/" },
+          { id: 34, label: "Том 34: Июль - октябрь 1917", volume: "Том 34", reldir: "VIL-FB2/34/", dir: "/ru/VIL-FB2/34/" },
+          { id: 35, label: "Том 35: Октябрь 1917~ март 1918", volume: "Том 35", reldir: "VIL-FB2/35/", dir: "/ru/VIL-FB2/35/" },
+          { id: 36, label: "Том 36: Март - июль 1918", volume: "Том 36", reldir: "VIL-FB2/36/", dir: "/ru/VIL-FB2/36/" },
+          { id: 37, label: "Том 37: Июль 1918-март 1919", volume: "Том 37", reldir: "VIL-FB2/37/", dir: "/ru/VIL-FB2/37/" },
+          { id: 38, label: "Том 38: Март - июнь 1919", volume: "Том 38", reldir: "VIL-FB2/38/", dir: "/ru/VIL-FB2/38/" },
+          { id: 39, label: "Том 39: Июнь - декабрь 1919", volume: "Том 39", reldir: "VIL-FB2/39/", dir: "/ru/VIL-FB2/39/" },
+          { id: 40, label: "Том 40: Декабрь 1919 - апрель 1920", volume: "Том 40", reldir: "VIL-FB2/40/", dir: "/ru/VIL-FB2/40/" },
+          { id: 41, label: "Том 41: Май - ноябрь 1920", volume: "Том 41", reldir: "VIL-FB2/41/", dir: "/ru/VIL-FB2/41/" },
+          { id: 42, label: "Том 42: Ноябрь 1920 - март 1921", volume: "Том 42", reldir: "VIL-FB2/42/", dir: "/ru/VIL-FB2/42/" },
+          { id: 43, label: "Том 43: Март - июнь 1921", volume: "Том 43", reldir: "VIL-UAIO/43", dir: "/ru/VIL-FB2/VIL-UAIO/43/" },
           { id: 44, label: "Том 44: Июнь 1921 - март 1922", volume: "Том 44", reldir: "VIL-UAIO/44", dir: "/ru/VIL-UAIO/44/" },
           { id: 45, label: "Том 45: Март 1922 - март 1923", volume: "Том 45", reldir: "VIL-UAIO/45", dir: "/ru/VIL-UAIO/45/" }
         ]

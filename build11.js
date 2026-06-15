@@ -17,7 +17,6 @@ const joinUrlPath = (...parts) => {
   const raw = parts.filter(v => v != null && String(v) !== '').join('/');
   return raw.replace(/([^:]\/)\/+/g, '$1').replace(/\/+$/, '');
 };
-const itemLabel = item => item?.volume || item?.label || item?.title || String(item?.id ?? '');
 const isIndexHome = item => {
   const raw = String(item?.path || '').trim().replace(/[?#].*$/, '');
   if (raw) return /\/index\.x?html?$/i.test(raw);
@@ -445,7 +444,7 @@ class LibraryIndex {
       const rawHit = this.byDir.get(key);
       const hit = rawHit && (!context || rawHit.col === context.col) ? rawHit : null;
       const labelSource = hit?.item;
-      const label = currentLabel && i === parts.length - 1 ? currentLabel : (itemLabel(labelSource) || part);
+      const label = currentLabel && i === parts.length - 1 ? currentLabel : (labelSource?.volume || labelSource?.label || part);
 
       if (i === parts.length - 1) {
         crumbs.push(`<span class="crumb current">${esc(label)}</span>`);
@@ -537,7 +536,7 @@ class VolumeIndexBuilder {
     const outputJs = path.join(dist, entry.dir, 'index.js');
     const outputHtml = path.join(dist, entry.dir, 'index.html');
 
-    let files = [], title = itemLabel(entry.item), preNavHtml = '', lang = 'zh', headExtras = '';
+    let files = [], title = entry.item.label, preNavHtml = '', lang = 'zh', headExtras = '';
 
     const jsonPath = path.join(sourceDir, 'index.json');
     let jsonSuccess = false;
@@ -652,7 +651,7 @@ class PageRenderer {
       bestDir = hit.dir;
       const depth = dir.split('/').length - bestDir.split('/').length;
       bestJs = depth === 0 ? './index.js' : '../'.repeat(depth) + 'index.js';
-      bestLabel = itemLabel(hit.item) || null;
+      bestLabel = hit.item.label || null;
     }
 
     const info = { jsPath: bestJs, label: bestLabel || 'Contents', volDir: bestDir };
