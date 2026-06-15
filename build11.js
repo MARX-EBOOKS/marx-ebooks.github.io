@@ -362,10 +362,15 @@ class LibraryIndex {
     const byDir = new Map();
     const serializableByDir = {};
     source.forEach((col, colIndex) => {
-      this.addIndexEntry(entries, byDir, serializableByDir, col, null, col, colIndex);
+      if (!col.basePath) {
+        this.addEntry(entries, byDir, serializableByDir, null, null, null, null);
+      }
+      else {
+        this.addEntry(entries, byDir, serializableByDir, col, null, col, colIndex);
+      }
       (col.groups || []).forEach((group, groupIndex) => {
-        this.addIndexEntry(entries, byDir, serializableByDir, col, group, group, colIndex, groupIndex);
-        (group.items || []).forEach((item, itemIndex) => this.addIndexEntry(entries, byDir, serializableByDir, col, group, item, colIndex, groupIndex, itemIndex));
+        this.addEntry(entries, byDir, serializableByDir, col, group, group, colIndex, groupIndex);
+        (group.items || []).forEach((item, itemIndex) => this.addEntry(entries, byDir, serializableByDir, col, group, item, colIndex, groupIndex, itemIndex));
       });
     });
     this.indexedSource = source;
@@ -375,7 +380,7 @@ class LibraryIndex {
     return this.entries;
   }
 
-  addIndexEntry(entries, byDir, serializableByDir, col, group, item, colIndex, groupIndex = null, itemIndex = null) {
+  addEntry(entries, byDir, serializableByDir, col, group, item, colIndex, groupIndex = null, itemIndex = null) {
     const homePage = item?.homePage || 'index.html';
     const rawDir = String(item?.dir || '').trim();
     let entryPath = '', dir = '';
@@ -398,12 +403,6 @@ class LibraryIndex {
 
     const coord = itemIndex != null ? [colIndex, groupIndex, itemIndex] : groupIndex != null ? [colIndex, groupIndex] : [colIndex];
     let entry = { col, group, item, path: entryPath, dir, colIndex, groupIndex, itemIndex };
-    if (entry.col && !entry.col.basePath) {
-      if (entry.col===entry.item) {
-        entry.item = null;
-      }
-      entry.col = null;
-    };
     const key = dir.replace(/^\/+/, '').toLowerCase();
     entries.push(entry);
     byDir.set(key, entry);
