@@ -387,7 +387,16 @@
     expandSection(id) {
       const item = this.navTree.querySelector(`.sidebar-item[data-section="${cssEsc(id)}"]`); if (!item) return;
       if (item.getAttribute('data-collapsed') !== 'false') this.toggleItem(item);
-      requestAnimationFrame(() => item.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+      const scroller = this.navTree.closest('.sidebar-nav') || this.navTree;
+      requestAnimationFrame(() => this.scrollInside(scroller, item, 'smooth'));
+    }
+
+    scrollInside(container, el, behavior = 'auto') {
+      if (!container || !el) return;
+      const cr = container.getBoundingClientRect(), er = el.getBoundingClientRect();
+      const max = Math.max(0, container.scrollHeight - container.clientHeight);
+      const top = container.scrollTop + er.top - cr.top - (container.clientHeight - el.offsetHeight) / 2;
+      container.scrollTo({ top: Math.max(0, Math.min(max, top)), behavior });
     }
 
     /*  滚动 */
@@ -621,7 +630,8 @@
       const key = id || `${active.dataset.file || ''}#${active.dataset.id || ''}@${links.indexOf(active)}`;
       if (key === this.lastSyncedId) return;
       this.lastSyncedId = key;
-      requestAnimationFrame(() => active.scrollIntoView({ block: 'center', behavior: 'auto' }));
+      const scroller = this.navTree.closest('.sidebar-nav') || this.navTree;
+      requestAnimationFrame(() => this.scrollInside(scroller, active));
     }
     highlight() {
       if (this.mode === 'libmap') return;

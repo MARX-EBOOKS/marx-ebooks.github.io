@@ -214,6 +214,11 @@ class ReaderApp {
 
     normalizeDocPath(path) { return String(path || '').replace(/#.*$/, ''); }
 
+    updateDesktopToc(clear = false) {
+        $('#toc-desktop').style.display = innerWidth <= 997 ? 'none' : '';
+        if (clear) $('#toc-desktop-nav').innerHTML = '';
+    }
+
     applyTheme(theme) {
         document.documentElement.dataset.theme = theme;
         localStorage.theme = theme;
@@ -326,6 +331,7 @@ class ReaderApp {
         state.mob = innerWidth < 768;
         if (wasMobile !== state.mob) $('#mobile-menu')?.classList.remove('dropdown--open');
         this.applySidebar();
+        this.updateDesktopToc();
     }
 
     updateScrollState() {
@@ -389,8 +395,7 @@ class ReaderApp {
         this.popup.forceClose();
         $('#welcome-view').style.display = 'none';
         $('#article-view').style.display = 'block';
-        $('#toc-desktop').style.display = 'none';
-        $('#toc-desktop-nav').innerHTML = '';
+        this.updateDesktopToc(true);
         $('#content').style.display = 'none';
         $('#doc-footer').style.display = 'none';
         const skeleton = $('#doc-skeleton');
@@ -438,7 +443,7 @@ class ReaderApp {
         this.updatePrevNext(docPath);
         window.__PAGE_BAR__?.scanContent(content);
 
-        $('#toc-desktop').style.display = '';
+        this.updateDesktopToc();
     }
 
     async injectDocStyles(parsed, finalUrl) {
@@ -639,8 +644,7 @@ class ReaderApp {
 
     showError(path, message) {
         $('#doc-skeleton').style.display = 'none';
-        $('#toc-desktop').style.display = 'none';
-        $('#toc-desktop-nav').innerHTML = '';
+        this.updateDesktopToc(true);
         const content = $('#content');
         content.innerHTML = `<p style="color:var(--text-2);padding:40px 0;">Cannot load <code>${esc(path)}</code><br><small>${esc(message)}</small></p>`;
         content.style.display = 'block';
@@ -658,8 +662,7 @@ class ReaderApp {
         $('#doc-footer').style.display = 'none';
         $('#article-view').style.display = 'none';
         $('#welcome-view').style.display = 'block';
-        $('#toc-desktop').style.display = 'none';
-        $('#toc-desktop-nav').innerHTML = '';
+        this.updateDesktopToc(true);
         document.title = this.siteTitle;;
         state.doc = null;
         if (push) history.pushState({}, '', location.pathname);
@@ -694,7 +697,8 @@ class ReaderApp {
             $('#mobile-menu')?.classList.remove('dropdown--open');
             return;
         }
-        if (a.closest('#nav-tree') && innerWidth < 997) this.closeSidebar();
+        const navTreeLink = a.closest('#nav-tree');
+        if (navTreeLink && innerWidth < 997) this.closeSidebar();
         if (a.classList.contains('navbar__logo') || a.classList.contains('doc-sidebar__brand')) {
             event.preventDefault();
             this.showHome(true);
@@ -708,12 +712,13 @@ class ReaderApp {
             return;
         }
         const href = a.getAttribute('href') || '';
+        const resolved = resolveDocLink(href, state.doc || '');
+        if (event.defaultPrevented && (!navTreeLink || resolved?.type !== 'doc' || sameDoc(resolved.docPath, state.doc))) return;
         if (href.startsWith('#') && href.length > 1) {
             event.preventDefault();
             this.scrollToAnchor(href.slice(1), false);
             return;
         }
-        const resolved = resolveDocLink(href, state.doc || '');
         if (resolved?.type === 'doc') {
             event.preventDefault();
             if (sameDoc(resolved.docPath, state.doc)) {
