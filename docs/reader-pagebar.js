@@ -22,6 +22,11 @@
       this.noticeTimer = null;
       this.quietUntil = 0;
       this.bag = new C.EventBag();
+      this.lang =[
+          document.querySelector('div.prose#content')?.getAttribute('lang'),
+          document.body?.getAttribute('lang'),
+          document.documentElement?.getAttribute('lang')
+        ].find(Boolean)?.trim().toLowerCase() || '';
     }
 
     init() {}
@@ -233,7 +238,7 @@
       marker.setAttribute('role', 'button');
       marker.setAttribute('aria-live', 'polite');
       marker.tabIndex = 0;
-      marker.textContent = info.scope ? info.label : 'S. ' + info.label;
+      marker.textContent = this.formatCitationPage(info);
       marker.setAttribute('aria-label', marker.textContent + ' Quellenangabe kopieren');
       marker.dataset.page = info.citePage || info.label;
       marker.dataset.pageAnchorId = info.id || '';
@@ -302,7 +307,7 @@
         return;
       }
       const info = typeof pageInfo === 'object' ? pageInfo : { label: pageInfo, citePage: pageInfo };
-      link.textContent = info.scope ? info.label : 'S. ' + info.label;
+      link.textContent = this.formatCitationPage(info);
       link.style.display = '';
       link.dataset.page = info.citePage || info.label;
       if (info.id) link.dataset.pageAnchorId = info.id;
@@ -392,28 +397,35 @@
       const stripRoot = C.PathResolver?.stripRoot;
       return typeof stripRoot === 'function' ? stripRoot(location.pathname) : location.pathname;
     }
-
+      
     generateCitation(page) {
       const path = this.currentDocPath();
       const vol = this.detectVolume(path);
       const cit = this.findCitation(path, vol);
       const col = vol?.col || null;
-      const format = cit?.pageParam || (col?.id === 'mecw' ? 'p. ${page}' : 'S. ${page}');
-      const pageText = this.formatCitationPage(page, format);
+      const pageText = this.formatCitationPage(page, cit?.pageParam);
       if (cit && (cit.prefix || cit.title || cit.year || cit.volume || cit.publisher)) {
         return [cit.prefix, cit.title, cit.volume, cit.publisher, cit.year].filter(Boolean).join(', ') + ', ' + pageText;
       }
       const id = col?.id || '';
       if (id === 'mew') return 'MEW, ' + pageText;
+      if (id === 'mew-zh') return '《马克思恩格斯全集》, ' + pageText;
       if (id === 'mega') return 'MEGA, ' + pageText;
       if (id === 'mecw') return 'MECW, ' + pageText;
       if (id === 'hegel') return 'G.W.F.Hegel Werke, ' + pageText;
       return (id ? id.toUpperCase() + ', ' : '') + pageText;
     }
 
-    formatCitationPage(page, pattern) {
-      const value = String(page);
-      return /(^|,\s)(S|p)\.\s/i.test(value) ? value : pattern.replace('${page}', value);
+    formatCitationPage(pageInfo, pattern) {
+      const info = typeof pageInfo === 'object' ? pageInfo : null;
+      if (info?.scope) return info.label;
+      const value = String(info ? (info.label ?? info.page ?? '') : pageInfo);
+      const pagenumtext = pattern?.replace('${page}', value)
+        || (this.lang.startsWith('de') ? 'S. ' + value
+        : this.lang.startsWith('ru') ? 'стр. ' + value
+          : this.lang.startsWith('zh') ? '第' + value + '页'
+            : 'p. ' + value);
+      return /(^|,\s)((S|p)\.\s|стр\.\s)|第.+页/i.test(value) ? value : pagenumtext;
     }
 
     findCitation(path, vol = this.detectVolume(path)) {
