@@ -24,10 +24,21 @@ const isFootnoteLink = a => {
 };
 
 const injectContentLang = (parsed, content) => {
-    if (!content) return;
-    const lang = parsed?.documentElement?.getAttribute('lang')?.trim();
-    if (lang) content.setAttribute('lang', lang);
-    else content.removeAttribute('lang');
+    if (!content) return '';
+    const source = parsed?.body?.querySelector('div.prose#content') || parsed?.body || null;
+    const lang = [
+        parsed?.documentElement?.getAttribute('lang'),
+        parsed?.body?.getAttribute('lang'),
+        source?.getAttribute?.('lang')
+    ].find(v => String(v || '').trim())?.trim() || '';
+    if (lang) {
+        content.setAttribute('lang', lang);
+        return lang
+    }
+    else {
+        content.removeAttribute('lang');
+        return ''
+    }
 };
 
 /* ===== 脚注弹窗 ===== */
@@ -431,7 +442,7 @@ class ReaderApp {
         this.rewriteDocAssets(parsed, finalUrl);
         await this.injectDocStyles(parsed, finalUrl);
         const content = $('#content');
-        injectContentLang(parsed, content);
+        const lang = injectContentLang(parsed, content);
         content.innerHTML = (parsed.body.querySelector('div.prose#content') || parsed.body).innerHTML;
         this.prepareAnchors(content);
         state.doc = docPath;
@@ -441,7 +452,7 @@ class ReaderApp {
         this.updateBreadcrumb(docPath, title);
         this.fixOverflow(content);
         this.updatePrevNext(docPath);
-        window.__PAGE_BAR__?.scanContent(content);
+        window.__PAGE_BAR__?.scanContent(content, lang);
 
         this.updateDesktopToc();
     }

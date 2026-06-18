@@ -22,18 +22,15 @@
       this.noticeTimer = null;
       this.quietUntil = 0;
       this.bag = new C.EventBag();
-      this.lang =[
-          document.querySelector('div.prose#content')?.getAttribute('lang'),
-          document.body?.getAttribute('lang'),
-          document.documentElement?.getAttribute('lang')
-        ].find(Boolean)?.trim().toLowerCase() || '';
+      this.lang = this.detectContentLang();
     }
 
     init() {}
 
-    scanContent(container) {
+    scanContent(container, lang) {
       this.reset(false);
       this.content = container || null;
+      this.lang = this.detectContentLang(container, lang);
       if (!container) return;
       this.pageNumbers = $$('a[id^="S"]', container)
         .filter(anchor => !this.isFootnoteAsideElement(anchor))
@@ -48,6 +45,15 @@
         return;
       }
       this.setup();
+    }
+
+    detectContentLang(container = this.content, lang = null) {
+      return [
+        lang,
+        container?.getAttribute?.('lang'),
+        document.body?.getAttribute('lang'),
+        document.documentElement?.getAttribute('lang')
+      ].find(v => String(v || '').trim())?.trim().toLowerCase() || '';
     }
 
     reset(clearContent = true) {
@@ -420,10 +426,11 @@
       const info = typeof pageInfo === 'object' ? pageInfo : null;
       if (info?.scope) return info.label;
       const value = String(info ? (info.label ?? info.page ?? '') : pageInfo);
+      const lang = this.lang || '';
       const pagenumtext = pattern?.replace('${page}', value)
-        || (this.lang.startsWith('de') ? 'S. ' + value
-        : this.lang.startsWith('ru') ? 'стр. ' + value
-          : this.lang.startsWith('zh') ? '第' + value + '页'
+        || (lang.startsWith('de') ? 'S. ' + value
+        : lang.startsWith('ru') ? 'стр. ' + value
+          : lang.startsWith('zh') ? '第' + value + '页'
             : 'p. ' + value);
       return /(^|,\s)((S|p)\.\s|стр\.\s)|第.+页/i.test(value) ? value : pagenumtext;
     }
