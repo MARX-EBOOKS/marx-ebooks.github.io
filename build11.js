@@ -391,11 +391,11 @@ class LibraryIndex {
         if (id != null && id !== '' && base) entryPath = joinUrlPath(base, id, homePage);
       }
       if (!entryPath || /^https?:/i.test(entryPath)) return;
-      const cleanPath = normPath(entryPath.replace(/[?#].*$/, '').replace(/^\/+/, ''));
+      const cleanPath = normPath(entryPath.replace(/[?#].*$/, '').replace(/^\.?[.\/]+/, ''));
       dir = cleanPath.replace(/\/[^/]+$/i, '');
     }
     if (!dir) return;
-    if (!(col.basePath && dir.startsWith(normPath(col.basePath.replace(/^\/+/, ''))))) return;
+    if (!(col.basePath && dir.startsWith(normPath(col.basePath.replace(/^\.?[\/]+/, ''))))) return;
     const coord = itemIndex != null ? [colIndex, groupIndex, itemIndex] : groupIndex != null ? [colIndex, groupIndex] : [colIndex];
     const key = dir.replace(/^\/+/, '').toLowerCase();
     let entry = { col, group, item, path: entryPath, dir, colIndex, groupIndex, itemIndex };
