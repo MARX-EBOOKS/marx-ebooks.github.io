@@ -13,10 +13,6 @@
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const cssEsc = v => (window.CSS?.escape ? CSS.escape(String(v)) : String(v).replace(/["\\]/g, '\\$&'));
-  const hasSel = () => {
-    const s = document.getSelection();
-    return !!(s && !s.isCollapsed && s.rangeCount);
-  };
   const scrollToEl = (el, off, b = 'smooth') => {
     if (!el) return;
     const offset = off != null ? off : (document.querySelector('.navbar')?.offsetHeight || 80);
@@ -168,7 +164,6 @@
       return [visibleTop, Math.max(visibleTop, visibleBottom)];
     }
     track(force) {
-      if (hasSel()) return;
       const id = this.pick();
       if (force || id !== this.activeId) {
         this.activeId = id
@@ -196,7 +191,7 @@
   /* ReaderCore (unified 导出) */
   const ReaderCore = window.ReaderCore || {
     $, $$, esc, cssEsc, EventBag, HeadingTracker, PathResolver,
-    normalizePath: normPath, normalizeDoc: normDoc, resolveUrl, hasSelection: hasSel,
+    normalizePath: normPath, normalizeDoc: normDoc, resolveUrl,
     scrollToEl, syncFill, onScrollFrame, getDomHeadings: getHeadings, buildHeadingTree: buildTree, expandTo
   };
   Object.assign(window, { ReaderCore, $, $$, esc, syncFill, onScrollFrame });
@@ -623,7 +618,7 @@
       }
     }
     syncSidebar(id) {
-      if (innerWidth >= 997 || hasSel()) return;
+      if (innerWidth >= 997) return;
       if (!this.sidebar?.classList.contains('doc-sidebar--open')) return;
       const active = this.activeSidebarLink || $('.sidebar-link.sidebar-link--active', this.navTree); if (!active) return;
       const links = this.sidebarLinks();

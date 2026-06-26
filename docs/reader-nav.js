@@ -10,10 +10,6 @@
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const cssEsc = v => (window.CSS?.escape ? CSS.escape(String(v)) : String(v).replace(/["\\]/g, '\\$&'));
-  const hasSel = () => {
-    const s = document.getSelection();
-    return !!(s && !s.isCollapsed && s.rangeCount);
-  }
   const scrollToEl = (el, off, b = 'smooth') => {
     if (!el) return;
     const offset = off != null ? off : (document.querySelector('.navbar')?.offsetHeight || 80);
@@ -388,7 +384,6 @@
       return [visibleTop, Math.max(visibleTop, visibleBottom)];
     }
     track(force) {
-      if (hasSel()) return;
       const id = this.pick();
       if (force || id !== this.activeId) {
         this.activeId = id
@@ -793,7 +788,7 @@
     }
 
     syncSidebar(id) {
-      if (innerWidth >= 997 || hasSel()) return;
+      if (innerWidth >= 997) return;
       if (!this.sidebar?.classList.contains('doc-sidebar--open')) return;
       const active = this.activeSidebarLink || $('.sidebar-link.sidebar-link--active', this.navTree); if (!active) return;
       const links = this.sidebarLinks();
@@ -858,7 +853,7 @@
     $, $$, esc, cssEsc, EventBag, PathUtils, PathResolver, HeadingTracker,
     normalizePath: normPath, normalizeDoc: normDoc, sameDocValue: PathUtils.sameDoc.bind(PathUtils),
     samePathValue: PathUtils.samePath.bind(PathUtils), startsWithPathValue: PathUtils.startsWithPath.bind(PathUtils),
-    fetchReaderResource, hasSelection: hasSel, resolveUrl: PathUtils.resolveUrl.bind(PathUtils),
+    fetchReaderResource, resolveUrl: PathUtils.resolveUrl.bind(PathUtils),
     resolveDocHref, readerHref: makeHref, findCollection, resolveLibraryPath, resolveLibraryEntry,
     detectVolume, scrollToEl, syncFill, onScrollFrame,
     getDomHeadings: getHeadings, getActiveHeadingId: (headings, t = 200) => {
@@ -872,7 +867,7 @@
     ReaderCore: Core, $, $$, on: (t, e, h, o) => t && t.addEventListener(e, h, o || false),
     esc, syncFill: Core.syncFill, resolveUrl: Core.resolveUrl,
     fetchReaderResource, findCollection, detectVolume: Core.detectVolume, scrollToEl, getDomHeadings: getHeadings,
-    getActiveHeadingId: Core.getActiveHeadingId, hasActiveTextSelection: hasSel,
+    getActiveHeadingId: Core.getActiveHeadingId,
     buildHeadingTree: buildTree, expandTo, VolDataStore, onScrollFrame
   });
 

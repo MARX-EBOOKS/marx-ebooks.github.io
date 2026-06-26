@@ -2,7 +2,7 @@
   'use strict';
 
   const C = window.ReaderCore || {};
-  const { $, $$, onScrollFrame, hasSelection, scrollToEl } = C;
+  const { $, $$, onScrollFrame, scrollToEl } = C;
   const navMenu = () => window.__NAV__?.menu || window.__NAV__ || null;
 
   class PageBarManager {
@@ -97,9 +97,9 @@
     }
 
     parsePageAnchor(id) {
-      let match = String(id).match(/^S(\d+)$/);
+      let match = String(id).match(/^[Ss](\d+)$/);
       if (match) return { page: match[1], label: match[1], citePage: match[1] };
-      match = String(id).match(/^S(.+?)-p?(\d+)$/i);
+      match = String(id).match(/^[Ss](.+?)-p?(\d+)$/i);
       if (!match) return null;
       const scope = match[1].replace(/^[-_]+|[-_]+$/g, '');
       const page = match[2];
@@ -131,13 +131,13 @@
     }
 
     updateFromScroll() {
-      if (!this.ready || hasSelection()) return;
+      if (!this.ready) return;
       this.reveal({ rect: this.pointRect(Math.max(80, innerHeight * 0.42)), source: 'scroll' });
     }
 
     handleContentClick(e) {
       const target = e.target?.nodeType === 1 ? e.target : e.target?.parentElement;
-      if (!target || this.shouldIgnoreTarget(target) || hasSelection()) return;
+      if (!target || this.shouldIgnoreTarget(target)) return;
       this.reveal({ rect: this.pointRect(e.clientY), source: 'content-click', force: true, toggleAny: true, sticky: true });
     }
 
@@ -310,13 +310,20 @@
         link.style.display = 'none';
         delete link.dataset.page;
         delete link.dataset.pageAnchorId;
+        link.href = '#';
         return;
       }
       const info = typeof pageInfo === 'object' ? pageInfo : { label: pageInfo, citePage: pageInfo };
       link.textContent = this.formatCitationPage(info);
       link.style.display = '';
       link.dataset.page = info.citePage || info.label;
-      if (info.id) link.dataset.pageAnchorId = info.id;
+      if (info.id) {
+        link.dataset.pageAnchorId = info.id;
+        link.href = C.readerHref ? C.readerHref(this.currentDocPath(), info.id) : '#' + info.id;
+      } else {
+        delete link.dataset.pageAnchorId;
+        link.href = '#';
+      }
       this.bindCopy(link);
     }
 
