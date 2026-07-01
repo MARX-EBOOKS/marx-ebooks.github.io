@@ -6,7 +6,7 @@ BODY {margin-right:4%; margin-left:4%;max-width:100%; -webkit-hyphens: auto;-moz
 .fn table,blockquote table {font-size: 0.75em;margin:1em auto;line-height: 150%;}
 div.fnt {margin:1em 0;font-size:1.25rem;}
 aside.fn {margin:2em 0;}
-.fni {text-indent:0;}
+.fni,.ni {text-indent:0;}
 blockquote p,.fn p,blockquote .poem {line-height:150%;margin:0 auto;}
 h1,h2 {text-align:center;margin:1.5em 0;line-height:200%;}
 h3,h4,h5,h6 {text-align:center;margin:1em 0;line-height:200%;}

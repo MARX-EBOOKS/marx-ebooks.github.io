@@ -51,8 +51,7 @@ window.LIBRARY_CONFIG = [
           { id: 24, label: "Band 24: Das Kapital, Zweiter Band", volume: "Band 24", dir: "/docs/MEW-ZENO/24/", citation: { year: 1963 } },
           { id: 25, label: "Band 25: Das Kapital, Dritter Band", volume: "Band 25", dir: "/docs/MEW-ZENO/25/", citation: { year: 1964 } },
           { id: 40, label: "Band 40: Ökonomisch-philosophische Manuskripte aus dem Jahre 1844", volume: "Band 40", dir: "/docs/MEW-ZENO/40/", citation: { year: 1968 } },
-          { id: 42, label: "Band 42: Ökonomische Manuskripte, 1857/1858", volume: "Band 42", dir: "/docs/MEW-ZENO/42/", citation: { year: 1983 } },
-          { id: 50, kind: "book", label: "Band 50: Weitere Werke (Differenz der demokritischen und epikureischen Naturphilosophie, Betrachtung eines Jünglings bei der Wahl eines Berufes)", dir: "/docs/MEW-ZENO/50/" }
+          { id: 42, label: "Band 42: Ökonomische Manuskripte, 1857/1858", volume: "Band 42", dir: "/docs/MEW-ZENO/42/", citation: { year: 1983 } }
         ]
       }
     ]
