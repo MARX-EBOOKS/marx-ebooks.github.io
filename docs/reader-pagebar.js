@@ -16,8 +16,10 @@
       this.lastMarkerAt = 0;
       this.ready = false;
       this.scrollOff = null;
+      this.contentObserver = null;
       this.resizeFrame = 0;
       this.scrollFrame = 0;
+      this.measureSig = '';
       this.markerTimer = null;
       this.noticeTimer = null;
       this.quietUntil = 0;
@@ -36,7 +38,7 @@
         .filter(anchor => !this.isFootnoteAsideElement(anchor))
         .map(anchor => {
           const parsed = this.parsePageAnchor(anchor.id);
-          return parsed ? { id: anchor.id, el: anchor, ...parsed, top: 0 } : null;
+          return parsed ? { id: anchor.id, el: anchor, ...parsed, top: NaN } : null;
         })
         .filter(Boolean);
       this.hasPageAnchors = this.pageNumbers.length > 0;
@@ -60,11 +62,14 @@
       this.bag.clear();
       if (this.scrollOff) this.scrollOff();
       this.scrollOff = null;
+      if (this.contentObserver) this.contentObserver.disconnect();
+      this.contentObserver = null;
       if (this.resizeFrame) cancelAnimationFrame(this.resizeFrame);
       if (this.scrollFrame) cancelAnimationFrame(this.scrollFrame);
       clearTimeout(this.markerTimer);
       this.resizeFrame = 0;
       this.scrollFrame = 0;
+      this.measureSig = '';
       this.markerTimer = null;
       this.ready = false;
       this.pageNumbers = [];
@@ -89,11 +94,12 @@
       this.bag.on(document, 'selectionchange', () => this.handleSelectionChange());
       this.bag.on(window, 'resize', () => this.queueMeasure(), { passive: true });
       this.scrollOff = onScrollFrame(() => this.queueScrollUpdate());
-      setTimeout(() => {
-        this.measure();
-        this.ready = true;
-        this.queueScrollUpdate();
-      }, 350);
+      if (window.ResizeObserver) {
+        this.contentObserver = new ResizeObserver(() => this.queueMeasure());
+        this.contentObserver.observe(this.content);
+      }
+      this.ready = true;
+      this.queueMeasure();
     }
 
     parsePageAnchor(id) {
@@ -116,10 +122,26 @@
     }
 
     measure() {
+      if (!this.content || !this.content.getClientRects().length) return false;
       this.pageNumbers.forEach(item => {
         item.top = item.el.getBoundingClientRect().top + scrollY;
       });
       this.pageNumbers.sort((a, b) => a.top - b.top);
+      this.measureSig = this.layoutSignature();
+      return true;
+    }
+
+    layoutSignature() {
+      const rect = this.content?.getBoundingClientRect?.();
+      return rect
+        ? [Math.round(rect.width), Math.round(rect.height), document.documentElement.scrollHeight, this.pageNumbers.length].join(':')
+        : '';
+    }
+
+    needsMeasure() {
+      return !this.measureSig
+        || this.measureSig !== this.layoutSignature()
+        || this.pageNumbers.some(item => !Number.isFinite(item.top));
     }
 
     queueScrollUpdate() {
@@ -195,7 +217,7 @@
 
     findPageForRect(rect) {
       if (!this.pageNumbers.length || !rect) return null;
-      if (this.pageNumbers.some(item => !Number.isFinite(item.top))) this.measure();
+      if (this.needsMeasure() && !this.measure()) return null;
       const y = scrollY + (rect.top + rect.bottom) / 2;
       let lo = 0;
       let hi = this.pageNumbers.length - 1;
