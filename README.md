@@ -11,7 +11,7 @@ scripts/ 文件夹中为本项目各文本格式加工时所用的工具，欢�
 
 # 文库目录对照
 
-## Marx-Engels-Werke / 马克思恩格斯全集
+## Marx-Engels-Werke (MEW) / 马克思恩格斯全集
 
 ### 1–39卷对应表
 
@@ -56,15 +56,14 @@ scripts/ 文件夹中为本项目各文本格式加工时所用的工具，欢�
 | 37        | Briefe Januar 1888 bis Dezember 1890<br>书信：1888年—1890年                       | [`/MEW/37/`](/MEW/37/) | —                                          | [`/docs/MEW-ZH/37/`](/docs/MEW-ZH/37/) | —                                                                                                                                                                                                               |
 | 38        | Briefe Januar 1891 bis Dezember 1892<br>书信：1891年—1892年                       | [`/MEW/38/`](/MEW/38/) | —                                          | [`/docs/MEW-ZH/38/`](/docs/MEW-ZH/38/) | —                                                                                                                                                                                                               |
 | 39        | Briefe Januar 1893 bis Juli 1895<br>书信：1893年—1895年7月                        | [`/MEW/39/`](/MEW/39/) | —                                          | [`/docs/MEW-ZH/39/`](/docs/MEW-ZH/39/) | —                                                                                                                                                                                                               |
-
-### 德文 MEW 补卷（与中文40–50卷不按卷号对应）
+### MEW ERGÄNZUNGSBAND SCHRIFTEN BIS 1844 （德文版增补卷）
 
 | 卷别/Band | 德文信息                                                       | 来源                                                                | 重要著作                                                 |
 | --------- | -------------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------- |
 | 40        | Karl Marx: Schriften und Briefe, November 1837 bis August 1844 | [`/MEW/40/`](/MEW/40/) · [`/docs/MEW-ZENO/40/`](/docs/MEW-ZENO/40/) | Ökonomisch-philosophische Manuskripte aus dem Jahre 1844 |
 | 42        | Karl Marx: Ökonomische Manuskripte 1857/1858                   | [`/MEW/42/`](/MEW/42/) · [`/docs/MEW-ZENO/42/`](/docs/MEW-ZENO/42/) | Grundrisse der Kritik der politischen Ökonomie           |
 
-### 中文《马克思恩格斯全集》40–50卷（与德文 MEW 补卷不按卷号对应）
+### 中文《马克思恩格斯全集》40–50卷（按马恩全集俄文第二版40-50卷编排）
 
 | 卷别   | 中文信息                                                       | 来源                                   | 重要内容                   |
 | ------ | -------------------------------------------------------------- | -------------------------------------- | -------------------------- |
@@ -153,14 +152,14 @@ scripts/ 文件夹中为本项目各文本格式加工时所用的工具，欢�
 
 ## Das Kapital / 《资本论》及相关经济学手稿
 
-| 文献                  | 德文信息                                       | 英文信息                       | 中文信息              | MEW / MEW-ZENO                                                      | MEGA²                                                         | MECW                           | 中文全集 / 文集                                                                                            |
+| 德文信息                                       | 英文信息                       | 中文信息              | MEW / MEW-ZENO                                                      | MEGA²                                                         | MECW                           | 中文全集 / 文集                                                                                            |
 | --------------------- | ---------------------------------------------- | ------------------------------ | --------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| 《资本论》第一卷      | Das Kapital, Erster Band                       | Capital, Volume I              | 《资本论》第一卷      | [`/MEW/23/`](/MEW/23/) · [`/docs/MEW-ZENO/23/`](/docs/MEW-ZENO/23/) | [`/MEGA/II/5/`](/MEGA/II/5/) · [`/MEGA/II/10/`](/MEGA/II/10/) | [`/en/MECW/35/`](/en/MECW/35/) | [`/docs/MEW-ZH/23/`](/docs/MEW-ZH/23/) · [`/docs/MEA/5/`](/docs/MEA/5/)                                    |
-| 《资本论》第二卷      | Das Kapital, Zweiter Band                      | Capital, Volume II             | 《资本论》第二卷      | [`/MEW/24/`](/MEW/24/) · [`/docs/MEW-ZENO/24/`](/docs/MEW-ZENO/24/) | [`/MEGA/II/13/`](/MEGA/II/13/)                                | [`/en/MECW/36/`](/en/MECW/36/) | [`/docs/MEW-ZH/24/`](/docs/MEW-ZH/24/) · [`/docs/MEA/6/`](/docs/MEA/6/)                                    |
-| 《资本论》第三卷      | Das Kapital, Dritter Band                      | Capital, Volume III            | 《资本论》第三卷      | [`/MEW/25/`](/MEW/25/) · [`/docs/MEW-ZENO/25/`](/docs/MEW-ZENO/25/) | [`/MEGA/II/15/`](/MEGA/II/15/)                                | [`/en/MECW/37/`](/en/MECW/37/) | [`/docs/MEW-ZH/25/`](/docs/MEW-ZH/25/) · [`/docs/MEA/7/`](/docs/MEA/7/)                                    |
-| 《剩余价值理论》      | Theorien über den Mehrwert                     | Theories of Surplus Value      | 《剩余价值理论》      | [`/MEW/26/`](/MEW/26/)                                              | —                                                             | [`/en/MECW/30/`](/en/MECW/30/) | [`/docs/MEW-ZH/26/`](/docs/MEW-ZH/26/)                                                                     |
-| 1857—1858年经济学手稿 | Grundrisse der Kritik der politischen Ökonomie | Grundrisse                     | 1857—1858年经济学手稿 | [`/MEW/42/`](/MEW/42/)                                              | [`/MEGA/II/1/`](/MEGA/II/1/)                                  | [`/en/MECW/28/`](/en/MECW/28/) | [`/docs/MEW-ZH/46/`](/docs/MEW-ZH/46/) · [`/docs/MEA/30/`](/docs/MEA/30/) · [`/docs/MEA/8/`](/docs/MEA/8/) |
-| 1861—1863年经济学手稿 | Ökonomische Manuskripte 1861–1863              | Economic Manuscripts 1861–1863 | 1861—1863年经济学手稿 | —                                                                   | —                                                             | [`/en/MECW/30/`](/en/MECW/30/) | [`/docs/MEW-ZH/47/`](/docs/MEW-ZH/47/) · [`/docs/MEW-ZH/48/`](/docs/MEW-ZH/48/)                            |
+| Das Kapital, Erster Band                       | Capital, Volume I              | 《资本论》第一卷      | [`/MEW/23/`](/MEW/23/) · [`/docs/MEW-ZENO/23/`](/docs/MEW-ZENO/23/) | [`/MEGA/II/5/`](/MEGA/II/5/) · [`/MEGA/II/10/`](/MEGA/II/10/) | [`/en/MECW/35/`](/en/MECW/35/) | [`/docs/MEW-ZH/23/`](/docs/MEW-ZH/23/) · [`/docs/MEA/5/`](/docs/MEA/5/)                                    |
+| Das Kapital, Zweiter Band                      | Capital, Volume II             | 《资本论》第二卷      | [`/MEW/24/`](/MEW/24/) · [`/docs/MEW-ZENO/24/`](/docs/MEW-ZENO/24/) | [`/MEGA/II/13/`](/MEGA/II/13/)                                | [`/en/MECW/36/`](/en/MECW/36/) | [`/docs/MEW-ZH/24/`](/docs/MEW-ZH/24/) · [`/docs/MEA/6/`](/docs/MEA/6/)                                    |
+| Das Kapital, Dritter Band                      | Capital, Volume III            | 《资本论》第三卷      | [`/MEW/25/`](/MEW/25/) · [`/docs/MEW-ZENO/25/`](/docs/MEW-ZENO/25/) | [`/MEGA/II/15/`](/MEGA/II/15/)                                | [`/en/MECW/37/`](/en/MECW/37/) | [`/docs/MEW-ZH/25/`](/docs/MEW-ZH/25/) · [`/docs/MEA/7/`](/docs/MEA/7/)                                    |
+| Theorien über den Mehrwert                     | Theories of Surplus Value      | 《剩余价值理论》      | [`/MEW/26/`](/MEW/26/)                                              | —                                                             | [`/en/MECW/30/`](/en/MECW/30/) | [`/docs/MEW-ZH/26/`](/docs/MEW-ZH/26/)                                                                     |
+| Grundrisse der Kritik der politischen Ökonomie | Grundrisse                     | 1857—1858年经济学手稿 | [`/MEW/42/`](/MEW/42/)                                              | [`/MEGA/II/1/`](/MEGA/II/1/)                                  | [`/en/MECW/28/`](/en/MECW/28/) | [`/docs/MEW-ZH/46/`](/docs/MEW-ZH/46/) · [`/docs/MEA/30/`](/docs/MEA/30/) · [`/docs/MEA/8/`](/docs/MEA/8/) |
+| Ökonomische Manuskripte 1861–1863              | Economic Manuscripts 1861–1863 | 1861—1863年经济学手稿 | —                                                                   | —                                                             | [`/en/MECW/30/`](/en/MECW/30/) | [`/docs/MEW-ZH/47/`](/docs/MEW-ZH/47/) · [`/docs/MEW-ZH/48/`](/docs/MEW-ZH/48/)                            |
 
 ## ПОЛНОЕ СОБРАНИЕ СОЧИНЕНИЙ В. И. ЛЕНИН ИЗДАНИЕ ПЯТОЕ (ЛЕНИН ПСС, 列宁全集俄文第五版) / 中文第二版
 
