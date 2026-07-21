@@ -8,7 +8,7 @@ Marx Engels Werke(MEW),Marx Engels Collected Work(MECW) and Ленин Полн�
 各网页可能有文字录入和格式上的差错，故内容仅供参考，如有引用等需要，请核对原书原文。<br>
 欢迎所有人提出改进、完善网页的建议。<br>
 仅供学习、研究、交流使用，不得用于商业等盈利用途使用、转载及进一步加工。<br>
-scripts/ 文件夹中为本项目各文本格式加工时所用的工具，欢迎大家检查、指正！
+[`/scripts/README.md`](/scripts/) 文件夹中为本项目各文本格式加工时所用的工具，欢迎大家检查、指正！
 
 # 文库目录对照
 
@@ -161,7 +161,7 @@ scripts/ 文件夹中为本项目各文本格式加工时所用的工具，欢�
 | Grundrisse der Kritik der politischen Ökonomie | Economic Manuscripts 1857–1858, or Grundrisse                  | 1857—1858年经济学手稿 | [`/MEW/42/`](/MEW/42/)                                              | [`/MEGA/II/1/`](/MEGA/II/1/)                                  | [`/en/MECW/28/`](/en/MECW/28/) · [`/en/MECW/29/`](/en/MECW/29/)  | [`/docs/MEW-ZH/46/`](/docs/MEW-ZH/46/) · [`/docs/MEA/30/`](/docs/MEA/30/) · [`/docs/MEA/8/`](/docs/MEA/8/) |
 | Ökonomische Manuskripte 1861–1863 & Theorien über den Mehrwert             | Economic Manuscripts 1861–1863 & Theories of Surplus Value | 1861—1863年经济学手稿（内含《剩余价值理论》） | [`/MEW/26/`](/MEW/26/)                                                                    | [`/en/MECW/30/`](/en/MECW/30/)                                                             | [`/en/MECW/30/`](/en/MECW/30/) · [`/en/MECW/31/`](/en/MECW/31/) · [`/en/MECW/32/`](/en/MECW/32/)  | [`/docs/MEW-ZH/47/`](/docs/MEW-ZH/47/) · [`/docs/MEW-ZH/48/`](/docs/MEW-ZH/48/) · [`/docs/MEW-ZH/26/`](/docs/MEW-ZH/26/) · [`/docs/MEA/8/`](/docs/MEA/8/)                          |
 
-## ПОЛНОЕ СОБРАНИЕ СОЧИНЕНИЙ В. И. ЛЕНИН ИЗДАНИЕ ПЯТОЕ (ЛЕНИН ПСС, 列宁全集俄文第五版) / 中文第二版
+## ПОЛНОЕ СОБРАНИЕ СОЧИНЕНИЙ В. И. ЛЕНИН ИЗДАНИЕ ПЯТОЕ (ЛЕНИН ПСС, 列宁全集俄文第五版) & 《列宁全集》中文第二版
 
 
 ### Том 1-27 / 第 1—27 卷
