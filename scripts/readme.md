@@ -71,7 +71,9 @@
   - 在插入页码锚点的过程中也可以同时检查多页转换的正误、缺漏，如有错漏也可重新转换。
 - 6. 拼接后打开最终 HTML 和数据生成器脚本 MEWmede.py 生成 HTML 目录。MEW-o1.py 是为了对 MLwerke.de 中的 90 年代网页进行大量繁杂的正则处理而从 MEWmede.py 中剥离的 HTML 生成器的入口，目前仍负责对各路 HTML，包括 AI 生成的 HTML 进行最终的正则处理。
   - 可以根据最终生成的目录页判断 AI 转换的标题层级是否正确，如不正确，可以手动修改标题层级后，再进行拼接、重新转换。
+
 # 阅读器 JS 应用说明
+
 主要分两个方向：
 1. SPA：docs/reader.html 及 docs/reader-nav.js, docs/reader-ui.js, docs/reader-pagebar.js, docs/reader-nav.js。
 2. SSG: 根目录的 build11.js, nav.js, reader.js。
