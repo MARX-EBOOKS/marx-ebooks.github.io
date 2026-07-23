@@ -32,9 +32,10 @@ jobs:
       - name: 设置 Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24'              # 根据项目需要修改版本
+          node-version: '22'              # 根据项目需要修改版本
           cache: 'npm'                    # 缓存 npm 依赖，加速构建
-
+      - name: 安装依赖
+        run: npm ci                   # 务必添加此步
       - name: 构建项目
         run: node build11.js --skip docs/MEGA/,docs/MEW/,docs/reader.html --logo '/favicon.ico' --logotext 'MLCLASSIC'
 
