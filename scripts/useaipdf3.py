@@ -410,7 +410,6 @@ class PageProcessor:
             FORMAT_REQUIREMENTS=Path("./prompts/convert23.md").read_text(encoding="utf-8")
         return FORMAT_REQUIREMENTS
 
-
     def convert_and_merge(self, page_list: list[int], user_instruction: str = "",enable_think:bool=False) -> str:
         capital=""
         if self.cfg.VOL in range(23,26):
@@ -463,15 +462,17 @@ class ToolHandler:
 
     ALL_TOOLS = [
         {"type": "function", "function": {
-            "name": "merge_pages",
-            "description": "将多个 PDF 页面发给 VLM 模型合并为一个 HTML 文件，注意一组一用。",
+            "name": "convert_pages",
+            "description": "将 PDF 页面组发给 VLM 模型转换为一个 HTML 文件，注意一组一用。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "pages": {"type": "array", "items": {"type": "integer"},
-                              "description": "要合并的页码组"},
-                    "merge_instruction": {"type": "string", "description": "合并要求",
-                                         "default": ""}
+                              "description": "要转换的页码组"},
+                    "convert_instruction": {"type": "string", "description": "转换要求",
+                                         "default": ""},
+                    "force_convert": {"type": "boolean", "description": "用户是否要求覆盖原分组进行转换，默认 False 即严格按分组转换。",
+                                         "default": False}
                 },
                 "required": ["pages"]
             }
@@ -531,10 +532,14 @@ class ToolHandler:
         }},
         {"type": "function", "function": {
             "name": "page_group",
-            "description": "查看PDF各篇目页码组",
+            "description": "查看PDF各篇目页码组，如要查看所有页码组可以把所有参数放空。",
             "parameters": {
             "type": "object", 
-            "properties": {}
+            "properties": {"page": {"type": "integer", "description": "指定页码查询页码组，可配合后两个参数按页或按组查询。"},
+                           "page_list": {"type": "array", "items": {"type": "integer"}, "description": "指定页码列表查询页码范围，注意把 range 转化为 list。"},
+                           "next_group_num": {"type": "integer", "description": "要查看的后续页码组个数"},
+                           "next_page_num": {"type": "integer", "description": "要查看的后续页数"},
+            }
             }
         }},
         {"type": "function", "function": {
@@ -683,7 +688,7 @@ class ToolHandler:
         self.tools       = use_tools if use_tools is not None else self.ALL_TOOLS
         self.pg=MEWbrief.page_group[pdf_cfg.VOL]
         self._dispatch = {
-            "merge_pages":    self._merge_pages,
+            "convert_pages":    self._convert_pages,
             "check_read_html":self._check_read_html,
             "get_page_images": self._get_page_images,
             "save_html":      self._save_html,
@@ -697,9 +702,9 @@ class ToolHandler:
             "table_content":self._table_content,
         }
         self.FORMAT_REQUIREMENTS = self.get_format_requirements(pdf_cfg.VOL)
-        self._page_to_group_start: dict[int, int] = {
-    pg: group[0]
-    for group in self.pg
+        self._page_to_group: dict[int, list[list[int],int]] = {
+    pg: [group,i]
+    for i,group in enumerate(self.pg)
     if isinstance(group, (list, tuple))
     for pg in group
 }
@@ -730,13 +735,9 @@ class ToolHandler:
                 fn_args = {k: v for k, v in fn_args.items() if k in valid}
         result = fn(**fn_args)
         return result if isinstance(result, list) else str(result)
-    def _resolve_page_path(self, pg: int) -> Path | None:
-        """按页码推断文件路径，找不到时返回 None。"""
-        p = self._resolve_html_path(pages=[pg])
-        return p if p.exists() else None
 
     def _resolve_html_path(self, html_path: str = "", pages: list[int] = None,
-                            merge_html: bool = False) -> Path:
+                            merge_html: bool = False) -> Path | None:
         if html_path:
             if not Path(html_path).parent.exists() and not merge_html:
                 Path(html_path).parent.mkdir(parents=True, exist_ok=True)
@@ -757,22 +758,24 @@ class ToolHandler:
 
         # ── 回退：在页码组里找包含该页码的组，取其首页 ──────────
         pg = pages[0]
-        group_start = self._page_to_group_start.get(pg)
-        if group_start is not None:
+        group_start = self._page_to_group.get(pg)[0][0] if self._page_to_group.get(pg) else None
+        if group_start:
             fallback = base_dir / f"{prefix}{group_start:03d}.html"
             if fallback.exists():
                 return fallback
-        return direct
+        return None
 
     def _read_html_text(self, html_path: str, pages: list[int]) -> tuple[Path, str]:
         """共用 helper：解析路径并读取 HTML 文本。"""
         path = self._resolve_html_path(html_path, pages)
+        if not path:
+            return None, None
         try:
             return path, path.read_text(encoding="utf-8")
         except FileNotFoundError:
             return path, None
     def _read_html_files_for_merge(self, pages: list[int], html_paths: list[str] = None,
-                         merge_instruction: str = "") -> str:
+                         convert_instruction: str = "") -> str:
         paths: list[Path] = []
         if html_paths:
             paths = [Path(p) for p in html_paths]
@@ -799,7 +802,7 @@ class ToolHandler:
         return (
             f"以下是 {len(paths)} 个 HTML 片段，请按照 get_requirements 的要求，将这些片段拼接成一个可连续阅读的完整HTML文本后，调用 save_html 保存。\n"
             f"建议输出路径：{suggested_output}\n"
-            f"用户附加要求：{merge_instruction}\n" if merge_instruction else ""
+            f"用户附加要求：{convert_instruction}\n" if convert_instruction else ""
             f"拼接规则（用户无特殊要求时）：\n"
             f"1. 识别作者注和编者注的链接与内容后，分别按不同编号系统编号，而编号系统即编号开始的数字也可由用户指定。其中作者注的id为Mxx/ZMxx/Exx/ZExx，编者注的id为Fxx/ZFxx，均已按照 get_requirements 中的要求放到对应aside容器中，因此输出时应该把连续多页aside栏中的脚注内容合并，保证各栏的脚注用对应的编号系统，即保证链接id的编号唯一\n"
             f"2. 相邻片段、页面的首尾若属同一自然段落则合并，注意如 get_requirements 中所述，将段落中多余的连字符号删去，将相应的空格加回\n"
@@ -811,28 +814,37 @@ class ToolHandler:
             + "\n\n".join(fragments)
         )
 
-
-    def _merge_pages(self, pages: list[int], merge_instruction: str = "") -> str:
+    def _convert_pages(self, pages: list[int], convert_instruction: str = "", force_convert: bool = False) -> str:
+        not_consistence=False
         try:
+            if pages!=self._page_to_group.get(pages[0])[0] and len(pages)>1 and not force_convert:
+                pages=self._page_to_group.get(pages[0])[0]
+                not_consistence=True
+            if not self._page_to_group.get(pages[0]):
+                return f"页码 {pages[0]} 不在任何已知页码组中，无法转换。"
             if len(pages)>=self.pdfcfg.LONG_SHORT:
                 output_path = self._get_processor(self.page_client_long).convert_and_merge(
-                pages, merge_instruction,self.pdfcfg.LONG_THINK)
+                pages, convert_instruction,self.pdfcfg.LONG_THINK)
             else:
                 output_path = self._get_processor(self.page_client_short).convert_and_merge(
-                pages, merge_instruction,self.pdfcfg.SHORT_THINK)
-            return f"合并完成，输出文件：{output_path}"
+                pages, convert_instruction,self.pdfcfg.SHORT_THINK)
+            if not_consistence and not force_convert:
+                return f"本次请求的页码与实际页码组不对应，已转换本组首页所在组，输出文件：{output_path}。请再次用户指定的转换分组。"
+            
+            return f"转换完成，输出文件：{output_path}"
+            
         except Exception as e:
-            return f"合并失败：{e}"
+            return f"转换失败：{e}"
 
     def _check_read_html(self, html_path: str = "", pages: list[int] = None) -> str:
         """仅读取 HTML 文本，返回给聊天模型自己校对。"""
         _, html = self._read_html_text(html_path, pages)
-        if html is None:
+        if not html:
             return f"文件不存在：{self._resolve_html_path(html_path, pages)}"
         return (
             "请检查 HTML 转换结果是否符合以下标准：\n"
             f"{self.FORMAT_REQUIREMENTS}\n\n"
-            "如不符合以上标准请反馈给用户，有上述错误请代用户在_merge_pages附加要求发给VLM重新转换，部分细微错误经用户同意后可代用户进行基础性修改。\n"
+            "如不符合以上标准请反馈给用户，有上述错误请代用户在 convert_pages 附加要求发给VLM重新转换，部分细微错误经用户同意后可代用户进行基础性修改。\n"
             f"当前 HTML:\n{html}"
         )
     def _get_page_images(self, pages: list[int]) -> list:
@@ -846,12 +858,48 @@ class ToolHandler:
         corrected = re.sub(r'\s*```.*?$', '', corrected, flags=re.DOTALL)
         Path(html_path).write_text(corrected, encoding="utf-8")
         return f"已保存：{html_path}"
-    def _page_group(self)  -> str:
-        pageinfo=f"{self.pg if self.pg else None}"
-        vol=self.pdfcfg.VOL
-        if not self.pg:
-            pageinfo=f"{MEWbrief.search_page_group(vol)}"
-        return f"篇目页码组："+pageinfo
+    def _page_group(self,page:int=None,page_list:list[int]=None,next_group_num:int=None,next_page_num:int=None) -> str:
+        if next_group_num and next_page_num:
+            return "请勿同时指定 next_group_num 与 next_page_num！"
+        pageinfo=""
+        if not page and not next_group_num and not next_page_num and not page_list:
+            pageinfo=f"{self.pg if self.pg else None}"
+            vol=self.pdfcfg.VOL
+            if not self.pg:
+                pageinfo=f"{MEWbrief.search_page_group(vol)}"
+            return f"篇目页码组："+pageinfo
+        elif page and not next_group_num and not next_page_num:
+            group=self._page_to_group.get(page)[0]
+            if not group:
+                return f"页码 {page} 不在任何已知页码组中。"
+            return f"页码 {page} 对应的页码组为：{group}"
+        elif page_list:
+            prevgroup=None
+            for p in page_list:
+                group = self._page_to_group.get(p)[0]
+                if group and prevgroup!=group:
+                    pageinfo += f"{group}, "
+                prevgroup=group
+            return f"指定页码所在组为: {pageinfo[:-2]}。请将各组分入不同的 convert_pages 中转换！" if pageinfo else f"指定页码 {page_list} 不在任何已知页码组中。"
+        elif not page_list:
+            group=self._page_to_group.get(page)[0]
+            group_idx=self._page_to_group.get(page)[1]
+            pageinfo=f"{group}"
+            if next_group_num:
+                for i in range(group_idx+1,min(group_idx+next_group_num+1, len(self.pg))):
+                    pageinfo+=f", {self.pg[i]}"
+                return f"{page}页所在组及其后{next_group_num}个页码组为: "+pageinfo+"。请将各组分入不同的 convert_pages 中转换！"
+            if next_page_num:
+                prevgroup=None
+                for i in range(page+1,page+next_page_num+1):
+                    await_page_group=self._page_to_group.get(page)[0]
+                    if await_page_group and prevgroup and await_page_group!=prevgroup:
+                        pageinfo+=f",{await_page_group}"
+                    prevgroup=await_page_group
+                return f"{page}页及其后{next_page_num}页所在组为: "+pageinfo+"。请将各组分入不同的 convert_pages 中转换！"
+            if not group:
+                return f"页码 {page} 不在任何已知页码组中。"
+            return f"页码 {page} 对应的页码组为：{group[0]}"
 
     def _grep_files(
         self, keyword: str = "",
@@ -875,8 +923,8 @@ class ToolHandler:
         elif pages:
             file_iter = []
             for pg in pages:
-                candidate = self._resolve_page_path(pg)
-                if candidate is None:
+                candidate = self._resolve_html_path(pages=[pg])
+                if not candidate:
                     return f"找不到页码 {pg} 对应的文件"
                 file_iter.append(candidate)
         else:
@@ -945,7 +993,7 @@ class ToolHandler:
         if not pages and not html_path:
             return "请明确要修改的页码或 HTML 文件！"
         path, html = self._read_html_text(html_path, pages)
-        if html is None:
+        if not html:
             return f"文件不存在：{path}"
 
         count = html.count(old_str)
@@ -966,7 +1014,7 @@ class ToolHandler:
                          merge_html: bool = False) -> str:
         pages = pages or []
         path, html = self._read_html_text(html_path, pages)
-        if html is None:
+        if not html:
             return f"文件不存在：{path}"
 
         _flag_map = {
@@ -1002,7 +1050,7 @@ class ToolHandler:
         return f"已保存：{path}\n" + "\n".join(results)
 
     def _get_requirements(self)  -> str:
-        return "# 转换要求：\n\n"+ Path("./prompts/convert2.md").read_text(encoding="utf-8")
+        return "# 转换要求：\n\n" + self.FORMAT_REQUIREMENTS
 
     def _add_notice(self, note: str) -> str:
         with self.pdfcfg.NOTICE_FILE.open("a", encoding="utf-8") as f:
@@ -1015,8 +1063,8 @@ def get_system_prompt(vol: int,model:str) -> str:
     pageg=str(MEWbrief.page_group[vol])
     merged="""- 对 7 页及以上的页面，如你是多模态模型，则务必首先调用 get_page_images 根据段落特征帮助用户制订一个好的分组，让用户可以在后期用程序机械拼接转换的页面，保证跨页段落不被打断。
   - **只需且必须保证**：
-    - 把跨页段落，尤其是有句子刚好在某一页页尾结束（句号、感叹号、括号、引号等在页尾正文处与页边无留白）、即后一页首行无缩进的段落（行首与页边无留白），分到同一个 merge_pages 进行转换，每一组页面在 4 个以下。
-    - 如果 4 页及以下的切分无法涵盖所有跨页段落，那么优先保证上述句子完成在页尾、下页首行无缩进的跨页段落被分到一个 merge_pages中去，其余由用户自行在后期进行合并。
+    - 把跨页段落，尤其是有句子刚好在某一页页尾结束（句号、感叹号、括号、引号等在页尾正文处与页边无留白）、即后一页首行无缩进的段落（行首与页边无留白），分到同一个 convert_pages 进行转换，每一组页面在 4 个以下。
+    - 如果 4 页及以下的切分无法涵盖所有跨页段落，那么优先保证上述句子完成在页尾、下页首行无缩进的跨页段落被分到一个 convert_pages 中去，其余由用户自行在后期进行合并。
   - 用户也可以要求你仅返回分组方案，此时应将分组方案输出为与页码组相同的数组，制定分组时每次阅读页面不要超过4个！"""
     if model not in ["MiniMax-M2.7","deepseek-v4-flash","stepfun-ai/step-3.5-flash","nvidia/nemotron-3-super-120b-a12b","deepseek-ai/DeepSeek-V4-Flash"]:
         merged2="""- 对 7 页及以上的页面，如你是多模态模型，则务必首先调用 get_page_images 对待输入的图片进行分组，一组不超过4个，保证每个分组最后一页的正文最后一行末尾是空白即段落结束、或是字母即词组明显未完成。用户也可以要求你仅返回分组方案，此时应将分组方案输出为与页码组相同的数组"""
@@ -1027,21 +1075,22 @@ def get_system_prompt(vol: int,model:str) -> str:
 
 # 🛠️ 可用工具：
 
-- merge_pages: 将多个 PDF 页面发给其他 VLM 模型合并为一个 HTML 文件
+- convert_pages: 将多个 PDF 页面发给其他 VLM 模型合并为一个 HTML 文件
 - add_notice: 记录转换过程中的问题
 - check_read_html：获取并检查转换后的 HTML 文本
 - save_html：保存修改后的HTML
 - page_group：查看PDF各篇目的页码组
-- grep_file：搜索转换后的 HTML 文件
+- grep_files：搜索转换后的 HTML 文件
 - table_content：通过目录表数组查看正确的标题层级及所对应页码，通过标题所在页码页码查找对应页码组及文件。
 
 # 📌 使用策略：
 
-- 用户说"把第 2 到 5 页转成 HTML"，则调用 merge_pages(pages=[2,3,4,5])
 - 用户输入多个页码或页码范围，务必严格对照下述篇目的页码组检查，如用户输入页码与分组不符时应询问用户，确认是否跳过部分页面，如用户同意则跳过
-- 在确定用户要求的页码范围的篇目划分后，务必按组转换各篇目，即将各组相应页面分入多个 merge_pages 交由其他模型排版，应先发页数较多的请求，不确定页码组的时候应调用函数page_group查对
+- 在确定用户要求的页码范围的组别划分后，务必按组转换各篇目，即将各相应页面组分入多个 convert_pages 交由其他模型排版，应先发页数较多的请求，不确定页码组的时候应调用函数 page_group 查对
+- 用户说"把第 2 到 5 页转成 HTML"，则调用 convert_pages(pages=[2,3,4,5])
 - 用户要求从某页的某个标题开始到其他页某个标题结束，则应严格按照用户要求，仅识别并转换某个标题开始至另个标题结束前的内容，不可缺漏，不可多余
-- 用户也可要求对特定内容格式批量进行修改，如更正标题层级、插入特定标签等，此时可以调用 grep_file 利用需修改的关键词与对应格式标签进行检索，检索后调用有关替换工具对内容进行替换
+- 用户明确要求覆盖原分组进行转换时，务必再次询问用户，确认后调用 convert_pages(pages=[用户要求的分组],force_convert=True)
+- 用户也可要求对特定内容格式批量进行修改，如更正标题层级、插入特定标签等，此时可以调用 grep_files 利用需修改的关键词与对应格式标签进行检索，检索后调用有关替换工具对内容进行替换
 - 可调用 table_content 查看文件的标题层级是否正确，如不正确请代用户修改，仅需修改标题层级，保留方括号、脚注上标、尾注锚点，保留斜体、换行等格式。可首先通过关键词检索标题对应文件的上下文及标签来检查、找到应替换内容。标题不仅可能在<h[1-6]>中，也可能在<p align="center">标签中，搜索时应注意随情况调整，未查到时阅读全文。转换包含标题的页码组时也可指示 VLM 按对应层级转换。
 - 检查注释时可通过以下几个特征判断异常：
   - 各类注释编号不连续，如 A/F/M/E 为前缀的 id 数字在同一文件中出现一个异常大的编号数字插在小编号之前
@@ -1049,10 +1098,9 @@ def get_system_prompt(vol: int,model:str) -> str:
   - aside 栏中脚注内容在语义上不完整，如仅以单词结尾或逗号结尾等
   有异常时务必向用户反馈！
 """
-    if model=="MiniMax-M2.7":
-        systemp+="- 用户也可以要求按组转换，如自第几页开始后几组，包含某几页的某几组，或转换某组之后的几组，此时应查对下方的页码组，同样按组转换。不要擅自合并分组，严格按组进行转换！"
     systemp+="""
 # 转换与合并HTML的要求
+
 """+requirements
     systemp+=f"""
 # 各篇目页码组：
@@ -1156,7 +1204,6 @@ class AppController:
         print("PDF 转换助手（自然语言控制）")
         print("  t 工具显示  d 思考模式  n 新对话  q 退出")
         print("  Ctrl+C 中止当前操作\n")
-
 # ==================== 入口（统一配置） ====================
 def main():
     # ── 🖼️ 页面转换模型（VLM，负责看图转 HTML）────────────────
