@@ -464,20 +464,24 @@ class PageMerger:
         recontent=re.sub(r"""([a-zA-Zßäöü,;])(</i>)*[\s\r\n]*</p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p>(<i>)*""",r"\1\2 \3\4",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"""([a-zA-Zßäöü,;](?:</i>)*)[\s\r\n]*(?:</p>)[\s\r\n]*?</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<blockquote>[\s\r\n]*?(?:<p>)((?:<i>)*[a-zA-Zßäöü])""",r"\1"+r"\2 \3",recontent,flags=re.IGNORECASE|re.DOTALL)
         #recontent=re.sub(r"""([a-zA-Zßäöü,;](?:</i>)*(?:</p>)[\s\r\n]*?)</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<blockquote>[\s\r\n]*?(?:<p>)(<i>)*""",r"\1</p>"+"\n"+r"\2<p>\3",recontent,flags=re.IGNORECASE|re.DOTALL)
-        recontent=re.sub(r"""( [a-zA-Zßäöü]+?)-[\s\r\n]*</p>[\s\r\n]*?</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p>([a-zA-Zßäöü][\S\s]+?</p>)""",r"\2\1"+r"\3</blockquote>",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r"""( [a-zA-Zßäöü]+?)-[\s\r\n]*</p>[\s\r\n]*?</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p(?: style="text-indent:\s*0;")*>([a-zA-Zßäöü][\S\s]+?</p>)""",r"\2\1"+r"\3</blockquote>",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r"""( [a-zA-Zßäöü]+?)-[\s\r\n]*[\s\r\n]*?</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<(?:p|blockquote)(?: style="text-indent:\s*0;")*>([a-zA-Zßäöü][\S\s]+?)</(?:p|blockquote)>""",r"\2\1"+r"\3</blockquote>",recontent,flags=re.IGNORECASE|re.DOTALL)
         #recontent=re.sub(r"""( [a-zA-Zßäöü,;]+-</i>)[\s\r\n]*</p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p>""",r"\2 \1",recontent,flags=re.IGNORECASE|re.DOTALL)
         #recontent=re.sub(r"""</sup></p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p>""",r"</sup> \1",recontent,flags=re.IGNORECASE|re.DOTALL)
-        recontent=re.sub(r"""[\s\r\n]*</p>[\s\r\n]*</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<blockquote>[\s\r\n]*<p>""",r"</p>"+"\n"+r"\1"+"\n<p>",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r"""[\s\r\n]*</p>[\s\r\n]*</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<blockquote>[\s\r\n]*<p(?: style="text-indent:\s*0;")*>""",r"</p>"+"\n"+r"\1"+"\n<p>",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"""([a-zA-Zßäöü,;](?:</i>)*)[\s\r\n]*</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<blockquote>""",r"\1 \2",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"""([a-zA-Zßäöü,;](?:</i>)*)[\s\r\n]*</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p>((?:<i>)*[a-zA-Zßäöü][\s\S]+?)</p>""",r"\1 \2\3</blockquote>",recontent,flags=re.IGNORECASE|re.DOTALL)
-        recontent=re.sub(r"""([a-zA-Zßäöü,;](?:</i>)*)[\s\r\n]*</p>[\s\r\n]*</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p>((?:<i>)*[a-zA-Zßäöü][\s\S]+?)</p>""",r"\1 \2\3</blockquote>",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r"""([a-zA-Zßäöü,;](?:</i>)*)[\s\r\n]*</p>[\s\r\n]*</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p(?: style="text-indent:\s*0;")*>((?:<i>)*[a-zA-Zßäöü][\s\S]+?)</p>""",r"\1 \2\3</blockquote>",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"""([a-zA-Zßäöü,;](?:</i>)*)</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<blockquote>""",r"\1 \2",recontent,flags=re.IGNORECASE|re.DOTALL)
-        recontent=re.sub(r""" ([a-zA-Zßäöü,;]+)-[\s\r\n]*</p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p>""",r"\2 \1",recontent,flags=re.IGNORECASE|re.DOTALL)
-        recontent=re.sub(r""" ([\S]+?)-</i>[\s\r\n]*</p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p><i>""",r"\2 \1",recontent,flags=re.IGNORECASE|re.DOTALL)
-        recontent=re.sub(r""" ([\S]+?)-</i>[\s\r\n]*</p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p>([\S\s]+?)([\.,]|<[^<>]+?>)""",r"\2 \1\3</i>\4",recontent,flags=re.IGNORECASE|re.DOTALL)
-        recontent=re.sub(r""" ([\S]+?)-</i>[\s\r\n]*</p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p>([\S]+?) """,r"\2 \1\3</i> ",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r""" ([a-zA-Zßäöü,;]+)-[\s\r\n]*</p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p(?: style="text-indent:\s*0;")*>""",r"\2 \1",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r""" ([\S]+?)-</i>[\s\r\n]*</p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p(?: style="text-indent:\s*0;")*><i>""",r"\2 \1",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r""" ([\S]+?)-</i>[\s\r\n]*</p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p(?: style="text-indent:\s*0;")*>([\S\s]+?)([\.,]|<[^<>]+?>)""",r"\2 \1\3</i>\4",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r""" ([\S]+?)-</i>[\s\r\n]*</p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p(?: style="text-indent:\s*0;")*>([\S]+?) """,r"\2 \1\3</i> ",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r'''„([^<>]+?)"''',r'„\1“',recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r'''„((?:[^<>]+?<[^<]+?"[^<]+?">[\S ]+?</[\S]+?>)+?[^<>]+?)"''',r'„\1“',recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r"""<blockquote>[\s\r\n]*<p( style="text-indent:\s*0;")*>((?:(?!<p[^<]*?>)[\S\s\r\n])+?)</p>[\s\r\n]*</blockquote>""",r"<blockquote\1>\2</blockquote>",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r' style="text-indent:\s*0;"',r' class="ni"',recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r"""(:[\S ]+?solid) (?:#000|black)""",r"\1",recontent,flags=re.IGNORECASE|re.DOTALL)
         if self.volume in range(261,264):
             recontent=re.sub(r"""<(?:p align="center"|h[\d](?: align="center")*)>((?:<i>)*[\[\d]+[\.\)\]]+[\S\s\r\n]+?)</(?:p|h[\d])>""",r"<h3>\1</h3>",recontent,flags=re.IGNORECASE|re.DOTALL)
             recontent=re.sub(r"""<(?:p align="center"|h[\d](?: align="center")*)>((?:<i>)*[\[a-k]+[\.\)\]]+[\S\s\r\n]+?)</(?:p|h[\d])>""",r"<h4>\1</h4>",recontent,flags=re.IGNORECASE|re.DOTALL)
@@ -584,10 +588,10 @@ def main():
     #volumes = [263]
     #volumes=[5,6,7,8,23,24,25]
     #volumes=list(range(4,9))+list(range(16,26))+list(range(261,264))
-    volumes =list(range(4,9))+list(range(16,26))+list(range(261,264))+list(range(27,40))
+    #volumes =list(range(4,9))+list(range(16,26))+list(range(261,264))+list(range(27,40))
     #volumes = [23,24,25]
-    volumes = [16]
-    #volumes = [22]
+    #volumes = [16]
+    volumes = [18,21,22,23,24]
     #volumes=range(27,40)
     for volume in volumes:
         input_dir = Path(f'./MEW_BRIEF/{volume}')
