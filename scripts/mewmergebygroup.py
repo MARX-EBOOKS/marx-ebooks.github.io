@@ -1,4 +1,5 @@
 import re
+from html import escape
 from pathlib import Path
 from typing import List, Tuple, Dict, Optional, NamedTuple
 from dataclasses import dataclass, field
@@ -16,6 +17,7 @@ class Footnote:
     extra_paras: List[str]
     fn_type: str
     page_num: int
+    first_para_attrs: str = ""
     new_number: int = 0
     preserve_original: bool = False          # ← 新增
 
@@ -84,6 +86,7 @@ class FootnoteManager:
                     self._counters[fn_type] += 1
 
                     first_content, extra_paras = self._extract_content_multipara(a_tag, paras)
+                    first_para_attrs = self._format_p_attrs(paras[0]) if paras[0].name == 'p' else ""
                     preserve_orig = (self.volume in range(23, 26) and fn_type in ('M', 'E')) 
 
                     fn = Footnote(
@@ -94,6 +97,7 @@ class FootnoteManager:
                         extra_paras = extra_paras,
                         fn_type     = fn_type,
                         page_num    = page_num,
+                        first_para_attrs= first_para_attrs,
                         new_number  = new_num,
                         preserve_original= preserve_orig,
                     )
@@ -102,6 +106,16 @@ class FootnoteManager:
                         self.m_e_footnotes.append(fn)
                     else:
                         self.f_footnotes.append(fn)
+    @staticmethod
+    def _format_p_attrs(p_tag: Tag) -> str:
+        """只保留脚注段落的 align/style，用于重建整理后的 <p>。"""
+        attrs = []
+        for name in ('align', 'style'):
+            value = p_tag.get(name)
+            if value is not None:
+                attrs.append(f' {name}="{escape(str(value), quote=True)}"')
+        return ''.join(attrs)
+
     def _extract_content_multipara(self, anchor_tag: Tag, paras: List[Tag]) -> Tuple[str, List[str]]:
         first_content = ""
         extra_paras: List[str] = []
@@ -123,6 +137,9 @@ class FootnoteManager:
             for p in paras[1:]:
                 if p.name in ('div', 'blockquote', 'table'):
                     extra_paras.append(str(p))      # 保留外壳
+                elif p.name == 'p' and self._format_p_attrs(p):
+                    attrs = self._format_p_attrs(p)
+                    extra_paras.append(f'<p{attrs}>{p.decode_contents()}</p>')
                 else:
                     extra_paras.append(p.decode_contents())  # <p> 等只取内部
         else:
@@ -206,7 +223,10 @@ class FootnoteManager:
         for fn in self.m_e_footnotes:
             final_first = self._patch_content_links(fn.content, fn.page_num)
             final_first = self._process_refs(final_first)
-            if '<div' in final_first or  '<blockquote' in final_first or  '<table' in final_first:
+            if fn.first_para_attrs:
+                author_lines.append(f'<p class="fni"><a id="{fn.new_id}" href="#{fn.new_ref}">{fn.new_label}</a></p>')
+                author_lines.append(f'<div class="fni"><p{fn.first_para_attrs}>{final_first}</p></div>')
+            elif '<div' in final_first or  '<blockquote' in final_first or  '<table' in final_first:
                 author_lines.append(f'<p class="fni"><a id="{fn.new_id}" href="#{fn.new_ref}">{fn.new_label}</a></p>')
                 author_lines.append(f'<div class="fni">{final_first}</div>')
 
@@ -217,9 +237,9 @@ class FootnoteManager:
             for ep in fn.extra_paras:
                 patched_ep = self._patch_content_links(ep, fn.page_num)
                 patched_ep = self._process_refs(patched_ep)
-                # 直接判断字符串开头是不是这三个块级标签
-                if patched_ep.lstrip().lower().startswith(('<div', '<blockquote', '<table')):
-                    author_lines.append(patched_ep)            # 块级标签原样输出
+                # 已保留外壳的块级标签直接输出，避免再套一层 <p>
+                if patched_ep.lstrip().lower().startswith(('<div', '<blockquote', '<table', '<p')):
+                    author_lines.append(patched_ep)
                 else:
                     author_lines.append(f'<p>{patched_ep}</p>') # 普通文本加 <p>
                     
@@ -237,12 +257,16 @@ class FootnoteManager:
             final_first = self._process_refs(final_first)
             if final_first.endswith(" –"):
                 final_first = final_first[:-2]
-            editor_lines.append(f'<p class="fni"><a id="{fn.new_id}" href="#{fn.new_ref}">{fn.new_label}</a> {final_first}</p>')
+            if fn.first_para_attrs:
+                editor_lines.append(f'<p class="fni"><a id="{fn.new_id}" href="#{fn.new_ref}">{fn.new_label}</a></p>')
+                editor_lines.append(f'<div class="fni"><p{fn.first_para_attrs}>{final_first}</p></div>')
+            else:
+                editor_lines.append(f'<p class="fni"><a id="{fn.new_id}" href="#{fn.new_ref}">{fn.new_label}</a> {final_first}</p>')
             
             for ep in fn.extra_paras:
                 patched_ep = self._patch_content_links(ep, fn.page_num)
                 patched_ep = self._process_refs(patched_ep)
-                if patched_ep.lstrip().lower().startswith(('<div', '<blockquote', '<table')):
+                if patched_ep.lstrip().lower().startswith(('<div', '<blockquote', '<table', '<p')):
                     editor_lines.append(patched_ep)
                 else:
                     editor_lines.append(f'<p>{patched_ep}</p>')
@@ -394,7 +418,6 @@ class PageMerger:
         content_reader = ContentReader(fn_manager)
         
         main_contents = []
-        has_title =False
         title_temp=""
 
         
@@ -403,20 +426,16 @@ class PageMerger:
             if not html_file.exists():
                 continue
             html_content=html_file.read_text(encoding='utf-8')
-            # 读取并处理页面
-            if self.volume in range(27,40):
-                title_temp=self.get_title(html_content)
-
+            # 读取并处理页面内容
+            if self.volume in range(27,40) and not title_temp:
+                title_temp=self.get_title(html_content,False,page_num) if page_num!=page_list[-1] else self.get_title(html_content,True,page_num)
             page_content= content_reader.read_and_process_page(html_content, page_num)
             if page_content:
                 # 添加页码标记
-                if has_title:
-                    if MEWbrief.mergepa[self.volume] and not page_num in MEWbrief.mergepa[self.volume]:
-                        main_contents.append(f'\n<a id="S{page_num}"></a>\n')
-                    else:
-                        main_contents.append(f'\n<a id="S{page_num}" class="mergepa"></a>\n')
+                if MEWbrief.mergepa[self.volume] and not page_num in MEWbrief.mergepa[self.volume]:
+                    main_contents.append(f'\n<a id="S{page_num}"></a>\n')
                 else:
-                    has_title = True
+                    main_contents.append(f'\n<a id="S{page_num}" class="mergepa"></a>\n')
                 main_contents.append(page_content)
         
         # 生成脚注HTML
@@ -428,19 +447,28 @@ class PageMerger:
                                            footnotes_html,title_temp,start_page,end_page)
         
         return merged_html
-    def get_title(self,html_content:str) -> Optional[str]:
+    def get_title(self,html_content:str="",last_page:bool=False,page_num:int=None) -> Optional[str]:
         """获取HTML文件的标题"""
         if not html_content:
             return None
         if self.volume in range(27,40):
             title_match=re.search(r"<title>([\S\r\n\s]+?)</title>",html_content,flags=re.IGNORECASE|re.DOTALL)
+            correct_title=re.search(r"<title>([\S\r\n\s]+?)[\d]{1,4}</title>",html_content,flags=re.IGNORECASE|re.DOTALL)
             if not title_match:
-                print(html_content)
+            #    print(html_content)
+                return ""
+            if not correct_title and not last_page:
+                return ""
             title=title_match.group(1)
-            title=re.sub(r"""^[\d]{1,4}[\s]*[·•][\s]*""",r"",title,flags=re.DOTALL|re.IGNORECASE)
+            title=re.sub(r"""^[\d]{1,4}[\s]*[·•\.]?[\s]*""",r"",title,flags=re.DOTALL|re.IGNORECASE)
             title=re.sub(r"""[\s]*[·•,][\s]*([\S\s]+?)$""",r" – \1", title,flags=re.DOTALL|re.IGNORECASE)
             title=re.sub(r"""[\s]*-[\s]+([\S\s]+?)$""",r" – \1", title,flags=re.DOTALL|re.IGNORECASE)
-            return title
+            title=re.sub(r"""^[\d]{1,4}[\s]*((?:Marx|Engels) an [\S\s]+?) ([\d]{1,2}\. [\S]+? [\d]{4})$""",r"\1 – \2",title,flags=re.DOTALL|re.IGNORECASE)
+            if "–" in title or last_page:
+                if not "–" in title: print(str(page_num)+' no title')
+                return title
+            else:
+                return ""
         soup = BeautifulSoup(html_content, 'html.parser')
         title_tag = soup.find(['h1','h2','h3','h4','h5','h6'])
         if title_tag:
@@ -455,13 +483,13 @@ class PageMerger:
         recontent=re.sub(r' style="(?:text-indent|margin-left): 2em;"',r'',body_content,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r'''<div class="pa"></div>''',r"",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r'''<br/>''',r"<br>",recontent,flags=re.IGNORECASE|re.DOTALL)
-        recontent=re.sub(r'''[\s\r\n]*</p>[\s\r\n]+<(a id="S[\d]+") class="mergepa"></a>[\s\r\n]+<p>''',r" <\1></a>",recontent,flags=re.IGNORECASE|re.DOTALL)
-        recontent=re.sub(r'''[\s\r\n]*</p>[\s\r\n]*</blockquote>[\s\r\n]+<(a id="S[\d]+") class="mergepa"></a>[\s\r\n]+<blockquote>[\s\r\n]*<p>''',r" <\1></a>",recontent,flags=re.IGNORECASE|re.DOTALL)
-        recontent=re.sub(r'''[\s\r\n]*</blockquote>[\s\r\n]+<(a id="S[\d]+") class="mergepa"></a>[\s\r\n]+<blockquote>''',r" <\1></a>",recontent,flags=re.IGNORECASE|re.DOTALL)
-        recontent=re.sub(r'''[\s\r\n]*</p>[\s\r\n]*</blockquote>[\s\r\n]+<(a id="S[\d]+") class="mergepa"></a>[\s\r\n]+<p>([\s\S]+?)</p>''',r" \1"+r"\2"+"</p></blockquote>",recontent,flags=re.IGNORECASE|re.DOTALL)
-        
-        recontent=re.sub(r"""([a-zA-Zßäöü,;])[\s\r\n]*</p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p>""",r"\1 \2",recontent,flags=re.IGNORECASE|re.DOTALL)
-        recontent=re.sub(r"""([a-zA-Zßäöü,;])(</i>)*[\s\r\n]*</p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p>(<i>)*""",r"\1\2 \3\4",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r'''[\s\r\n]+</p>''',r"</p>",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r'''[\s\r\n]*</p>[\s\r\n]+<(a id="S[\d]+") class="mergepa"></a>[\s\r\n]+<p(?: style="text-indent:\s*0;")*>''',r" <\1></a>",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r'''[\s\r\n]*</p>[\s\r\n]*</blockquote>[\s\r\n]+<(a id="S[\d]+") class="mergepa"></a>[\s\r\n]+<blockquote(?: style="text-indent:\s*0;")*>[\s\r\n]*<p(?: style="text-indent:\s*0;")*>''',r" <\1></a>",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r'''[\s\r\n]*</blockquote>[\s\r\n]+<(a id="S[\d]+") class="mergepa"></a>[\s\r\n]+<blockquote(?: style="text-indent:\s*0;")*>''',r" <\1></a>",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r'''[\s\r\n]*</p>[\s\r\n]*</blockquote>[\s\r\n]+<(a id="S[\d]+") class="mergepa"></a>[\s\r\n]+<p(?: style="text-indent:\s*0;")*>([\s\S]+?)</p>''',r" \1"+r"\2"+"</p></blockquote>",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r"""([a-zA-Zßäöü,;])[\s\r\n]*</p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p(?: style="text-indent:\s*0;")*>""",r"\1 \2",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r"""([a-zA-Zßäöü,;])(</i>)*[\s\r\n]*</p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p(?: style="text-indent:\s*0;")*>(<i>)*""",r"\1\2 \3\4",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"""([a-zA-Zßäöü,;](?:</i>)*)[\s\r\n]*(?:</p>)[\s\r\n]*?</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<blockquote>[\s\r\n]*?(?:<p>)((?:<i>)*[a-zA-Zßäöü])""",r"\1"+r"\2 \3",recontent,flags=re.IGNORECASE|re.DOTALL)
         #recontent=re.sub(r"""([a-zA-Zßäöü,;](?:</i>)*(?:</p>)[\s\r\n]*?)</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<blockquote>[\s\r\n]*?(?:<p>)(<i>)*""",r"\1</p>"+"\n"+r"\2<p>\3",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"""( [a-zA-Zßäöü]+?)-[\s\r\n]*</p>[\s\r\n]*?</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p(?: style="text-indent:\s*0;")*>([a-zA-Zßäöü][\S\s]+?</p>)""",r"\2\1"+r"\3</blockquote>",recontent,flags=re.IGNORECASE|re.DOTALL)
@@ -470,7 +498,7 @@ class PageMerger:
         #recontent=re.sub(r"""</sup></p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p>""",r"</sup> \1",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"""[\s\r\n]*</p>[\s\r\n]*</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<blockquote>[\s\r\n]*<p(?: style="text-indent:\s*0;")*>""",r"</p>"+"\n"+r"\1"+"\n<p>",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"""([a-zA-Zßäöü,;](?:</i>)*)[\s\r\n]*</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<blockquote>""",r"\1 \2",recontent,flags=re.IGNORECASE|re.DOTALL)
-        recontent=re.sub(r"""([a-zA-Zßäöü,;](?:</i>)*)[\s\r\n]*</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p>((?:<i>)*[a-zA-Zßäöü][\s\S]+?)</p>""",r"\1 \2\3</blockquote>",recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r"""([a-zA-Zßäöü,;](?:</i>)*)[\s\r\n]*</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p(?: style="text-indent:\s*0;")*>((?:<i>)*[a-zA-Zßäöü][\s\S]+?)</p>""",r"\1 \2\3</blockquote>",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"""([a-zA-Zßäöü,;](?:</i>)*)[\s\r\n]*</p>[\s\r\n]*</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p(?: style="text-indent:\s*0;")*>((?:<i>)*[a-zA-Zßäöü][\s\S]+?)</p>""",r"\1 \2\3</blockquote>",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"""([a-zA-Zßäöü,;](?:</i>)*)</blockquote>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<blockquote>""",r"\1 \2",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r""" ([a-zA-Zßäöü,;]+)-[\s\r\n]*</p>[\s\r\n]+(<a id="S[\d]+"></a>)[\s\r\n]+<p(?: style="text-indent:\s*0;")*>""",r"\2 \1",recontent,flags=re.IGNORECASE|re.DOTALL)
@@ -480,7 +508,6 @@ class PageMerger:
         recontent=re.sub(r'''„([^<>]+?)"''',r'„\1“',recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r'''„((?:[^<>]+?<[^<]+?"[^<]+?">[\S ]+?</[\S]+?>)+?[^<>]+?)"''',r'„\1“',recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"""<blockquote>[\s\r\n]*<p( style="text-indent:\s*0;")*>((?:(?!<p[^<]*?>)[\S\s\r\n])+?)</p>[\s\r\n]*</blockquote>""",r"<blockquote\1>\2</blockquote>",recontent,flags=re.IGNORECASE|re.DOTALL)
-        recontent=re.sub(r' style="text-indent:\s*0;"',r' class="ni"',recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"""(:[\S ]+?solid) (?:#000|black)""",r"\1",recontent,flags=re.IGNORECASE|re.DOTALL)
         if self.volume in range(261,264):
             recontent=re.sub(r"""<(?:p align="center"|h[\d](?: align="center")*)>((?:<i>)*[\[\d]+[\.\)\]]+[\S\s\r\n]+?)</(?:p|h[\d])>""",r"<h3>\1</h3>",recontent,flags=re.IGNORECASE|re.DOTALL)
@@ -492,29 +519,29 @@ class PageMerger:
         recontent=re.sub(r"</i>[\s\r\n]+<i>",r" ",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"\n{3,}","\n\n",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"""(<h[\d]) align="center">""",r"\1>",recontent,flags=re.DOTALL|re.IGNORECASE)
-        recontent=re.sub(r"""<p>(?:<[\S]>)*(Aus dem [\S]+?en.)(?:</[\S]>)*</p>""",r"""<div class="que">\1</div>""",recontent,flags=re.DOTALL|re.IGNORECASE)
-        recontent=re.sub(r"""<p>(Aus dem [\S]+?en und [\S]+?en.)</p>""",r"""<div class="que">\1</div>""",recontent,flags=re.DOTALL|re.IGNORECASE)
-        if not self.volume in range(27,40):
-            title=self.get_title(recontent)    
+        recontent=re.sub(r"""<p(?: style="text-indent:\s*0;")*>(?:<[\S]>)*(Aus dem [\S]+?en.)(?:</[\S]>)*</p>""",r"""<div class="que">\1</div>""",recontent,flags=re.DOTALL|re.IGNORECASE)
+        recontent=re.sub(r"""<p(?: style="text-indent:\s*0;")*>Nach einer handgeschriebenen Abschrift.</p>""",r"""<div class="que">Nach einer handgeschriebenen Abschrift.</div>""",recontent,flags=re.DOTALL|re.IGNORECASE)
+        recontent=re.sub(r"""<p(?: style="text-indent:\s*0;")*>(Aus dem [\S]+?en und [\S]+?en.)</p>""",r"""<div class="que">\1</div>""",recontent,flags=re.DOTALL|re.IGNORECASE)
         if self.volume in range(261,264):
-                vol=f"26.{self.volume-260}"
+            vol=f"26.{self.volume-260}"
         else:
             vol=f"{self.volume}"
         if start_page==end_page:
             source=f"""<div class="que">Quelle: Marx/Engels: Werke, Bd. {vol}, Berlin: Dietz Verlag {MEWbrief.bookjahre[self.volume]}, S. {start_page}.</div>"""
         else:
             source=f"""<div class="que">Quelle: Marx/Engels: Werke, Bd. {vol}, Berlin: Dietz Verlag {MEWbrief.bookjahre[self.volume]}, S. {start_page}-{end_page}.</div>"""  
-        recontent=re.sub(r"""<p[^<]*?>(?:<i>)*(Nach(?::[\s\r\n\S]+?| de[mr] (?:[\S]+?[ ]*){1,4}\.[\s\r\n]*(?:<br>[\S ]+?)*))[\s\r\n]*</p>""",r"""<div class="que">\1</div>""",recontent,flags=re.DOTALL|re.IGNORECASE)
-        #recontent=re.sub(r"""<p(?: align="right")*>(Nach(?::[\s\r\n\S]+?| de[mr] (?:[\S]+?[ ]*){1,4}\.[\s\r\n]*(?:<br>Aus dem [\S]+?en.)*))[\s\r\n]*</p>""",r"""<div class="que">\1</div>""",recontent,flags=re.DOTALL|re.IGNORECASE)
+        recontent=re.sub(r"""<p(?: style="text-indent:\s*0;")?>(?:<i>)*(Nach(?::[\s\r\n\S]+?| de[mr] (?:[\S]+?[ ]*){1,4}\.[\s\r\n]*(?:<br>[\S ]+?)*))[\s\r\n]*</p>""",r"""<div class="que">\1</div>""",recontent,flags=re.DOTALL|re.IGNORECASE)
+        recontent=re.sub(r' style="text-indent:\s*0;"',r' class="ni"',recontent,flags=re.IGNORECASE|re.DOTALL)
+        #recontent=re.sub(r"""<p(?: style="text-indent:\s*0;")?>(Nach(?::[\s\r\n\S]+?| de[mr] (?:[\S]+?[ ]*){1,4}\.[\s\r\n]*(?:<br>Aus dem [\S]+?en.)*))[\s\r\n]*</p>""",r"""<div class="que">\1</div>""",recontent,flags=re.DOTALL|re.IGNORECASE)
         if self.volume in range(27,40):
             title=title_temp
             recontent=re.sub(r"""<(?:p align="center"|h[\d])>([\d]{1,4})</(?:p|h[\d])>[\s\r\n]+<h[\d]>([\S ]+?)</h[\d]>""",r"<h1>\1<br>\2</h1>",recontent,flags=re.DOTALL|re.IGNORECASE)
             recontent=re.sub(r"""<h[\d]>([\d]{1,4}<br>[\S ]+?)</h[\d]>[\s\r\n]+<(?:p align="center"|h[\d])>([\S ]{1,4})</(?:p|h[\d])>""",r"<h1>\1<br>\2</h1>",recontent,flags=re.DOTALL|re.IGNORECASE)
             recontent=re.sub(r"""<h[\d]>([\d]{4})<br>([\S ]+?)</h[\d]>""",r"""<h2>\1</h2>
 <h1>\2</h1>""",recontent,flags=re.DOTALL|re.IGNORECASE)
-            
             recontent=re.sub(r"""<p>((?:Meine|Lieber|Dear)(?: [\S]+?){1,4})<br>[\s\r\n]*""",r"""<p>\1</p>
 <p>""",recontent,flags=re.DOTALL|re.IGNORECASE)
+            recontent=re.sub(r"""<p align="right">([\S ]+?)</p>[\s\r\n]*<p align="right">([\S ]+?)</p>""",r"""<p align="right">\1<br>\2</p>""",recontent,flags=re.DOTALL|re.IGNORECASE)
             return f'''<!DOCTYPE html>
 <html>
 <head>
@@ -528,8 +555,12 @@ class PageMerger:
 {source}
 </body>
 </html>'''
+        title=self.get_title(recontent)
         if not title:
-            title=f"MEW Band {self.volume}"
+            title=f"MEW Band {self.volume} S. {start_page}-{end_page}"
+        recontent=re.sub(r'[⟨〈‹]',r"&lt;", recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r'[⟩〉›]',r"&gt;", recontent,flags=re.IGNORECASE|re.DOTALL)
+        recontent=re.sub(r"""<p align="right">(\[„[\S\r\n\s]+?<br>[\S\r\n\s]+?\])</p>""",r'<div class="que rgt">\1</div>',recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"""<p(?:(?!right)[^<])*>([\[]*Karl Marx[\]]*|[\[]*Friedrich Engels[\]]*|[\[]*Karl Marx/Friedrich Engels[\]]*)</p>[\s\r\n]+<h[\d][^<]*?>([\s\S]+?)</h[\d]>""",r"<h1>\1<br>\2</h1>",recontent,flags=re.IGNORECASE|re.DOTALL)
         recontent=re.sub(r"<p[^<]*>(Geschrieben (?:[\S ]+?)*(?:[\s\r\n]*<br>[\S\s\r\n]+?)*)</p>",r"""<div class="que">\1</div>""",recontent,flags=re.DOTALL|re.IGNORECASE)
         recontent=re.sub(r'<div class="que">((?:(?!<div[^<]*?>)[\S\s\r\n])+?)</div>[\s\r\n]*<div class="que">',r'<div class="que">\1<br>',recontent,flags=re.IGNORECASE|re.DOTALL)
@@ -589,10 +620,10 @@ def main():
     #volumes=[5,6,7,8,23,24,25]
     #volumes=list(range(4,9))+list(range(16,26))+list(range(261,264))
     #volumes =list(range(4,9))+list(range(16,26))+list(range(261,264))+list(range(27,40))
-    #volumes = [23,24,25]
+    volumes = [39]
     #volumes = [16]
-    volumes = [18,21,22,23,24]
-    #volumes=range(27,40)
+    #volumes = [18,21,22,23,24]
+    #volumes=[7,8,17,25] + list(range(27,38))
     for volume in volumes:
         input_dir = Path(f'./MEW_BRIEF/{volume}')
         #
