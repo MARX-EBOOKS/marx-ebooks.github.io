@@ -31,7 +31,7 @@ pre {max-width: 100%;overflow-x: auto;white-space: pre;}
 .lft {text-align:left;}
 .rgt {text-align:right;}
 @media (prefers-color-scheme: dark) {
-  body {
+body {
 background-color: #020206;
 color:#ABABAB;
 }
@@ -49,7 +49,7 @@ a:active  {
   text-decoration: underline;
 }
 h1,h2,h3,h4,h5,h6,b {
- color:  #F0F0F0;
+font-weight:bold;
 }
 a b,b a {
  color:   #64ABD5;
