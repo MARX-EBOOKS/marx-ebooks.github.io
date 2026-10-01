@@ -892,7 +892,7 @@ input[type="range"]:focus::-webkit-slider-thumb {
 }
 
 /* 引文：原始 150% → 比例 0.75 */
-.prose :is(blockquote) * {
+.prose :is(blockquote, .quote, .cite, .zizat, .a3) * {
   --lh-ratio-bq: 0.75;
   line-height: calc(var(--lh-user) * var(--lh-ratio-bq)) !important;
 }
